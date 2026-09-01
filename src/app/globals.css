@@ -1,18 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --border: #27272a;
+  --ropimo-ink: #10251F;
+  --ropimo-ink-hover: #18342C;
+  --ropimo-lime: #C7F34A;
+  --ropimo-lime-hover: #B7E63D;
+
+  --ropimo-background: #FFFFFF;
+  --ropimo-surface: #FFFFFF;
+  --ropimo-soft-green: #E7EADF;
+
+  --ropimo-border: #D8DDD4;
+
+  --ropimo-text: #18221E;
+  --ropimo-muted-text: #65706A;
+
+  /* Standard aliases */
+  --background: var(--ropimo-background);
+  --foreground: var(--ropimo-text);
+  --card: var(--ropimo-surface);
+  --card-foreground: var(--ropimo-text);
+  --border: var(--ropimo-border);
+  --primary: var(--ropimo-ink);
+  --primary-foreground: #FFFFFF;
+  --muted: var(--ropimo-soft-green);
+  --muted-foreground: var(--ropimo-muted-text);
 }
 
 @theme inline {
+  --color-ropimo-ink: var(--ropimo-ink);
+  --color-ropimo-ink-hover: var(--ropimo-ink-hover);
+  --color-ropimo-lime: var(--ropimo-lime);
+  --color-ropimo-lime-hover: var(--ropimo-lime-hover);
+  --color-ropimo-background: var(--ropimo-background);
+  --color-ropimo-surface: var(--ropimo-surface);
+  --color-ropimo-soft-green: var(--ropimo-soft-green);
+  --color-ropimo-border: var(--ropimo-border);
+  --color-ropimo-text: var(--ropimo-text);
+  --color-ropimo-muted-text: var(--ropimo-muted-text);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -22,13 +48,41 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--ropimo-background);
+  color: var(--ropimo-text);
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Consistent focus ring for keyboard navigation */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ropimo-ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Suppress native checkbox/radio appearance to avoid inconsistencies */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ropimo-ink);
+}
+
+/* Prevent horizontal overflow on all page containers */
+.page-content {
+  min-width: 0;
+  overflow-x: hidden;
 }
