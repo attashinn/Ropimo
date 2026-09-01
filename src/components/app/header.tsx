@@ -242,13 +242,12 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
           <button
             type="button"
             onClick={() => setCommandMenuOpen(true)}
-            className="flex h-9 items-center gap-4 rounded-[10px] border border-[#D8DDD4] bg-white px-3 text-xs text-[#65706A] shadow-2xs hover:border-[#B8C0B2] hover:text-[#18221E] transition-colors cursor-pointer"
+            className="flex h-9 items-center gap-2 sm:gap-4 rounded-[10px] border border-[#D8DDD4] bg-white px-2.5 sm:px-3 text-xs text-[#65706A] shadow-2xs hover:border-[#B8C0B2] hover:text-[#18221E] transition-colors cursor-pointer"
+            title="Search (⌘K)"
           >
-            <div className="flex items-center gap-2">
-              <Search className="h-3.5 w-3.5 text-[#65706A]" />
-              <span className="text-xs">Search anything...</span>
-            </div>
-            <kbd className="hidden sm:inline-flex items-center rounded border border-[#D8DDD4] bg-[#F4F3EE] px-1.5 py-0.5 font-mono text-[10px] text-[#65706A]">
+            <Search className="h-3.5 w-3.5 text-[#65706A] shrink-0" />
+            <span className="text-xs hidden sm:inline">Search anything...</span>
+            <kbd className="hidden md:inline-flex items-center rounded border border-[#D8DDD4] bg-[#F4F3EE] px-1.5 py-0.5 font-mono text-[10px] text-[#65706A]">
               ⌘K
             </kbd>
           </button>
