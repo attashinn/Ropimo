@@ -30,6 +30,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
           data: {
             full_name: fullName,
           },

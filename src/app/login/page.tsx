@@ -22,6 +22,29 @@ function LoginForm() {
 
   const supabase = createClient();
 
+  // Detect and display auth errors passed via URL (e.g. expired magic link)
+  React.useEffect(() => {
+    const error = searchParams.get("error");
+    const errorCode = searchParams.get("error_code");
+    const errorDescription = searchParams.get("error_description");
+
+    if (errorCode === "otp_expired" || error === "otp_expired" || (errorDescription && errorDescription.toLowerCase().includes("expired"))) {
+      setErrorMsg("Your sign-in link is invalid or has expired. Please request a new magic link below.");
+      setAuthMode("magic-link");
+    } else if (error === "auth-failed") {
+      setErrorMsg(
+        errorDescription
+          ? decodeURIComponent(errorDescription.replace(/\+/g, " "))
+          : "Sign-in could not be completed. Please try again."
+      );
+    } else if (errorDescription) {
+      setErrorMsg(decodeURIComponent(errorDescription.replace(/\+/g, " ")));
+    } else if (error) {
+      setErrorMsg(decodeURIComponent(error.replace(/\+/g, " ")));
+    }
+  }, [searchParams]);
+
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
