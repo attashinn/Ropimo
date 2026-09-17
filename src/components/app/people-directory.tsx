@@ -851,7 +851,7 @@ export function PeopleDirectory({
                         className="p-3 rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] space-y-1"
                       >
                         <p className="font-semibold text-[#18221E]">{act.action}</p>
-                        <p className="text-[11px] text-[#8A958F]">{act.timeAgo || act.createdAt}</p>
+                        <p className="text-[11px] text-[#8A958F]" suppressHydrationWarning>{act.timeAgo || act.createdAt}</p>
                       </div>
                     ))
                   )}

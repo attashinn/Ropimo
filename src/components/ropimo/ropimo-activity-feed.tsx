@@ -176,7 +176,7 @@ export function RopimoActivityFeed({
 
                   <div className="flex items-center gap-1.5 shrink-0 text-[11px] text-[#8A958F] pt-0.5">
                     {getActionIcon(item.type)}
-                    <span>{formatRelativeTime(item.timestamp)}</span>
+                    <span suppressHydrationWarning>{formatRelativeTime(item.timestamp)}</span>
                   </div>
                 </div>
               );

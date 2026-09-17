@@ -61,9 +61,18 @@ export interface OverviewDashboardProps {
 function formatRelativeTime(dateStr?: string | null): string {
   if (!dateStr) return "recently";
   try {
-    const d = new Date(dateStr);
+    let normalized = dateStr;
+    if (
+      typeof dateStr === "string" &&
+      !dateStr.endsWith("Z") &&
+      !/[+-]\d{2}(:\d{2})?$/.test(dateStr)
+    ) {
+      normalized = dateStr.replace(" ", "T") + "Z";
+    }
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return dateStr;
     const now = new Date();
-    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+    const diffSec = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 1000));
 
     if (diffSec < 60) return "just now";
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
@@ -801,8 +810,11 @@ export function OverviewDashboard({
                       <span className="font-bold text-[#18221E]">{act.userName}</span>{" "}
                       <span className="text-[#65706A]">{act.action}</span>
                     </p>
-                    <p className="mt-0.5 text-[11px] text-[#8A958F] truncate">
-                      {act.target} · {act.time}
+                    <p
+                      className="mt-0.5 text-[11px] text-[#8A958F] truncate"
+                      suppressHydrationWarning
+                    >
+                      {act.target} · <span suppressHydrationWarning>{act.time}</span>
                     </p>
                   </div>
                 </div>
@@ -905,10 +917,16 @@ export function OverviewDashboard({
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Date badge */}
                     <div className="flex flex-col items-center justify-center rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4] w-9 py-0.5 shrink-0 text-center">
-                      <span className="text-[9px] font-bold text-[#8A958F] tracking-wider leading-none">
+                      <span
+                        className="text-[9px] font-bold text-[#8A958F] tracking-wider leading-none"
+                        suppressHydrationWarning
+                      >
                         {ev.month}
                       </span>
-                      <span className="text-sm font-bold text-[#18221E] leading-tight">
+                      <span
+                        className="text-sm font-bold text-[#18221E] leading-tight"
+                        suppressHydrationWarning
+                      >
                         {ev.day}
                       </span>
                     </div>

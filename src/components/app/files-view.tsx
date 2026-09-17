@@ -1211,7 +1211,7 @@ export function FilesView({
                       <p className="text-xs font-bold text-[#18221E] truncate">
                         {act.action}
                       </p>
-                      <p className="text-[10px] text-[#65706A] truncate">
+                      <p className="text-[10px] text-[#65706A] truncate" suppressHydrationWarning>
                         by {act.user_name} · {formatRelativeTime(act.created_at)}
                       </p>
                     </div>
@@ -2986,7 +2986,7 @@ function ActivityTimelineModal({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-[#18221E]">{act.action}</p>
-                  <p className="text-[10px] text-[#65706A] mt-0.5">
+                  <p className="text-[10px] text-[#65706A] mt-0.5" suppressHydrationWarning>
                     by {act.user_name} · {formatRelativeTime(act.created_at)}
                   </p>
                 </div>

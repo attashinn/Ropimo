@@ -522,7 +522,7 @@ export function ProjectDetailView({
                         <p className="text-[#18221E]">
                           <span className="font-semibold">{act.userName}</span> {act.action}
                         </p>
-                        <span className="text-[10px] text-[#8A958F]">{act.time}</span>
+                        <span className="text-[10px] text-[#8A958F]" suppressHydrationWarning>{act.time}</span>
                       </div>
                     </div>
                   ))}
@@ -827,7 +827,7 @@ export function ProjectDetailView({
                     <p className="text-[#18221E]">
                       <span className="font-semibold">{act.userName}</span> {act.action}
                     </p>
-                    <span className="text-[10px] text-[#8A958F]">{act.time}</span>
+                    <span className="text-[10px] text-[#8A958F]" suppressHydrationWarning>{act.time}</span>
                   </div>
                 </div>
               ))}

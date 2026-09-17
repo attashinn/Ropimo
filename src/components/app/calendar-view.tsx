@@ -1550,7 +1550,7 @@ function CreateEventModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -1567,10 +1567,10 @@ function CreateEventModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="relative w-full max-w-xl rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xl z-10 my-8"
+            className="relative w-full max-w-xl max-h-[calc(100vh-2.5rem)] rounded-[16px] border border-[#D8DDD4] bg-white shadow-2xl z-10 flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-[#D8DDD4]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D8DDD4] shrink-0 bg-white">
               <div>
                 <h3 className="text-lg font-bold text-[#18221E]">Create Event</h3>
                 <p className="text-xs text-[#65706A]">
@@ -1580,306 +1580,308 @@ function CreateEventModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md p-1.5 text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] focus:outline-none"
+                className="rounded-md p-1.5 text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] focus:outline-none transition-colors"
               >
                 <XIcon size={16} />
               </button>
             </div>
 
-            {error && (
-              <div className="mt-3 rounded-[8px] bg-red-50 p-2.5 text-xs text-red-600 border border-red-200">
-                {error}
-              </div>
-            )}
-
             {/* Form */}
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              {/* Event Title */}
-              <div>
-                <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                  Event title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Weekly Development Meeting"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] placeholder:text-[#65706A] focus:border-[#10251F] focus:bg-white focus:outline-none"
-                  autoFocus
-                />
-              </div>
-
-              {/* Event Type & All-day Toggle */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Event type *
-                  </label>
-                  <CustomSelect
-                    value={eventType}
-                    onChange={(val) => setEventType(val as CalendarEventType)}
-                    options={EVENT_TYPE_OPTIONS}
-                    className="w-full"
-                    buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pb-2">
-                  <input
-                    type="checkbox"
-                    id="all-day-toggle"
-                    checked={isAllDay}
-                    onChange={(e) => setIsAllDay(e.target.checked)}
-                    className="h-4 w-4 rounded border-[#D8DDD4] text-[#10251F] focus:ring-[#10251F]"
-                  />
-                  <label htmlFor="all-day-toggle" className="text-xs font-medium text-[#18221E] cursor-pointer">
-                    All-day event
-                  </label>
-                </div>
-              </div>
-
-              {/* Date & Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Date *
-                  </label>
-                  <DatePicker
-                    value={startDate}
-                    onChange={(val) => {
-                      setStartDate(val);
-                      setEndDate(val);
-                    }}
-                    placeholder="Select date"
-                  />
-                </div>
-
-                {!isAllDay && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                        Start time
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="10:00 AM"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                        End time
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="11:00 AM"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Department & Project Links */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Department (Optional)
-                  </label>
-                  <CustomSelect
-                    value={departmentId}
-                    onChange={setDepartmentId}
-                    options={departmentSelectOptions}
-                    placeholder="None"
-                    className="w-full"
-                    buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Project (Optional)
-                  </label>
-                  <CustomSelect
-                    value={projectId}
-                    onChange={setProjectId}
-                    options={projectSelectOptions}
-                    placeholder="None"
-                    className="w-full"
-                    buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
-                  />
-                </div>
-              </div>
-
-              {/* Participants Picker */}
-              <div>
-                <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                  Participants / Assignees
-                </label>
-                <div className="space-y-2">
-                  {/* Selected Tags */}
-                  {selectedParticipantIds.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedParticipantIds.map((pid) => {
-                        const person = people.find((p) => p.user_id === pid || p.id === pid);
-                        if (!person) return null;
-                        return (
-                          <span
-                            key={pid}
-                            className="inline-flex items-center gap-1 rounded-full bg-[#E7EADF] pl-2 pr-1 py-0.5 text-xs text-[#10251F] font-semibold"
-                          >
-                            <span>{person.full_name || person.email}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedParticipantIds((prev) => prev.filter((id) => id !== pid))
-                              }
-                              className="rounded-full p-0.5 hover:bg-[#D8DDD4]"
-                            >
-                              <XIcon size={10} />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dropdown list of teammates */}
-                  <div className="max-h-28 overflow-y-auto rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 space-y-1">
-                    {people.map((p) => {
-                      const uid = p.user_id || p.id;
-                      const isSelected = selectedParticipantIds.includes(uid);
-                      return (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedParticipantIds((prev) => prev.filter((id) => id !== uid));
-                            } else {
-                              setSelectedParticipantIds((prev) => [...prev, uid]);
-                            }
-                          }}
-                          className={cn(
-                            "flex items-center justify-between p-1.5 rounded-[6px] text-xs cursor-pointer transition-colors",
-                            isSelected ? "bg-white shadow-2xs font-semibold text-[#10251F]" : "hover:bg-white text-[#65706A]"
-                          )}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#10251F] text-[9px] font-bold text-[#F4F3EE]">
-                              {(p.full_name || p.email || "U")[0]?.toUpperCase() || "U"}
-                            </div>
-                            <span>{p.full_name || p.email}</span>
-                          </div>
-                          {isSelected && <CheckIcon size={13} className="text-[#246244]" />}
-                        </div>
-                      );
-                    })}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                {error && (
+                  <div className="rounded-[8px] bg-red-50 p-2.5 text-xs text-red-600 border border-red-200">
+                    {error}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Location & Meeting Link */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Event Title */}
                 <div>
                   <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Location (Optional)
+                    Event title *
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Conference Room A"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                    required
+                    placeholder="e.g. Weekly Development Meeting"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] placeholder:text-[#65706A] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                    autoFocus
                   />
                 </div>
 
+                {/* Event Type & All-day Toggle */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Event type *
+                    </label>
+                    <CustomSelect
+                      value={eventType}
+                      onChange={(val) => setEventType(val as CalendarEventType)}
+                      options={EVENT_TYPE_OPTIONS}
+                      className="w-full"
+                      buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pb-2">
+                    <input
+                      type="checkbox"
+                      id="all-day-toggle"
+                      checked={isAllDay}
+                      onChange={(e) => setIsAllDay(e.target.checked)}
+                      className="h-4 w-4 rounded border-[#D8DDD4] text-[#10251F] focus:ring-[#10251F]"
+                    />
+                    <label htmlFor="all-day-toggle" className="text-xs font-medium text-[#18221E] cursor-pointer">
+                      All-day event
+                    </label>
+                  </div>
+                </div>
+
+                {/* Date & Time */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Date *
+                    </label>
+                    <DatePicker
+                      value={startDate}
+                      onChange={(val) => {
+                        setStartDate(val);
+                        setEndDate(val);
+                      }}
+                      placeholder="Select date"
+                    />
+                  </div>
+
+                  {!isAllDay && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                          Start time
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="10:00 AM"
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                          End time
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="11:00 AM"
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Department & Project Links */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Department (Optional)
+                    </label>
+                    <CustomSelect
+                      value={departmentId}
+                      onChange={setDepartmentId}
+                      options={departmentSelectOptions}
+                      placeholder="None"
+                      className="w-full"
+                      buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Project (Optional)
+                    </label>
+                    <CustomSelect
+                      value={projectId}
+                      onChange={setProjectId}
+                      options={projectSelectOptions}
+                      placeholder="None"
+                      className="w-full"
+                      buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
+                    />
+                  </div>
+                </div>
+
+                {/* Participants Picker */}
                 <div>
                   <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                    Meeting link (Optional)
+                    Participants / Assignees
                   </label>
-                  <input
-                    type="url"
-                    placeholder="https://meet.google.com/xyz"
-                    value={meetingLink}
-                    onChange={(e) => setMeetingLink(e.target.value)}
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                  Description / Agenda
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Optional event details, agenda, notes, or sprint objectives..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none resize-none"
-                />
-              </div>
-
-              {/* Attachments Section */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-[#18221E]">
-                    Attachments
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-semibold text-[#246244] hover:underline"
-                  >
-                    + Upload File
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </div>
-
-                {attachments.length > 0 && (
-                  <div className="space-y-1.5 mt-2">
-                    {attachments.map((att) => (
-                      <div
-                        key={att.id}
-                        className="flex items-center justify-between rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-1.5 text-xs"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <FileIcon size={14} className="text-[#65706A]" />
-                          <span className="font-medium text-[#18221E] truncate">{att.name}</span>
-                          <span className="text-[10px] text-[#65706A]">({formatFileSize(att.size)})</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttachment(att.id)}
-                          className="text-[#65706A] hover:text-red-600"
-                        >
-                          <XIcon size={12} />
-                        </button>
+                  <div className="space-y-2">
+                    {/* Selected Tags */}
+                    {selectedParticipantIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedParticipantIds.map((pid) => {
+                          const person = people.find((p) => p.user_id === pid || p.id === pid);
+                          if (!person) return null;
+                          return (
+                            <span
+                              key={pid}
+                              className="inline-flex items-center gap-1 rounded-full bg-[#E7EADF] pl-2 pr-1 py-0.5 text-xs text-[#10251F] font-semibold"
+                            >
+                              <span>{person.full_name || person.email}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedParticipantIds((prev) => prev.filter((id) => id !== pid))
+                                }
+                                className="rounded-full p-0.5 hover:bg-[#D8DDD4]"
+                              >
+                                <XIcon size={10} />
+                              </button>
+                            </span>
+                          );
+                        })}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Dropdown list of teammates */}
+                    <div className="max-h-28 overflow-y-auto rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 space-y-1">
+                      {people.map((p) => {
+                        const uid = p.user_id || p.id;
+                        const isSelected = selectedParticipantIds.includes(uid);
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedParticipantIds((prev) => prev.filter((id) => id !== uid));
+                              } else {
+                                setSelectedParticipantIds((prev) => [...prev, uid]);
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center justify-between p-1.5 rounded-[6px] text-xs cursor-pointer transition-colors",
+                              isSelected ? "bg-white shadow-2xs font-semibold text-[#10251F]" : "hover:bg-white text-[#65706A]"
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#10251F] text-[9px] font-bold text-[#F4F3EE]">
+                                {(p.full_name || p.email || "U")[0]?.toUpperCase() || "U"}
+                              </div>
+                              <span>{p.full_name || p.email}</span>
+                            </div>
+                            {isSelected && <CheckIcon size={13} className="text-[#246244]" />}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Location & Meeting Link */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Location (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Conference Room A"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                      Meeting link (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://meet.google.com/xyz"
+                      value={meetingLink}
+                      onChange={(e) => setMeetingLink(e.target.value)}
+                      className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                    Description / Agenda
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Optional event details, agenda, notes, or sprint objectives..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none resize-none"
+                  />
+                </div>
+
+                {/* Attachments Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-[#18221E]">
+                      Attachments
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-semibold text-[#246244] hover:underline"
+                    >
+                      + Upload File
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+
+                  {attachments.length > 0 && (
+                    <div className="space-y-1.5 mt-2">
+                      {attachments.map((att) => (
+                        <div
+                          key={att.id}
+                          className="flex items-center justify-between rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-1.5 text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <FileIcon size={14} className="text-[#65706A]" />
+                            <span className="font-medium text-[#18221E] truncate">{att.name}</span>
+                            <span className="text-[10px] text-[#65706A]">({formatFileSize(att.size)})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(att.id)}
+                            className="rounded p-0.5 text-[#65706A] hover:bg-[#D8DDD4] hover:text-[#18221E]"
+                          >
+                            <XIcon size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Footer Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D8DDD4]">
+              <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-[#D8DDD4] bg-[#FAF9F5]/90 backdrop-blur-xs shrink-0">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-[8px] px-3.5 py-2 text-xs font-semibold text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
+                  className="rounded-[8px] px-3.5 py-2 text-xs font-semibold text-[#65706A] hover:bg-[#E7EADF] hover:text-[#18221E] transition-colors"
                 >
                   Cancel
                 </button>
@@ -1958,7 +1960,7 @@ function EventDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -1973,10 +1975,10 @@ function EventDetailsModal({
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative w-full max-w-xl rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xl z-10 my-8 space-y-5"
+        className="relative w-full max-w-xl max-h-[calc(100vh-2.5rem)] rounded-[16px] border border-[#D8DDD4] bg-white shadow-2xl z-10 flex flex-col overflow-hidden"
       >
         {/* Top bar */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#D8DDD4]">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#D8DDD4] shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -2023,188 +2025,191 @@ function EventDetailsModal({
           </div>
         </div>
 
-        {/* Title & Metadata */}
-        <div className="space-y-3">
-          <h2
-            className={cn(
-              "text-xl font-bold text-[#18221E]",
-              event.status === "completed" && "line-through opacity-70"
-            )}
-          >
-            {event.title}
-          </h2>
-
-          {/* Date / Time */}
-          <div className="flex items-center gap-2 text-xs font-medium text-[#65706A]">
-            <ClockIcon size={14} className="text-[#10251F]" />
-            <span>
-              {event.start_date}
-              {event.start_time && ` · ${event.start_time}`}
-              {event.end_time && ` – ${event.end_time}`}
-              {event.is_all_day && " (All Day)"}
-            </span>
-          </div>
-
-          {/* Location */}
-          {event.location && (
-            <div className="flex items-center gap-2 text-xs font-medium text-[#65706A]">
-              <MapPinIcon size={14} className="text-[#10251F]" />
-              <span>{event.location}</span>
-            </div>
-          )}
-
-          {/* Meeting Link */}
-          {event.meeting_link && (
-            <div className="flex items-center gap-3 pt-1">
-              <a
-                href={event.meeting_link}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] shadow-xs"
-              >
-                <VideoIcon size={14} className="text-[#C7F34A]" />
-                <span>Join Meeting</span>
-                <ExternalLinkIcon size={12} className="opacity-75" />
-              </a>
-              <span className="text-xs text-[#65706A] truncate max-w-xs">{event.meeting_link}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Project & Department Tags */}
-        {(event.project_name || event.department_name) && (
-          <div className="flex items-center gap-2 pt-2 pb-2 border-y border-[#D8DDD4]">
-            {event.department_name && (
-              <div className="flex items-center gap-1.5 rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4] px-2.5 py-1 text-xs font-semibold text-[#18221E]">
-                <span className="text-[#65706A]">Department:</span>
-                <span>{event.department_name}</span>
-              </div>
-            )}
-
-            {event.project_name && (
-              <div className="flex items-center gap-1.5 rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4] px-2.5 py-1 text-xs font-semibold text-[#18221E]">
-                <span className="text-[#65706A]">Project:</span>
-                <span>{event.project_name}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Description */}
-        {event.description && (
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
-              Description / Notes
-            </span>
-            <p className="text-xs text-[#18221E] leading-relaxed whitespace-pre-wrap bg-[#FAF9F5] p-3 rounded-[8px] border border-[#D8DDD4]">
-              {event.description}
-            </p>
-          </div>
-        )}
-
-        {/* Participants */}
-        {event.participants.length > 0 && (
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
-              Participants ({event.participants.length})
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {event.participants.map((p, pIdx) => (
-                <div
-                  key={`detail-part-${p.id || p.user_id || pIdx}`}
-                  className="flex items-center gap-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2"
-                >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#10251F] text-xs font-bold text-[#F4F3EE]">
-                    {(p.full_name || p.email || "U")[0]?.toUpperCase() || "U"}
-                  </div>
-                  <div className="truncate">
-                    <p className="text-xs font-bold text-[#18221E] truncate">
-                      {p.full_name || p.email}
-                    </p>
-                    <p className="text-[10px] text-[#65706A] truncate">
-                      {p.job_title || p.role}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Attachments */}
-        {event.attachments && event.attachments.length > 0 && (
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
-              Attachments ({event.attachments.length})
-            </span>
-            <div className="space-y-1.5">
-              {event.attachments.map((att) => (
-                <div
-                  key={att.id}
-                  className="flex items-center justify-between rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <FileIcon size={14} className="text-[#10251F]" />
-                    <span className="font-semibold text-[#18221E] truncate">{att.name}</span>
-                    <span className="text-[10px] text-[#65706A]">({formatFileSize(att.size)})</span>
-                  </div>
-                  <a
-                    href={att.url}
-                    download={att.name}
-                    className="text-xs font-semibold text-[#246244] hover:underline"
-                  >
-                    Download
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Comments / Activity */}
-        <div className="space-y-2 pt-2 border-t border-[#D8DDD4]">
-          <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
-            Activity & Notes
-          </span>
-
-          {comments.length > 0 && (
-            <div className="space-y-2 max-h-36 overflow-y-auto">
-              {comments.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-[8px] bg-[#FAF9F5] border border-[#D8DDD4] p-2 text-xs space-y-0.5"
-                >
-                  <div className="flex items-center justify-between text-[10px] text-[#65706A]">
-                    <span className="font-bold text-[#18221E]">{c.author_name}</span>
-                    <span>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <p className="text-xs text-[#18221E]">{c.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add comment box */}
-          <form onSubmit={handleAddComment} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Add a quick note or update..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              className="flex-1 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-1.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={submittingComment || !commentText.trim()}
-              className="rounded-[8px] bg-[#10251F] px-3 py-1.5 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] disabled:opacity-50"
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+          {/* Title & Metadata */}
+          <div className="space-y-3">
+            <h2
+              className={cn(
+                "text-xl font-bold text-[#18221E]",
+                event.status === "completed" && "line-through opacity-70"
+              )}
             >
-              Post
-            </button>
-          </form>
+              {event.title}
+            </h2>
+
+            {/* Date / Time */}
+            <div className="flex items-center gap-2 text-xs font-medium text-[#65706A]">
+              <ClockIcon size={14} className="text-[#10251F]" />
+              <span>
+                {event.start_date}
+                {event.start_time && ` · ${event.start_time}`}
+                {event.end_time && ` – ${event.end_time}`}
+                {event.is_all_day && " (All Day)"}
+              </span>
+            </div>
+
+            {/* Location */}
+            {event.location && (
+              <div className="flex items-center gap-2 text-xs font-medium text-[#65706A]">
+                <MapPinIcon size={14} className="text-[#10251F]" />
+                <span>{event.location}</span>
+              </div>
+            )}
+
+            {/* Meeting Link */}
+            {event.meeting_link && (
+              <div className="flex items-center gap-3 pt-1">
+                <a
+                  href={event.meeting_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] shadow-xs"
+                >
+                  <VideoIcon size={14} className="text-[#C7F34A]" />
+                  <span>Join Meeting</span>
+                  <ExternalLinkIcon size={12} className="opacity-75" />
+                </a>
+                <span className="text-xs text-[#65706A] truncate max-w-xs">{event.meeting_link}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Project & Department Tags */}
+          {(event.project_name || event.department_name) && (
+            <div className="flex items-center gap-2 pt-2 pb-2 border-y border-[#D8DDD4]">
+              {event.department_name && (
+                <div className="flex items-center gap-1.5 rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4] px-2.5 py-1 text-xs font-semibold text-[#18221E]">
+                  <span className="text-[#65706A]">Department:</span>
+                  <span>{event.department_name}</span>
+                </div>
+              )}
+
+              {event.project_name && (
+                <div className="flex items-center gap-1.5 rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4] px-2.5 py-1 text-xs font-semibold text-[#18221E]">
+                  <span className="text-[#65706A]">Project:</span>
+                  <span>{event.project_name}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          {event.description && (
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
+                Description / Notes
+              </span>
+              <p className="text-xs text-[#18221E] leading-relaxed whitespace-pre-wrap bg-[#FAF9F5] p-3 rounded-[8px] border border-[#D8DDD4]">
+                {event.description}
+              </p>
+            </div>
+          )}
+
+          {/* Participants */}
+          {event.participants.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
+                Participants ({event.participants.length})
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {event.participants.map((p, pIdx) => (
+                  <div
+                    key={`detail-part-${p.id || p.user_id || pIdx}`}
+                    className="flex items-center gap-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#10251F] text-xs font-bold text-[#F4F3EE]">
+                      {(p.full_name || p.email || "U")[0]?.toUpperCase() || "U"}
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-[#18221E] truncate">
+                        {p.full_name || p.email}
+                      </p>
+                      <p className="text-[10px] text-[#65706A] truncate">
+                        {p.job_title || p.role}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {event.attachments && event.attachments.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
+                Attachments ({event.attachments.length})
+              </span>
+              <div className="space-y-1.5">
+                {event.attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center justify-between rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <FileIcon size={14} className="text-[#10251F]" />
+                      <span className="font-semibold text-[#18221E] truncate">{att.name}</span>
+                      <span className="text-[10px] text-[#65706A]">({formatFileSize(att.size)})</span>
+                    </div>
+                    <a
+                      href={att.url}
+                      download={att.name}
+                      className="text-xs font-semibold text-[#246244] hover:underline"
+                    >
+                      Download
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comments / Activity */}
+          <div className="space-y-2 pt-2 border-t border-[#D8DDD4]">
+            <span className="text-xs font-semibold text-[#65706A] uppercase tracking-wider text-[10px]">
+              Activity & Notes
+            </span>
+
+            {comments.length > 0 && (
+              <div className="space-y-2 max-h-36 overflow-y-auto">
+                {comments.map((c) => (
+                  <div
+                    key={c.id}
+                    className="rounded-[8px] bg-[#FAF9F5] border border-[#D8DDD4] p-2 text-xs space-y-0.5"
+                  >
+                    <div className="flex items-center justify-between text-[10px] text-[#65706A]">
+                      <span className="font-bold text-[#18221E]">{c.author_name}</span>
+                      <span>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-xs text-[#18221E]">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add comment box */}
+            <form onSubmit={handleAddComment} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a quick note or update..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                className="flex-1 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-1.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={submittingComment || !commentText.trim()}
+                className="rounded-[8px] bg-[#10251F] px-3 py-1.5 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] disabled:opacity-50"
+              >
+                Post
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-[#D8DDD4]">
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#D8DDD4] bg-[#FAF9F5]/90 backdrop-blur-xs shrink-0">
           {(event.event_type === "task" || event.task_id) && (
             <button
               type="button"
@@ -2367,7 +2372,7 @@ function EditEventModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -2380,127 +2385,133 @@ function EditEventModal({
         initial={{ opacity: 0, scale: 0.96, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        className="relative w-full max-w-xl rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xl z-10 my-8"
+        className="relative w-full max-w-xl max-h-[calc(100vh-2.5rem)] rounded-[16px] border border-[#D8DDD4] bg-white shadow-2xl z-10 flex flex-col overflow-hidden"
       >
-        <div className="flex items-center justify-between pb-4 border-b border-[#D8DDD4]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#D8DDD4] shrink-0 bg-white">
           <h3 className="text-lg font-bold text-[#18221E]">Edit Event</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-[#65706A] hover:bg-[#FAF9F5]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors"
+          >
             <XIcon size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-[#18221E] mb-1">
-              Event title *
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                Event type
-              </label>
-              <CustomSelect
-                value={eventType}
-                onChange={(val) => setEventType(val as CalendarEventType)}
-                options={EVENT_TYPE_OPTIONS}
-                className="w-full"
-                buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                Date *
-              </label>
-              <DatePicker
-                value={startDate}
-                onChange={(val) => {
-                  setStartDate(val);
-                  setEndDate(val);
-                }}
-                placeholder="Select date"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                Start time
+                Event title *
               </label>
               <input
                 type="text"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  Event type
+                </label>
+                <CustomSelect
+                  value={eventType}
+                  onChange={(val) => setEventType(val as CalendarEventType)}
+                  options={EVENT_TYPE_OPTIONS}
+                  className="w-full"
+                  buttonClassName="w-full h-9 rounded-[8px] bg-[#FAF9F5]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  Date *
+                </label>
+                <DatePicker
+                  value={startDate}
+                  onChange={(val) => {
+                    setStartDate(val);
+                    setEndDate(val);
+                  }}
+                  placeholder="Select date"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  Start time
+                </label>
+                <input
+                  type="text"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  End time
+                </label>
+                <input
+                  type="text"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#18221E] mb-1">
+                  Meeting link
+                </label>
+                <input
+                  type="url"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                End time
+                Description
               </label>
-              <input
-                type="text"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none resize-none"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                Location
-              </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#18221E] mb-1">
-                Meeting link
-              </label>
-              <input
-                type="url"
-                value={meetingLink}
-                onChange={(e) => setMeetingLink(e.target.value)}
-                className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#18221E] mb-1">
-              Description
-            </label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:bg-white focus:outline-none resize-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D8DDD4]">
+          <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-[#D8DDD4] bg-[#FAF9F5]/90 backdrop-blur-xs shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-[8px] px-3.5 py-2 text-xs font-semibold text-[#65706A] hover:bg-[#FAF9F5]"
+              className="rounded-[8px] px-3.5 py-2 text-xs font-semibold text-[#65706A] hover:bg-[#E7EADF] transition-colors"
             >
               Cancel
             </button>
@@ -2508,7 +2519,7 @@ function EditEventModal({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] disabled:opacity-50"
+              className="rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] disabled:opacity-50 transition-colors shadow-xs"
             >
               {loading ? "Saving..." : "Save Changes"}
             </button>

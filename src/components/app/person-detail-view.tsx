@@ -552,7 +552,7 @@ export function PersonDetailView({
                       <p className="font-semibold text-[#18221E]">
                         {act.action} {act.target}
                       </p>
-                      <span className="text-[11px] text-[#65706A]">{act.timeAgo}</span>
+                      <span className="text-[11px] text-[#65706A]" suppressHydrationWarning>{act.timeAgo}</span>
                     </div>
                   ))}
                 </div>
@@ -782,7 +782,7 @@ export function PersonDetailView({
                 <p className="font-semibold text-[#18221E]">
                   {item.action} {item.target}
                 </p>
-                <span className="text-[11px] text-[#65706A]">{item.timeAgo}</span>
+                <span className="text-[11px] text-[#65706A]" suppressHydrationWarning>{item.timeAgo}</span>
               </div>
             ))
           ) : (
