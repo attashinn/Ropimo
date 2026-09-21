@@ -11,6 +11,7 @@ export async function getInvitationByToken(
   invitation: WorkspaceInvitation | null;
   workspaceName?: string;
   departmentName?: string;
+  inviterName?: string;
   error?: string;
 }> {
   if (!token || !token.trim()) {
@@ -77,10 +78,37 @@ export async function getInvitationByToken(
     } catch {}
   }
 
+  // Resolve department name if present
+  if (invitation.department_id) {
+    try {
+      const { data: dept } = await adminClient
+        .from("departments")
+        .select("name")
+        .eq("id", invitation.department_id)
+        .maybeSingle();
+      if (dept?.name) departmentName = dept.name;
+    } catch {}
+  }
+
+  // Resolve inviter name if present
+  let inviterName: string | undefined;
+  if (invitation.invited_by) {
+    try {
+      const { data: inviter } = await adminClient
+        .from("workspace_members")
+        .select("full_name")
+        .eq("user_id", invitation.invited_by)
+        .eq("workspace_id", invitation.workspace_id)
+        .maybeSingle();
+      if (inviter?.full_name) inviterName = inviter.full_name;
+    } catch {}
+  }
+
   return {
     invitation,
     workspaceName,
     departmentName,
+    inviterName,
   };
 }
 

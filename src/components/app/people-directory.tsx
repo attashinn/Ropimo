@@ -219,10 +219,18 @@ export function PeopleDirectory({
         </span>
       );
     }
+    if (s === "inactive" || s === "terminated") {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8DDD4] bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#65706A]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#8A958F]" />
+          Inactive
+        </span>
+      );
+    }
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8DDD4] bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#65706A]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#8A958F]" />
-        Inactive
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8DDD4] bg-[#EAF4E2] px-2.5 py-0.5 text-[11px] font-semibold text-[#246244]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#246244]" />
+        Active
       </span>
     );
   };

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { signUpAction } from "@/lib/auth/actions";
 import { LogoIcon, SparklesIcon } from "@/components/landing/icons";
 import { PrimaryButton } from "@/components/ui/primary-button";
 
@@ -15,40 +15,39 @@ export default function SignupPage() {
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [alreadyExists, setAlreadyExists] = React.useState(false);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
-
-  const supabase = createClient();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
+    setAlreadyExists(false);
     setSuccessMsg(null);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const res = await signUpAction({
+        fullName,
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-          data: {
-            full_name: fullName,
-          },
-        },
       });
 
-      if (error) {
-        setErrorMsg(error.message);
+      if (!res.success) {
+        setErrorMsg(res.error || "Failed to create account.");
+        if (res.alreadyExists) {
+          setAlreadyExists(true);
+        }
         setLoading(false);
         return;
       }
 
-      if (data.session) {
-        router.push("/app");
+      if (res.redirect) {
+        router.push(res.redirect);
         router.refresh();
       } else {
         setSuccessMsg(
-          "Account created! Please check your email inbox to verify your account."
+          res.message ||
+            "Account created! Please check your email inbox to verify your account."
         );
         setLoading(false);
       }
@@ -83,8 +82,18 @@ export default function SignupPage() {
         {/* Form Container */}
         <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-7 sm:p-8 shadow-2xs">
           {errorMsg && (
-            <div className="mb-5 rounded-[8px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-              {errorMsg}
+            <div className="mb-5 rounded-[8px] border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
+              <p className="font-medium">{errorMsg}</p>
+              {alreadyExists && (
+                <div className="mt-2.5 pt-2 border-t border-red-200/60">
+                  <Link
+                    href={`/login?email=${encodeURIComponent(email)}`}
+                    className="inline-flex items-center gap-1 font-semibold text-[#10251F] underline hover:text-[#18221E]"
+                  >
+                    Go to Sign In &rarr;
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

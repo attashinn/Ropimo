@@ -1,8 +1,9 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getDefaultWorkspace } from "@/lib/workspace/queries";
+import { getDefaultWorkspace, getUserWorkspaces } from "@/lib/workspace/queries";
 import { getUserContext } from "@/lib/auth/permissions";
+import { getWorkspaceProjects } from "@/lib/project/queries";
 import { AppShell } from "@/components/app/app-shell";
 import { getNavVisibility } from "@/lib/auth/permissions";
 import { UserContext } from "@/types/permissions";
@@ -43,9 +44,11 @@ export default async function ProtectedAppLayout({
     redirect("/onboarding");
   }
 
-  // Resolve the full UserContext (workspace role + dept memberships) once per layout render.
-  // This is cached per React render tree so child pages calling getUserContext() hit no extra DB.
-  const userCtx: UserContext | null = await getUserContext(workspace.id);
+  const [userCtx, projects, allWorkspaces] = await Promise.all([
+    getUserContext(workspace.id),
+    getWorkspaceProjects(workspace.id),
+    getUserWorkspaces(),
+  ]);
 
   const userData = {
     email: user.email,
@@ -58,8 +61,10 @@ export default async function ProtectedAppLayout({
     <AppShell
       user={userData}
       workspace={workspace}
+      allWorkspaces={allWorkspaces}
       userContext={userCtx}
       navVisibility={navVisibility}
+      projects={projects}
     >
       {children}
     </AppShell>

@@ -60,6 +60,17 @@ export const getDefaultWorkspace = cache(async (): Promise<Workspace | null> => 
   if (!workspaces || workspaces.length === 0) {
     return null;
   }
+
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const activeId = cookieStore.get("ropimo_active_workspace")?.value;
+    if (activeId) {
+      const activeWs = workspaces.find((w) => w.id === activeId);
+      if (activeWs) return activeWs;
+    }
+  } catch {}
+
   return workspaces[0];
 });
 

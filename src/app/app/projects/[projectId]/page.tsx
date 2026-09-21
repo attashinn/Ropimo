@@ -11,10 +11,15 @@ export interface ProjectDetailPageProps {
   params: Promise<{
     projectId: string;
   }>;
+  searchParams?: Promise<{
+    phase?: string;
+  }>;
 }
 
-export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps) {
   const { projectId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const phase = resolvedSearchParams?.phase;
   const workspace = await getDefaultWorkspace();
 
   if (!workspace) {
@@ -32,6 +37,15 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const projects = await getWorkspaceProjects(workspace.id);
   const departments = await getWorkspaceDepartments(workspace.id);
 
+  // Fetch project files/attachments from workspace_files
+  const adminClient = (await import("@/lib/supabase/admin")).createAdminClient();
+  const { data: dbFiles } = await adminClient
+    .from("workspace_files")
+    .select("*")
+    .eq("project_id", project.id)
+    .eq("is_trash", false)
+    .order("created_at", { ascending: false });
+
   return (
     <ProjectDetailView
       project={project}
@@ -40,6 +54,8 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       people={people}
       projects={projects}
       departments={departments}
+      initialPhase={phase}
+      initialFiles={dbFiles || []}
     />
   );
 }

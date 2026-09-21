@@ -17,6 +17,9 @@ import {
   Users,
   Maximize2,
   Minimize2,
+  Sparkles,
+  DollarSign,
+  Briefcase,
 } from "lucide-react";
 import { ProjectStatus, ProjectPriority, Project } from "@/types/project";
 import { Department } from "@/types/department";
@@ -25,13 +28,15 @@ import { createProjectAction } from "@/lib/project/actions";
 import {
   StatusMenu,
   PriorityMenu,
-  AssigneesMenu,
   STATUS_LIST,
   PRIORITY_OPTIONS,
   ClickUpStatus,
   ClickUpPriority,
 } from "./clickup-property-dropdowns";
 import { DatePicker } from "@/components/ui/date-picker";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { BrainQuickCreator } from "./ai/brain-quick-creator";
+import { cn } from "@/lib/utils";
 
 export interface CreateProjectModalProps {
   isOpen: boolean;
@@ -56,7 +61,9 @@ export function CreateProjectModal({
 }: CreateProjectModalProps) {
   const router = useRouter();
 
-  // Project Fields (NO Task Fields)
+  const [creationMode, setCreationMode] = React.useState<"manual" | "ai">("manual");
+
+  // Form Fields
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [departmentId, setDepartmentId] = React.useState(defaultDepartmentId || "");
@@ -72,19 +79,36 @@ export function CreateProjectModal({
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  // Dropdown menus
-  const [openDropdown, setOpenDropdown] = React.useState<string | null>(null);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  // Status & Priority Popovers
+  const [statusOpen, setStatusOpen] = React.useState(false);
+  const [priorityOpen, setPriorityOpen] = React.useState(false);
+
+  const statusRef = React.useRef<HTMLDivElement>(null);
+  const priorityRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpenDropdown(null);
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setStatusOpen(false);
+      }
+      if (priorityRef.current && !priorityRef.current.contains(e.target as Node)) {
+        setPriorityOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Keyboard shortcut Esc
+  React.useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isOpen && !statusOpen && !priorityOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, statusOpen, priorityOpen, onClose]);
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -105,6 +129,7 @@ export function CreateProjectModal({
 
   const trimmedName = name.trim();
   const isValid = trimmedName.length >= 2;
+
   const availableDepts = React.useMemo(() => {
     const list = [...departments];
     if (defaultDepartmentId && !list.some((d) => d.id === defaultDepartmentId)) {
@@ -123,10 +148,37 @@ export function CreateProjectModal({
   }, [departments, defaultDepartmentId, workspaceId]);
 
   const activeDepartment = availableDepts.find((d) => d.id === departmentId);
-  const selectedLead = people.find((p) => p.user_id === leadId);
-
   const currentStatusObj = STATUS_LIST.find((s) => s.id === status) || STATUS_LIST[0];
   const currentPriorityObj = PRIORITY_OPTIONS.find((p) => p.id === priority) || PRIORITY_OPTIONS[0];
+
+  // Options for CustomSelects
+  const departmentOptions = React.useMemo(() => {
+    return availableDepts.map((d) => ({
+      value: d.id,
+      label: d.name,
+      dotColor: d.color || "#10251F",
+      icon: <Building2 className="w-3.5 h-3.5" />,
+    }));
+  }, [availableDepts]);
+
+  const leadOptions = React.useMemo(() => {
+    return people.map((p) => {
+      const nameStr = p.full_name || p.email || "Workspace Member";
+      const initials = nameStr
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .substring(0, 2)
+        .toUpperCase();
+      return {
+        value: p.user_id,
+        label: nameStr,
+        avatarUrl: p.avatar_url || null,
+        initials,
+        sublabel: p.job_title || p.email,
+      };
+    });
+  }, [people]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,282 +240,338 @@ export function CreateProjectModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden bg-black/45 backdrop-blur-[3px]">
-        {/* Real Project Creation Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden bg-black/40 backdrop-blur-[3px]">
+        {/* Modal Container */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.98, y: 12 }}
+          initial={{ opacity: 0, scale: 0.97, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.98, y: 12 }}
+          exit={{ opacity: 0, scale: 0.97, y: 12 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
-          ref={dropdownRef}
-          className={`relative z-10 flex flex-col bg-white border border-[#E2E8F0] shadow-2xl rounded-[18px] overflow-hidden text-[#111827] font-sans antialiased transition-all ${
+          className={`relative z-10 flex flex-col bg-white border border-[#D8DDD4] shadow-2xl rounded-[20px] overflow-hidden text-[#18221E] font-sans antialiased transition-all ${
             isFullscreen
               ? "fixed inset-2 sm:inset-3 max-w-none h-[calc(100vh-1.5rem)]"
-              : "w-[94vw] max-w-[800px] max-h-[88vh]"
+              : "w-[94vw] max-w-[780px] max-h-[90vh]"
           }`}
         >
-          {/* ── TOP BREADCRUMB BAR ───────────────────────────────────────── */}
-          <div className="flex items-center justify-between px-6 py-3.5 border-b border-[#F1F5F9] bg-white shrink-0 text-[13px] select-none">
-            <div className="flex items-center gap-2 text-[#64748B]">
-              <span className="flex items-center gap-1.5 text-[#0F172A] font-medium">
-                <Folder className="w-4 h-4 text-[#D97706]" />
-                <span>{activeDepartment ? activeDepartment.name : "Workspace"}</span>
+          {/* ── TOP HEADER BAR ─────────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7EADF] bg-[#FAF9F5]/70 shrink-0 text-xs select-none">
+            <div className="flex items-center gap-2 text-[#65706A]">
+              <span className="flex items-center gap-1.5 font-semibold text-[#18221E] px-2 py-1 rounded-[7px] bg-white border border-[#D8DDD4]">
+                <Folder className="w-3.5 h-3.5 text-[#10251F]" />
+                <span>{activeDepartment ? activeDepartment.name : "Client Projects"}</span>
               </span>
-              <span className="text-[#CBD5E1]">/</span>
-              <span className="text-[#64748B] font-semibold">
-                Create Project
-              </span>
+              <span className="text-[#8A958F]">/</span>
+              <span className="text-[#65706A] font-medium">New Project</span>
             </div>
 
-            <div className="flex items-center gap-2 text-[#64748B]">
+            <div className="flex items-center gap-1.5 text-[#65706A]">
               <button
                 type="button"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 hover:bg-[#F8FAFC] rounded-lg text-[#94A3B8] hover:text-[#0F172A] transition-colors"
-                title={isFullscreen ? "Restore" : "Fullscreen"}
+                className="p-1.5 hover:bg-white rounded-[7px] border border-transparent hover:border-[#D8DDD4] text-[#65706A] hover:text-[#18221E] transition-colors cursor-pointer"
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 hover:bg-[#F8FAFC] rounded-lg text-[#94A3B8] hover:text-[#0F172A] transition-colors"
+                className="p-1.5 hover:bg-white rounded-[7px] border border-transparent hover:border-[#D8DDD4] text-[#65706A] hover:text-[#18221E] transition-colors cursor-pointer"
                 title="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
           {/* Error Alert */}
           {errorMsg && (
-            <div className="px-6 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between">
+            <div className="px-6 py-2.5 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between">
               <span>{errorMsg}</span>
-              <button type="button" onClick={() => setErrorMsg(null)}>
+              <button type="button" onClick={() => setErrorMsg(null)} className="cursor-pointer">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
 
-          {/* ── FORM CONTENT ─────────────────────────────────────────────── */}
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto">
+          {/* Creation Mode Switcher: Manual vs ClickUp Brain */}
+          <div className="flex items-center justify-between px-6 py-2.5 bg-[#FAF9F5] border-b border-[#E7EADF] shrink-0 select-none">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#F0EFEA] border border-[#E2E1DC]">
+              <button
+                type="button"
+                onClick={() => setCreationMode("manual")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  creationMode === "manual"
+                    ? "bg-white text-[#18221E] shadow-xs"
+                    : "text-[#65706A] hover:text-[#18221E]"
+                )}
+              >
+                <span>📁</span>
+                <span>Create Manually</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode("ai")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  creationMode === "ai"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-xs font-bold"
+                    : "text-[#65706A] hover:text-emerald-700"
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Create with AI (Brain)</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-[#8A958F] hidden sm:inline">
+              {creationMode === "ai" ? "ClickUp Brain AI • Type project goals, mention @lead, attach brief" : "Manual field customization"}
+            </span>
+          </div>
+
+          {/* ── CONDITIONAL BODY ────────────────────────────────────────── */}
+          {creationMode === "ai" ? (
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              <BrainQuickCreator
+                type="project"
+                workspaceId={workspaceId}
+                people={people}
+                defaultDepartmentId={departmentId}
+                onSuccess={(createdItem) => {
+                  onClose();
+                  router.refresh();
+                  if (onProjectCreated && createdItem.project) onProjectCreated(createdItem.project);
+                  if (onSuccess) onSuccess();
+                }}
+                onCancel={onClose}
+              />
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto">
             <div className="p-7 space-y-6 flex-1">
-              {/* Project Title Input */}
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] mb-2 uppercase tracking-wider">
-                  Project Name <span className="text-red-500">*</span>
-                </label>
+              {/* Project Title Input (Linear / Notion borderless style) */}
+              <div className="space-y-1">
                 <input
                   type="text"
                   autoFocus
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Website Redesign, Brand Strategy, Mobile App..."
-                  className="w-full text-[20px] font-bold text-[#0F172A] placeholder:text-[#94A3B8] px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] focus:border-[#0F172A] focus:outline-none transition-all"
+                  placeholder="Project name..."
+                  className="w-full text-2xl sm:text-3xl font-bold tracking-tight text-[#18221E] placeholder:text-[#8A958F] bg-transparent border-0 focus:outline-none focus:ring-0 px-0 py-1 transition-all"
                 />
+                <p className="text-[11px] text-[#8A958F]">
+                  Give your project a clear, descriptive title.
+                </p>
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] mb-2 uppercase tracking-wider">
-                  Project Brief & Objectives
+              {/* Project Description / Scope */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#8A958F]">
+                  Description & Scope
                 </label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the scope, primary deliverables, and goals for this project..."
-                  className="w-full text-xs text-[#334155] placeholder:text-[#94A3B8] p-3.5 rounded-xl border border-[#E2E8F0] focus:border-[#0F172A] focus:outline-none transition-all resize-none"
-                />
+                <div className="rounded-[12px] border border-[#D8DDD4] bg-white p-3 focus-within:border-[#10251F] focus-within:ring-1 focus-within:ring-[#10251F]/10 transition-all">
+                  <textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Outline key deliverables, milestones, and objectives for this project..."
+                    className="w-full text-xs text-[#18221E] placeholder:text-[#8A958F] bg-transparent border-0 focus:outline-none resize-none leading-relaxed"
+                  />
+                </div>
               </div>
 
-              {/* 2-Column Properties Table */}
-              <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                {/* 1. Department */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Department</span>
-                  </span>
-                  <select
-                    value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs font-medium text-[#0F172A] focus:outline-none focus:border-[#0F172A]"
-                  >
-                    {availableDepts.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* ── PROPERTIES GRID ────────────────────────────────────────── */}
+              <div className="space-y-3">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-[#8A958F]">
+                  Project Properties
+                </span>
 
-                {/* 2. Project Lead */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Project Lead</span>
-                  </span>
-                  <select
-                    value={leadId}
-                    onChange={(e) => setLeadId(e.target.value)}
-                    className="w-full py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs font-medium text-[#0F172A] focus:outline-none focus:border-[#0F172A]"
-                  >
-                    {people.map((p) => (
-                      <option key={p.user_id} value={p.user_id}>
-                        {p.full_name || p.email}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-4 rounded-[14px] bg-[#FAF9F5] border border-[#D8DDD4]">
+                  {/* 1. Department (CustomSelect) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Department</span>
+                    </span>
+                    <CustomSelect
+                      value={departmentId}
+                      onChange={setDepartmentId}
+                      options={departmentOptions}
+                      placeholder="Select department..."
+                      fullWidth
+                      buttonClassName="h-9 bg-white"
+                    />
+                  </div>
 
-                {/* 3. Status */}
-                <div className="relative">
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <CircleDot className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Status</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOpenDropdown(openDropdown === "status" ? null : "status")}
-                    className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs font-medium text-[#0F172A]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {currentStatusObj.icon}
-                      <span>{currentStatusObj.label}</span>
-                    </div>
-                    <ChevronDown className="w-3 h-3 text-zinc-400" />
-                  </button>
+                  {/* 2. Project Lead (CustomSelect) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Project Lead</span>
+                    </span>
+                    <CustomSelect
+                      value={leadId}
+                      onChange={setLeadId}
+                      options={leadOptions}
+                      placeholder="Assign lead..."
+                      fullWidth
+                      searchable={leadOptions.length > 5}
+                      buttonClassName="h-9 bg-white"
+                    />
+                  </div>
 
-                  {openDropdown === "status" && (
-                    <div className="absolute left-0 top-full mt-1 z-50">
-                      <StatusMenu
-                        currentStatus={status}
-                        onSelect={(newSt) => {
-                          setStatus(newSt);
-                          setOpenDropdown(null);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
+                  {/* 3. Status Menu */}
+                  <div ref={statusRef} className="relative space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <CircleDot className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Status</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setStatusOpen(!statusOpen)}
+                      className="flex h-9 w-full items-center justify-between gap-2 rounded-[10px] border border-[#D8DDD4] bg-white px-3 text-xs font-semibold text-[#18221E] shadow-2xs hover:bg-[#FAF9F5] hover:border-[#10251F] transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {currentStatusObj.icon}
+                        <span>{currentStatusObj.label}</span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8A958F]" />
+                    </button>
 
-                {/* 4. Priority */}
-                <div className="relative">
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <Flag className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Priority</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
-                    className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs font-medium text-[#0F172A]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {currentPriorityObj.icon}
-                      <span className={currentPriorityObj.color}>{currentPriorityObj.label}</span>
-                    </div>
-                    <ChevronDown className="w-3 h-3 text-zinc-400" />
-                  </button>
+                    {statusOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 z-50">
+                        <StatusMenu
+                          currentStatus={status}
+                          onSelect={(newSt) => {
+                            setStatus(newSt);
+                            setStatusOpen(false);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                  {openDropdown === "priority" && (
-                    <div className="absolute left-0 top-full mt-1 z-50">
-                      <PriorityMenu
-                        currentPriority={priority}
-                        onSelect={(newPr) => {
-                          setPriority(newPr);
-                          setOpenDropdown(null);
-                        }}
-                        people={people}
-                      />
-                    </div>
-                  )}
-                </div>
+                  {/* 4. Priority Menu */}
+                  <div ref={priorityRef} className="relative space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <Flag className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Priority</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPriorityOpen(!priorityOpen)}
+                      className="flex h-9 w-full items-center justify-between gap-2 rounded-[10px] border border-[#D8DDD4] bg-white px-3 text-xs font-semibold text-[#18221E] shadow-2xs hover:bg-[#FAF9F5] hover:border-[#10251F] transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {currentPriorityObj.icon}
+                        <span className={currentPriorityObj.color}>{currentPriorityObj.label}</span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8A958F]" />
+                    </button>
 
-                {/* 5. Start Date */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Start Date</span>
-                  </span>
-                  <DatePicker
-                    value={startDate}
-                    onChange={(val) => setStartDate(val)}
-                    placeholder="Select start date"
-                  />
-                </div>
+                    {priorityOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 z-50">
+                        <PriorityMenu
+                          currentPriority={priority}
+                          onSelect={(newPr) => {
+                            setPriority(newPr);
+                            setPriorityOpen(false);
+                          }}
+                          people={people}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                {/* 6. Due Date */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Due Date</span>
-                  </span>
-                  <DatePicker
-                    value={dueDate}
-                    onChange={(val) => setDueDate(val)}
-                    placeholder="Select due date"
-                  />
-                </div>
+                  {/* 5. Start Date (Custom DatePicker) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Start Date</span>
+                    </span>
+                    <DatePicker
+                      value={startDate}
+                      onChange={setStartDate}
+                      placeholder="Select start date"
+                      buttonClassName="h-9 bg-white"
+                    />
+                  </div>
 
-                {/* 7. Client Name (Optional) */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Client Name (Optional)</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="e.g. Acme Corp"
-                    className="w-full py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs text-[#0F172A] focus:outline-none focus:border-[#0F172A]"
-                  />
-                </div>
+                  {/* 6. Due Date (Custom DatePicker) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Due Date</span>
+                    </span>
+                    <DatePicker
+                      value={dueDate}
+                      onChange={setDueDate}
+                      placeholder="Select due date"
+                      buttonClassName="h-9 bg-white"
+                    />
+                  </div>
 
-                {/* 8. Budget (Optional) */}
-                <div>
-                  <span className="text-[#64748B] block mb-1 font-medium flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5 text-[#94A3B8]" />
-                    <span>Budget (Optional)</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={budget}
-                    onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. $25,000"
-                    className="w-full py-1.5 px-2.5 rounded-lg border border-[#E2E8F0] bg-white text-xs text-[#0F172A] focus:outline-none focus:border-[#0F172A]"
-                  />
+                  {/* 7. Client Name (Optional) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Client Name (Optional)</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="e.g. Acme Corporation"
+                      className="flex h-9 w-full items-center rounded-[10px] border border-[#D8DDD4] bg-white px-3 text-xs font-medium text-[#18221E] shadow-2xs placeholder:text-[#8A958F] focus:border-[#10251F] focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  {/* 8. Budget (Optional) */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-[#65706A] flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-[#8A958F]" />
+                      <span>Budget (Optional)</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="e.g. $25,000"
+                      className="flex h-9 w-full items-center rounded-[10px] border border-[#D8DDD4] bg-white px-3 text-xs font-medium text-[#18221E] shadow-2xs placeholder:text-[#8A958F] focus:border-[#10251F] focus:outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ── FOOTER ACTIONS ───────────────────────────────────────────── */}
-            <div className="flex items-center justify-between px-7 py-4 border-t border-[#F1F5F9] bg-[#FAFAFA] shrink-0">
-              <span className="text-xs text-[#94A3B8]">
-                Press <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-[#E2E8F0] text-[#64748B]">Esc</kbd> to cancel
+            <div className="flex items-center justify-between px-7 py-4 border-t border-[#E7EADF] bg-[#FAF9F5]/70 shrink-0">
+              <span className="text-[11px] text-[#8A958F]">
+                Press <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-[#D8DDD4] text-[#65706A]">Esc</kbd> to dismiss
               </span>
 
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-lg border border-[#E2E8F0] bg-white text-xs font-semibold text-[#334155] hover:bg-[#F8FAFC] transition-colors"
+                  className="px-4 py-2 rounded-[10px] border border-[#D8DDD4] bg-white text-xs font-semibold text-[#65706A] hover:text-[#18221E] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!isValid || loading}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[#10251F] hover:bg-[#18342C] text-[#F4F3EE] text-xs font-semibold shadow-xs transition-all disabled:opacity-40 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-[10px] bg-[#10251F] hover:bg-[#18342C] text-[#F4F3EE] text-xs font-semibold shadow-xs transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                 >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{loading ? "Creating..." : "Create Project"}</span>
                 </button>
               </div>
             </div>
           </form>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

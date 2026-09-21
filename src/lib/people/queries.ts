@@ -156,10 +156,24 @@ export const getWorkspacePeople = cache(
         profile?.employeeId ||
         null;
 
-      const employmentStatus =
-        (linkedCandidate?.employment_status as EmploymentStatus | undefined) ||
-        (profile?.employmentStatus as EmploymentStatus | undefined) ||
-        (linkedOnboarding && linkedOnboarding.status !== "Completed" ? "Pending" : "Active");
+      // Derive employment status: prioritize explicit workspace_member status, then candidate/profile
+      let rawStatus: string = (m.employment_status as string) || (profile?.employmentStatus as string) || (linkedCandidate?.employment_status as string) || "Active";
+      let employmentStatus: EmploymentStatus = "Active";
+      const s = rawStatus.toLowerCase();
+      if (s === "active") {
+        employmentStatus = "Active";
+      } else if (s === "pending" || s === "invited") {
+        employmentStatus = "Pending";
+      } else if (s.includes("leave")) {
+        employmentStatus = "On Leave";
+      } else if (s.includes("probation")) {
+        employmentStatus = "Probation";
+      } else if (s === "inactive" || s === "terminated") {
+        employmentStatus = "Inactive";
+      } else {
+        // Any other state (like "pending approval" for a joined workspace member) is Active
+        employmentStatus = "Active";
+      }
 
       const onboardingStatus =
         (linkedOnboarding?.status as OnboardingStatus | undefined) ||

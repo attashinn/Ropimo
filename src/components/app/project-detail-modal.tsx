@@ -23,6 +23,7 @@ import {
   Search,
   Bell,
   ChevronDown,
+  ChevronRight,
   X,
   Bold,
   Italic,
@@ -35,15 +36,21 @@ import {
   Quote,
   Maximize2,
   Minimize2,
+  CheckSquare,
+  ArrowUpRight,
 } from "lucide-react";
+import Link from "next/link";
+import { RichDescriptionEditor } from "@/components/app/rich-description-editor";
 import { Project, ProjectStatus, ProjectPriority } from "@/types/project";
-import { Task, TaskStatus } from "@/types/task";
+import { Task, TaskStatus, TaskPriority } from "@/types/task";
 import { Workspace } from "@/types/workspace";
 import { WorkspacePerson } from "@/types/people";
 import { Department } from "@/types/department";
 import {
   updateProjectAction,
 } from "@/lib/project/actions";
+import { createTaskAction, updateTaskAction } from "@/lib/task/actions";
+import { cn } from "@/lib/utils";
 import {
   StatusMenu,
   PriorityMenu,
@@ -53,6 +60,7 @@ import {
   ClickUpStatus,
   ClickUpPriority,
 } from "./clickup-property-dropdowns";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export interface ProjectDetailModalProps {
   isOpen: boolean;
@@ -91,25 +99,28 @@ export function ProjectDetailModal({
   const [isBookmarked, setIsBookmarked] = React.useState(false);
 
   // Criteria State
-  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([
-    { id: "c1", text: "New hero section with headline and subtext", done: true },
-    { id: "c2", text: "Highlight 3 core features with icons", done: false },
-    { id: "c3", text: "Improve mobile responsiveness", done: false },
-    { id: "c4", text: "Review and optimize performance", done: false },
-  ]);
+  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([]);
   const [newCriteriaInput, setNewCriteriaInput] = React.useState("");
   const [showAddCriteria, setShowAddCriteria] = React.useState(false);
 
   // Time Tracking
-  const [loggedMinutes, setLoggedMinutes] = React.useState(204);
-  const [estimatedMinutes, setEstimatedMinutes] = React.useState(480);
+  const [loggedMinutes, setLoggedMinutes] = React.useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = React.useState(0);
   const [isLoggingTime, setIsLoggingTime] = React.useState(false);
   const [logTimeInput, setLogTimeInput] = React.useState("");
 
   // Tags
-  const [tags, setTags] = React.useState<string[]>(["Design", "Homepage"]);
+  const [tags, setTags] = React.useState<string[]>([]);
   const [isEditingTags, setIsEditingTags] = React.useState(false);
   const [newTagInput, setNewTagInput] = React.useState("");
+
+  // Due Date State
+  const [dueDate, setDueDate] = React.useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split("T")[0];
+  });
+  const [reviewerId, setReviewerId] = React.useState("");
 
   // Comments
   const [comments, setComments] = React.useState<
@@ -122,29 +133,7 @@ export function ProjectDetailModal({
       time: string;
       attachment?: { name: string; type: string; size: string };
     }[]
-  >([
-    {
-      id: "cm-1",
-      user: "Jesmin Sikder",
-      role: "HR Manager",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Please share the Figma file when you're done with the project overview.",
-      time: "2 hours ago",
-    },
-    {
-      id: "cm-2",
-      user: "Morgan Sterling",
-      role: "Product Designer",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Here's the latest update for review.",
-      time: "1 hour ago",
-      attachment: {
-        name: "Homepage_Hero_v2.fig",
-        type: "Figma file",
-        size: "2.4 MB",
-      },
-    },
-  ]);
+  >([]);
   const [newComment, setNewComment] = React.useState("");
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -153,11 +142,32 @@ export function ProjectDetailModal({
   const [openDropdown, setOpenDropdown] = React.useState<string | null>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
+  // Local project tasks state
+  const [localTasks, setLocalTasks] = React.useState<Task[]>(tasks);
+  const [isAddingTask, setIsAddingTask] = React.useState(false);
+  const [newTaskTitle, setNewTaskTitle] = React.useState("");
+  const [newTaskPriority, setNewTaskPriority] = React.useState<TaskPriority>("medium");
+  const [creatingTask, setCreatingTask] = React.useState(false);
+  const [taskSearch, setTaskSearch] = React.useState("");
+  const [addingTaskStatus, setAddingTaskStatus] = React.useState<TaskStatus | null>(null);
+  const [inlineTaskTitle, setInlineTaskTitle] = React.useState("");
+  const [inlineTaskPriority, setInlineTaskPriority] = React.useState<TaskPriority>("medium");
+  const [inlineTaskDueDate, setInlineTaskDueDate] = React.useState("");
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Record<string, boolean>>({});
+  const [taskPriorityDropdownId, setTaskPriorityDropdownId] = React.useState<string | null>(null);
+  const [taskStatusDropdownId, setTaskStatusDropdownId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLocalTasks(tasks);
+  }, [tasks]);
+
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
       }
+      setTaskPriorityDropdownId(null);
+      setTaskStatusDropdownId(null);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -200,7 +210,202 @@ export function ProjectDetailModal({
   const currentStatusObj = STATUS_LIST.find((s) => s.id === status) || STATUS_LIST[0];
   const currentPriorityObj = PRIORITY_OPTIONS.find((p) => p.id === priority) || PRIORITY_OPTIONS[0];
 
-  const projectTasks = tasks.filter((t) => t.project_id === project.id);
+  const currentOwner = people.find((p) => p.role === "owner") || people[0];
+  const creatorName = currentOwner?.full_name || "Tashin Khan";
+  const createdOnText = project.created_at
+    ? new Date(project.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Recently";
+
+  const daysLeft = (() => {
+    if (!dueDate) return null;
+    const target = new Date(dueDate).getTime();
+    const now = new Date().setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target - now) / 86400000);
+    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return "Due today";
+    return `${diff}d left`;
+  })();
+
+  const formattedDueDate = (() => {
+    if (!dueDate) return "No due date";
+    const [y, m, d] = dueDate.split("-");
+    if (!y || !m || !d) return dueDate;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  })();
+
+  const projectTasks = localTasks.filter((t) => project && t.project_id === project.id);
+
+  const handleToggleTaskStatus = async (task: Task) => {
+    const isComp = task.status === "completed";
+    const nextStatus: TaskStatus = isComp ? "todo" : "completed";
+
+    // Optimistic update
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
+    );
+
+    try {
+      await updateTaskAction({
+        taskId: task.id,
+        workspaceId: workspace.id,
+        status: nextStatus,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      setLocalTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t))
+      );
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+    setTaskStatusDropdownId(null);
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    );
+    try {
+      await updateTaskAction({
+        taskId,
+        workspaceId: workspace.id,
+        status: newStatus,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateTaskPriority = async (taskId: string, newPriority: TaskPriority) => {
+    setTaskPriorityDropdownId(null);
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, priority: newPriority } : t))
+    );
+    try {
+      await updateTaskAction({
+        taskId,
+        workspaceId: workspace.id,
+        priority: newPriority,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleInlineCreateTask = async (status: TaskStatus) => {
+    if (!inlineTaskTitle.trim() || creatingTask) return;
+    setCreatingTask(true);
+    try {
+      const res = await createTaskAction({
+        workspaceId: workspace.id,
+        projectId: project.id,
+        departmentId: project.department_id || undefined,
+        title: inlineTaskTitle.trim(),
+        priority: inlineTaskPriority,
+        dueDate: inlineTaskDueDate || undefined,
+        status,
+      });
+      if (res.success && res.taskId) {
+        const newTaskItem: Task = {
+          id: res.taskId,
+          workspace_id: workspace.id,
+          project_id: project.id,
+          department_id: project.department_id || null,
+          title: inlineTaskTitle.trim(),
+          description: null,
+          status,
+          priority: inlineTaskPriority,
+          due_date: inlineTaskDueDate || null,
+          created_by: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          assignees: [],
+          attachments: [],
+          activities: [],
+          comments: [],
+          submissions: [],
+          project: {
+            id: project.id,
+            name: project.name,
+            color: project.color || "#10251F",
+            icon: project.icon || "folder",
+          },
+        };
+        setLocalTasks((prev) => [newTaskItem, ...prev]);
+        setInlineTaskTitle("");
+        setInlineTaskDueDate("");
+        setAddingTaskStatus(null);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || creatingTask) return;
+    setCreatingTask(true);
+    try {
+      const res = await createTaskAction({
+        workspaceId: workspace.id,
+        projectId: project.id,
+        departmentId: project.department_id || undefined,
+        title: newTaskTitle.trim(),
+        priority: newTaskPriority,
+        status: "todo",
+      });
+      if (res.success && res.taskId) {
+        const newTaskItem: Task = {
+          id: res.taskId,
+          workspace_id: workspace.id,
+          project_id: project.id,
+          department_id: project.department_id || null,
+          title: newTaskTitle.trim(),
+          description: null,
+          status: "todo",
+          priority: newTaskPriority,
+          due_date: null,
+          created_by: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          assignees: [],
+          attachments: [],
+          activities: [],
+          comments: [],
+          submissions: [],
+          project: {
+            id: project.id,
+            name: project.name,
+            color: project.color || "#10251F",
+            icon: project.icon || "folder",
+          },
+        };
+        setLocalTasks((prev) => [newTaskItem, ...prev]);
+        setNewTaskTitle("");
+        setIsAddingTask(false);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCreatingTask(false);
+    }
+  };
 
   const handleUpdateField = async (fields: {
     name?: string;
@@ -487,12 +692,13 @@ export function ProjectDetailModal({
                   </div>
 
                   {/* Due Date Badge */}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] text-[#475569] font-medium text-xs">
-                    <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
-                    <span>Sep 4, 2026</span>
-                    <span className="text-[#94A3B8] text-[11px] bg-white px-1.5 py-0.2 rounded font-normal">
-                      3 days left
-                    </span>
+                  <div className="relative">
+                    <DatePicker
+                      value={dueDate}
+                      onChange={setDueDate}
+                      placeholder="Due date"
+                      buttonClassName="h-7 px-2.5 rounded-full bg-[#F1F5F9] border-transparent text-[#475569] hover:bg-[#E2E8F0] shadow-none text-xs"
+                    />
                   </div>
                 </div>
               </div>
@@ -563,7 +769,7 @@ export function ProjectDetailModal({
               >
                 <span>Tasks</span>
                 <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                  {projectTasks.length || 4}
+                  {projectTasks.length}
                 </span>
                 {activeTab === "subtasks" && (
                   <motion.div
@@ -615,53 +821,21 @@ export function ProjectDetailModal({
 
             {/* ── 2-COLUMN GRID BODY ─────────────────────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* ── LEFT COLUMN (Description, Criteria, Comments) ───────── */}
+              {/* ── LEFT COLUMN ────────────────────────────────────────── */}
               <div className="lg:col-span-8 space-y-8">
-                {/* Description */}
-                <div className="space-y-3">
-                  <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
-                  <textarea
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    onBlur={() => handleUpdateField({ description })}
-                    placeholder="Define the single source of truth for the engagement..."
-                    className="w-full text-[13.5px] leading-relaxed text-[#334155] placeholder:text-[#94A3B8] bg-transparent border-0 focus:outline-none resize-none"
-                  />
-
-                  {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-1 pt-1 text-[#64748B]">
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Bold className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Italic className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Strikethrough className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <AlignLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <List className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <ListOrdered className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Code className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Quote className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+                {/* 1. DETAILS TAB */}
+                {activeTab === "details" && (
+                  <div className="space-y-8">
+                    {/* Description */}
+                    <div className="space-y-3">
+                      <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
+                      <RichDescriptionEditor
+                        value={description}
+                        onChange={(val) => setDescription(val)}
+                        onBlur={(val) => handleUpdateField({ description: val })}
+                        placeholder="Add detailed project overview, roadmap, and scope..."
+                      />
+                    </div>
 
                 {/* Acceptance Criteria */}
                 <div className="space-y-3.5 pt-2">
@@ -840,19 +1014,580 @@ export function ProjectDetailModal({
                   </div>
                 </div>
               </div>
+                )}
 
-              {/* ── RIGHT COLUMN (Task Details, Time Tracking, Tags) ─────── */}
+                {/* 2. CLICKUP-STYLE TASKS TAB */}
+                {activeTab === "subtasks" && (() => {
+                  const filteredTasks = projectTasks.filter((t) => {
+                    if (!taskSearch.trim()) return true;
+                    return t.title.toLowerCase().includes(taskSearch.toLowerCase());
+                  });
+
+                  const completedCount = projectTasks.filter((t) => t.status === "completed").length;
+                  const completionRate = projectTasks.length > 0
+                    ? Math.round((completedCount / projectTasks.length) * 100)
+                    : 0;
+
+                  const GROUPS: {
+                    id: TaskStatus;
+                    label: string;
+                    headerBg: string;
+                    badgeBg: string;
+                    badgeText: string;
+                    dotColor: string;
+                    filterFn: (t: Task) => boolean;
+                  }[] = [
+                    {
+                      id: "todo",
+                      label: "TO DO",
+                      headerBg: "hover:bg-slate-50",
+                      badgeBg: "bg-slate-100",
+                      badgeText: "text-slate-700",
+                      dotColor: "bg-slate-400",
+                      filterFn: (t) => t.status === "todo",
+                    },
+                    {
+                      id: "in_progress",
+                      label: "IN PROGRESS",
+                      headerBg: "hover:bg-purple-50/40",
+                      badgeBg: "bg-purple-100",
+                      badgeText: "text-[#7C3AED]",
+                      dotColor: "bg-[#7C3AED]",
+                      filterFn: (t) => t.status === "in_progress",
+                    },
+                    {
+                      id: "in_review",
+                      label: "IN REVIEW",
+                      headerBg: "hover:bg-amber-50/40",
+                      badgeBg: "bg-amber-100",
+                      badgeText: "text-amber-800",
+                      dotColor: "bg-amber-500",
+                      filterFn: (t) => t.status === "in_review" || t.status === "blocked" || t.status === "changes_requested",
+                    },
+                    {
+                      id: "completed",
+                      label: "COMPLETE",
+                      headerBg: "hover:bg-teal-50/40",
+                      badgeBg: "bg-teal-100",
+                      badgeText: "text-[#0D9488]",
+                      dotColor: "bg-[#0D9488]",
+                      filterFn: (t) => t.status === "completed",
+                    },
+                  ];
+
+                  return (
+                    <div className="space-y-6">
+                      {/* ClickUp Header Toolbar */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F1F5F9]">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-[15px] font-bold text-[#0F172A]">Tasks</h2>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                              {projectTasks.length}
+                            </span>
+                          </div>
+
+                          {/* Progress Meter */}
+                          {projectTasks.length > 0 && (
+                            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+                              <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                <div
+                                  className="h-full bg-[#0D9488] transition-all duration-300 rounded-full"
+                                  style={{ width: `${completionRate}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-semibold text-slate-500">
+                                {completedCount}/{projectTasks.length} ({completionRate}%)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Search & Quick Add */}
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              value={taskSearch}
+                              onChange={(e) => setTaskSearch(e.target.value)}
+                              placeholder="Search tasks..."
+                              className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 w-44 sm:w-52"
+                            />
+                            {taskSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setTaskSearch("")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingTaskStatus("todo");
+                              setInlineTaskTitle("");
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10251F] text-[#C7F34A] text-xs font-semibold hover:bg-[#19362e] transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Task</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Zero State if no tasks at all */}
+                      {projectTasks.length === 0 ? (
+                        <div className="py-14 px-6 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 space-y-4">
+                          <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center mx-auto text-slate-400">
+                            <CheckSquare className="w-6 h-6 text-[#10251F]" />
+                          </div>
+                          <div className="max-w-md mx-auto">
+                            <p className="text-sm font-bold text-[#0F172A]">No tasks in this project yet</p>
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                              Organize your deliverables into ClickUp-style status groups, assign owners, set deadlines, and track milestones.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingTaskStatus("todo");
+                              setInlineTaskTitle("");
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10251F] text-[#C7F34A] text-xs font-semibold hover:bg-[#19362e] transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Create First Task</span>
+                          </button>
+                        </div>
+                      ) : (
+                        /* ClickUp Status Groups */
+                        <div className="space-y-6">
+                          {GROUPS.map((group) => {
+                            const groupTasks = filteredTasks.filter(group.filterFn);
+                            const isCollapsed = !!collapsedGroups[group.id];
+                            const isQuickAddActive = addingTaskStatus === group.id;
+
+                            // Skip empty completed/review groups only if user is actively searching and there are no results
+                            if (taskSearch.trim() && groupTasks.length === 0) {
+                              return null;
+                            }
+
+                            return (
+                              <div
+                                key={group.id}
+                                className="rounded-xl border border-slate-200/90 bg-white overflow-hidden shadow-xs"
+                              >
+                                {/* Group Header */}
+                                <div
+                                  onClick={() => {
+                                    setCollapsedGroups((prev) => ({
+                                      ...prev,
+                                      [group.id]: !prev[group.id],
+                                    }));
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-between px-3 py-2.5 bg-slate-50/70 border-b border-slate-100 cursor-pointer select-none transition-colors",
+                                    group.headerBg
+                                  )}
+                                >
+                                  {/* Left: Status Pill + Count */}
+                                  <div className="flex items-center gap-2">
+                                    <ChevronDown
+                                      className={cn(
+                                        "w-3.5 h-3.5 text-slate-400 transition-transform duration-150",
+                                        isCollapsed && "-rotate-90"
+                                      )}
+                                    />
+                                    <span
+                                      className={cn(
+                                        "px-2.5 py-0.5 rounded-md font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-2xs",
+                                        group.badgeBg,
+                                        group.badgeText
+                                      )}
+                                    >
+                                      <span className={cn("w-1.5 h-1.5 rounded-full", group.dotColor)} />
+                                      {group.label}
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-slate-500">
+                                      {groupTasks.length}
+                                    </span>
+                                  </div>
+
+                                  {/* Right: Table Column Labels & Quick Add */}
+                                  <div className="flex items-center gap-6">
+                                    <div className="hidden md:flex items-center gap-6 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                      <span className="w-24 text-center">Assignee</span>
+                                      <span className="w-24 text-center">Due Date</span>
+                                      <span className="w-20 text-center">Priority</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAddingTaskStatus(group.id);
+                                        setInlineTaskTitle("");
+                                        if (isCollapsed) {
+                                          setCollapsedGroups((prev) => ({ ...prev, [group.id]: false }));
+                                        }
+                                      }}
+                                      className="p-1 rounded hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 transition-colors"
+                                      title={`Add task to ${group.label}`}
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Task Rows */}
+                                {!isCollapsed && (
+                                  <div className="divide-y divide-slate-100">
+                                    {groupTasks.length === 0 && !isQuickAddActive ? (
+                                      <div className="py-4 px-4 text-center text-xs text-slate-400">
+                                        No tasks in {group.label.toLowerCase()}
+                                      </div>
+                                    ) : (
+                                      groupTasks.map((t) => {
+                                        const isCompleted = t.status === "completed";
+                                        const assignee = t.assignees?.[0] || people.find((p) => p.user_id === t.created_by);
+
+                                        // Priority metadata
+                                        const priorityConfig: Record<
+                                          TaskPriority,
+                                          { flagColor: string; bg: string; text: string; label: string }
+                                        > = {
+                                          urgent: {
+                                            flagColor: "text-red-600 fill-red-600",
+                                            bg: "bg-red-50 hover:bg-red-100/80 border-red-200",
+                                            text: "text-red-700",
+                                            label: "Urgent",
+                                          },
+                                          high: {
+                                            flagColor: "text-amber-500 fill-amber-500",
+                                            bg: "bg-amber-50 hover:bg-amber-100/80 border-amber-200",
+                                            text: "text-amber-700",
+                                            label: "High",
+                                          },
+                                          medium: {
+                                            flagColor: "text-blue-500 fill-blue-500",
+                                            bg: "bg-blue-50 hover:bg-blue-100/80 border-blue-200",
+                                            text: "text-blue-700",
+                                            label: "Normal",
+                                          },
+                                          low: {
+                                            flagColor: "text-slate-400 fill-slate-400",
+                                            bg: "bg-slate-50 hover:bg-slate-100/80 border-slate-200",
+                                            text: "text-slate-600",
+                                            label: "Low",
+                                          },
+                                        };
+                                        const pMeta = priorityConfig[t.priority] || priorityConfig.medium;
+
+                                        // Due date calculation
+                                        let dueDateLabel: string | null = null;
+                                        let isOverdue = false;
+                                        if (t.due_date) {
+                                          const d = new Date(t.due_date);
+                                          if (!isNaN(d.getTime())) {
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            const target = new Date(d);
+                                            target.setHours(0, 0, 0, 0);
+                                            const diffDays = Math.round(
+                                              (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                                            );
+                                            isOverdue = diffDays < 0 && !isCompleted;
+                                            if (diffDays === 0) dueDateLabel = "Today";
+                                            else if (diffDays === 1) dueDateLabel = "Tomorrow";
+                                            else if (diffDays === -1) dueDateLabel = "Yesterday";
+                                            else
+                                              dueDateLabel = d.toLocaleDateString("en-US", {
+                                                month: "short",
+                                                day: "numeric",
+                                              });
+                                          }
+                                        }
+
+                                        return (
+                                          <div
+                                            key={t.id}
+                                            className="group flex items-center justify-between gap-3 px-3.5 py-2.5 hover:bg-[#F8FAFC] transition-colors"
+                                          >
+                                            {/* Left: Status Circle & Title */}
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                              {/* ClickUp Check Circle Button */}
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleToggleTaskStatus(t);
+                                                }}
+                                                className={cn(
+                                                  "w-4 h-4 rounded-full flex items-center justify-center transition-all shrink-0 cursor-pointer",
+                                                  isCompleted
+                                                    ? "bg-[#0D9488] text-white shadow-2xs"
+                                                    : "border-2 border-slate-300 hover:border-[#0D9488] hover:bg-teal-50 text-transparent hover:text-[#0D9488]"
+                                                )}
+                                                title={isCompleted ? "Mark as incomplete" : "Click to complete"}
+                                              >
+                                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                              </button>
+
+                                              {/* Title */}
+                                              <span
+                                                onClick={() =>
+                                                  onTaskClicked ? onTaskClicked(t) : router.push("/app/my-tasks")
+                                                }
+                                                className={cn(
+                                                  "text-xs font-medium truncate cursor-pointer transition-colors leading-snug",
+                                                  isCompleted
+                                                    ? "line-through text-slate-400"
+                                                    : "text-[#0F172A] hover:text-[#0D9488]"
+                                                )}
+                                                title={t.title}
+                                              >
+                                                {t.title}
+                                              </span>
+                                            </div>
+
+                                            {/* Right: Columns (Assignee, Due Date, Priority, Actions) */}
+                                            <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+                                              {/* Assignee */}
+                                              <div className="w-20 sm:w-24 flex items-center justify-center">
+                                                {assignee ? (
+                                                  <div
+                                                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium max-w-full"
+                                                    title={assignee.full_name || assignee.email}
+                                                  >
+                                                    <span className="w-3.5 h-3.5 rounded-full bg-[#10251F] text-[#C7F34A] flex items-center justify-center text-[8px] font-bold shrink-0">
+                                                      {(assignee.full_name || assignee.email || "U").charAt(0).toUpperCase()}
+                                                    </span>
+                                                    <span className="truncate max-w-[55px]">
+                                                      {assignee.full_name ? assignee.full_name.split(" ")[0] : "User"}
+                                                    </span>
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-[11px] text-slate-300 group-hover:text-slate-400 flex items-center gap-1">
+                                                    <User className="w-3 h-3" />
+                                                    <span className="text-[10px] hidden sm:inline">None</span>
+                                                  </span>
+                                                )}
+                                              </div>
+
+                                              {/* Due Date */}
+                                              <div className="w-20 sm:w-24 flex items-center justify-center">
+                                                {dueDateLabel ? (
+                                                  <span
+                                                    className={cn(
+                                                      "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border",
+                                                      isOverdue
+                                                        ? "bg-red-50 text-red-600 border-red-200"
+                                                        : "bg-slate-50 text-slate-600 border-slate-200"
+                                                    )}
+                                                  >
+                                                    <Calendar className="w-2.5 h-2.5" />
+                                                    <span>{dueDateLabel}</span>
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-[10px] text-slate-300 group-hover:text-slate-400 flex items-center gap-1">
+                                                    <Calendar className="w-2.5 h-2.5" />
+                                                    <span className="hidden sm:inline">No date</span>
+                                                  </span>
+                                                )}
+                                              </div>
+
+                                              {/* Priority Dropdown Trigger */}
+                                              <div className="w-18 sm:w-20 relative flex items-center justify-center">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setTaskPriorityDropdownId(
+                                                      taskPriorityDropdownId === t.id ? null : t.id
+                                                    );
+                                                    setTaskStatusDropdownId(null);
+                                                  }}
+                                                  className={cn(
+                                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors cursor-pointer",
+                                                    pMeta.bg,
+                                                    pMeta.text
+                                                  )}
+                                                >
+                                                  <Flag className={cn("w-2.5 h-2.5", pMeta.flagColor)} />
+                                                  <span>{pMeta.label}</span>
+                                                </button>
+
+                                                {/* ClickUp Priority Popover */}
+                                                {taskPriorityDropdownId === t.id && (
+                                                  <div
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 w-32 animate-in fade-in zoom-in-95 duration-100"
+                                                  >
+                                                    {(
+                                                      [
+                                                        { id: "urgent", label: "Urgent", flag: "text-red-600 fill-red-600" },
+                                                        { id: "high", label: "High", flag: "text-amber-500 fill-amber-500" },
+                                                        { id: "medium", label: "Normal", flag: "text-blue-500 fill-blue-500" },
+                                                        { id: "low", label: "Low", flag: "text-slate-400 fill-slate-400" },
+                                                      ] as const
+                                                    ).map((opt) => (
+                                                      <button
+                                                        key={opt.id}
+                                                        type="button"
+                                                        onClick={() => handleUpdateTaskPriority(t.id, opt.id)}
+                                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 font-medium text-slate-700"
+                                                      >
+                                                        <Flag className={cn("w-3 h-3", opt.flag)} />
+                                                        <span>{opt.label}</span>
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* Open Task Modal Link */}
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  onTaskClicked ? onTaskClicked(t) : router.push("/app/my-tasks")
+                                                }
+                                                className="p-1 rounded hover:bg-slate-200/70 text-slate-400 hover:text-slate-800 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                title="Open task details"
+                                              >
+                                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+
+                                    {/* Inline Rapid Task Creator Row */}
+                                    {isQuickAddActive ? (
+                                      <form
+                                        onSubmit={(e) => {
+                                          e.preventDefault();
+                                          handleInlineCreateTask(group.id);
+                                        }}
+                                        className="p-3 bg-[#FAF9F5] border-t border-slate-200 space-y-2.5 animate-in fade-in duration-150"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="w-4 h-4 rounded-full border-2 border-dashed border-slate-300 shrink-0" />
+                                          <input
+                                            type="text"
+                                            autoFocus
+                                            value={inlineTaskTitle}
+                                            onChange={(e) => setInlineTaskTitle(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Escape") {
+                                                setAddingTaskStatus(null);
+                                                setInlineTaskTitle("");
+                                              }
+                                            }}
+                                            placeholder={`Task name in ${group.label}... (Press Enter to save)`}
+                                            className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#10251F] shadow-2xs"
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between pl-6 text-xs">
+                                          <div className="flex items-center gap-2">
+                                            <select
+                                              value={inlineTaskPriority}
+                                              onChange={(e) => setInlineTaskPriority(e.target.value as TaskPriority)}
+                                              className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
+                                            >
+                                              <option value="urgent">🚩 Urgent</option>
+                                              <option value="high">🚩 High</option>
+                                              <option value="medium">🚩 Normal</option>
+                                              <option value="low">🚩 Low</option>
+                                            </select>
+                                            <input
+                                              type="date"
+                                              value={inlineTaskDueDate}
+                                              onChange={(e) => setInlineTaskDueDate(e.target.value)}
+                                              className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none cursor-pointer shadow-2xs"
+                                            />
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setAddingTaskStatus(null);
+                                                setInlineTaskTitle("");
+                                              }}
+                                              className="px-2.5 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+                                            >
+                                              Cancel
+                                            </button>
+                                            <button
+                                              type="submit"
+                                              disabled={!inlineTaskTitle.trim() || creatingTask}
+                                              className="px-3.5 py-1 rounded-lg bg-[#10251F] text-[#C7F34A] text-[11px] font-semibold hover:bg-[#19362e] disabled:opacity-50 cursor-pointer shadow-xs flex items-center gap-1"
+                                            >
+                                              <span>{creatingTask ? "Saving..." : "Save Task"}</span>
+                                              <span className="text-[9px] opacity-70">↵</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </form>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAddingTaskStatus(group.id);
+                                          setInlineTaskTitle("");
+                                        }}
+                                        className="w-full flex items-center gap-2 py-2 px-3 text-xs font-medium text-slate-400 hover:text-slate-800 hover:bg-slate-50 cursor-pointer transition-colors"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        <span>Add Task</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 3. ATTACHMENTS TAB */}
+                {activeTab === "attachments" && (
+                  <div className="py-12 text-center rounded-2xl border border-dashed border-[#E2E8F0] space-y-2 bg-[#FAF9F5]/40">
+                    <Paperclip className="w-6 h-6 text-[#94A3B8] mx-auto" />
+                    <p className="text-xs font-semibold text-[#0F172A]">Project Files & Assets</p>
+                    <p className="text-[11px] text-[#64748B]">All project specs, briefs, and assets can be attached here.</p>
+                  </div>
+                )}
+
+                {/* 4. ACTIVITY TAB */}
+                {activeTab === "activity" && (
+                  <div className="py-12 text-center rounded-2xl border border-dashed border-[#E2E8F0] space-y-2 bg-[#FAF9F5]/40">
+                    <Clock className="w-6 h-6 text-[#94A3B8] mx-auto" />
+                    <p className="text-xs font-semibold text-[#0F172A]">Project Activity Timeline</p>
+                    <p className="text-[11px] text-[#64748B]">Created {createdOnText} by {creatorName}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* ── RIGHT COLUMN (Project Details, Time Tracking, Tags) ─────── */}
               <div className="lg:col-span-4 space-y-6">
-                {/* Card 1: Task Details */}
+                {/* Card 1: Project Details */}
                 <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white shadow-2xs space-y-4 text-[13px]">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-[#0F172A]">Task details</h3>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-[#64748B] hover:text-[#0F172A] px-2.5 py-1 rounded-md border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
+                    <h3 className="font-bold text-[#0F172A]">Project details</h3>
+                    <Link
+                      href={`/app/projects/${project.id}`}
+                      className="text-xs font-semibold text-[#246244] hover:underline flex items-center gap-1"
                     >
-                      Edit
-                    </button>
+                      <span>Full view</span>
+                      <ArrowUpRight className="w-3 h-3" />
+                    </Link>
                   </div>
 
                   <div className="space-y-3.5">
@@ -923,12 +1658,18 @@ export function ProjectDetailModal({
                     </div>
 
                     {/* Due date */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                         <Calendar className="w-4 h-4 text-[#94A3B8]" />
                         <span>Due date</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">Sep 4, 2026</span>
+                      <DatePicker
+                        value={dueDate}
+                        onChange={setDueDate}
+                        placeholder="No due date"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#E2E8F0] shadow-none"
+                        align="right"
+                      />
                     </div>
 
                     {/* Created by */}
@@ -937,7 +1678,7 @@ export function ProjectDetailModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created by</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">Morgan Sterling</span>
+                      <span className="font-medium text-[#0F172A]">{creatorName}</span>
                     </div>
 
                     {/* Created on */}
@@ -946,7 +1687,7 @@ export function ProjectDetailModal({
                         <Clock className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created on</span>
                       </span>
-                      <span className="text-[#475569] text-xs">Aug 18, 2026 11:12 AM</span>
+                      <span className="text-[#475569] text-xs">{createdOnText}</span>
                     </div>
 
                     {/* Reviewer */}
@@ -955,12 +1696,18 @@ export function ProjectDetailModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Reviewer</span>
                       </span>
-                      <div className="flex items-center gap-2 font-medium text-[#0F172A]">
-                        <div className="w-5 h-5 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[9px] font-bold">
-                          JS
-                        </div>
-                        <span>Jesmin Sikder</span>
-                      </div>
+                      <select
+                        value={reviewerId}
+                        onChange={(e) => setReviewerId(e.target.value)}
+                        className="text-xs font-medium text-[#0F172A] bg-transparent border border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#0F172A] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
+                      >
+                        <option value="">Unassigned</option>
+                        {people.map((p) => (
+                          <option key={p.user_id} value={p.user_id}>
+                            {p.full_name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

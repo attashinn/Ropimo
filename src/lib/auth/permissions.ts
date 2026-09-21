@@ -466,6 +466,7 @@ export type NavVisibility = {
   leave: boolean;
   projects: boolean;
   myTasks: boolean;
+  agent: boolean;
   calendar: boolean;
   files: boolean;
   documents: boolean;
@@ -483,6 +484,7 @@ export function getNavVisibility(ctx: UserContext): NavVisibility {
     leave: true,
     projects: true,
     myTasks: true,
+    agent: true,
     calendar: true,
     files: ctx.isOwnerOrAdmin,
     documents: true,

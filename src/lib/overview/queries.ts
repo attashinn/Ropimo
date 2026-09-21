@@ -174,6 +174,23 @@ export const getOverviewData = cache(
 
     const openJobs = jobOpenings.filter((j) => j.status === "Open" || !j.status);
 
+    // Merge recent leave requests into activities feed
+    const enrichedActivities: WorkspaceActivityItem[] = [...recentActivities];
+    pendingLeaves.forEach((leave) => {
+      const applicantName =
+        leave.person?.full_name || peopleMap.get(leave.user_id)?.full_name || "Team Member";
+      enrichedActivities.push({
+        id: `leave-${leave.id}`,
+        type: "leave_requested" as any,
+        targetName: `${leave.leave_type} (${leave.duration_days} ${leave.duration_days === 1 ? "day" : "days"})`,
+        createdAt: leave.created_at || leave.start_date,
+        actorName: applicantName,
+      });
+    });
+    enrichedActivities.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
     return {
       workspaceId,
       workspaceName,
@@ -186,7 +203,7 @@ export const getOverviewData = cache(
       completedCount: metrics.completedCount,
       people,
       departments,
-      recentActivities,
+      recentActivities: enrichedActivities.slice(0, 10),
       upcomingDeadlines,
       jobOpenings,
       openJobsCount: openJobs.length,

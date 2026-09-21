@@ -48,3 +48,9 @@ next-env.d.ts
 # local store data
 .data/
 .attendance_data.json
+
+# user uploaded files (stored in R2, not git)
+/public/uploads/
+
+# scratch directory
+scratch/

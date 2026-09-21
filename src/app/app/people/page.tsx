@@ -16,6 +16,8 @@ import {
 import { getWorkspaceInvitations } from "@/lib/invitations/queries";
 import { PeopleDirectory } from "@/components/app/people-directory";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "People & Recruitment — Ropimo",
   description: "Manage your team, employee information, recruitment pipeline, job openings, and interviews.",

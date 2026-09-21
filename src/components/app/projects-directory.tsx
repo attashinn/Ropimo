@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
+import { Task } from "@/types/task";
 import { Department } from "@/types/department";
 import { WorkspacePerson } from "@/types/people";
 import { SearchIcon } from "@/components/app/nav-icons";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/project/actions";
 import { AppIcon } from "@/components/ui/app-icon";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { stripHtml } from "@/lib/utils";
 
 export interface ProjectsDirectoryProps {
   workspaceId: string;
@@ -24,6 +26,7 @@ export interface ProjectsDirectoryProps {
   projects: Project[];
   departments?: Department[];
   people?: WorkspacePerson[];
+  tasks?: Task[];
   userRole?: string;
 }
 
@@ -33,6 +36,7 @@ export function ProjectsDirectory({
   projects = [],
   departments = [],
   people = [],
+  tasks = [],
   userRole = "owner",
 }: ProjectsDirectoryProps) {
   const router = useRouter();
@@ -534,7 +538,7 @@ export function ProjectsDirectory({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#D8DDD4] bg-[#FAF9F5]/70 text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-                  <th className="py-3.5 px-4 min-w-[220px]">Project</th>
+                  <th className="py-3.5 px-4 min-w-[200px] max-w-[280px]">Project</th>
                   <th className="py-3.5 px-3 min-w-[130px]">Department</th>
                   <th className="py-3.5 px-3 min-w-[130px]">Manager</th>
                   <th className="py-3.5 px-3 min-w-[120px]">Progress</th>
@@ -589,11 +593,11 @@ export function ProjectsDirectory({
                     return (
                       <tr
                         key={project.id}
-                        onClick={() => setSelectedProject(project)}
+                        onClick={() => router.push(`/app/projects/${project.id}`)}
                         className="hover:bg-[#FAF9F5]/70 transition-colors cursor-pointer group"
                       >
                         {/* Project Name + Icon + Subtitle */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 max-w-[280px]">
                           <div className="flex items-center gap-3">
                             <div
                               style={{ backgroundColor: project.color || "#10251F" }}
@@ -601,12 +605,12 @@ export function ProjectsDirectory({
                             >
                               {project.icon || (project.name?.[0] || "P").toUpperCase()}
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 max-w-[220px]">
                               <span className="font-bold text-[#18221E] group-hover:text-[#10251F] group-hover:underline truncate block text-xs">
                                 {project.name}
                               </span>
                               <p className="text-[11px] text-[#65706A] truncate">
-                                {project.description || "Internal company operating system"}
+                                {stripHtml(project.description) || "Internal company operating system"}
                               </p>
                             </div>
                           </div>
@@ -892,6 +896,7 @@ export function ProjectsDirectory({
         workspace={{ id: workspaceId, name: workspaceName, slug: workspaceName } as any}
         people={people}
         departments={departments}
+        tasks={tasks}
       />
     </div>
   );

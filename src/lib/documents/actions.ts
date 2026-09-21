@@ -52,35 +52,9 @@ export async function createDocumentAction(
     data: { user },
   } = await authClient.auth.getUser();
 
-  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  const bodyContent = content || `# ${trimmedTitle}\n\nStart writing here...`;
+  const words = bodyContent.trim().split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.ceil(words / 200));
-
-  const newDocId = `doc-${Date.now()}`;
-  const runtimeDoc: DocumentItem = {
-    id: newDocId,
-    workspace_id: workspaceId,
-    title: trimmedTitle,
-    subtitle: subtitle?.trim() || null,
-    description: description?.trim() || null,
-    content: content || "",
-    category: category || "HR",
-    status: status || "Published",
-    department_id: departmentId || null,
-    project_id: projectId || null,
-    access_level: accessLevel,
-    author_id: user?.id || null,
-    author_name: user?.user_metadata?.full_name || "Tashin Khan",
-    word_count: words,
-    read_time_minutes: readTime,
-    last_updated: "Just now",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    versions: [],
-    comments: [],
-  };
-
-  // Always save in runtime store immediately
-  addRuntimeDocument(runtimeDoc);
 
   const adminClient = createAdminClient();
 
@@ -92,7 +66,7 @@ export async function createDocumentAction(
         title: trimmedTitle,
         subtitle: subtitle?.trim() || null,
         description: description?.trim() || null,
-        content: content || "",
+        content: bodyContent,
         category: category || "HR",
         status: status || "Published",
         department_id: departmentId || null,
@@ -105,24 +79,52 @@ export async function createDocumentAction(
       .select()
       .single();
 
-    if (newDoc) {
-      // Create initial version 1.0
-      await adminClient.from("workspace_document_versions").insert({
-        document_id: newDoc.id,
-        version_number: "1.0",
-        author_id: user?.id || null,
-        author_name: user?.user_metadata?.full_name || "Tashin Khan",
-        note: "Initial document creation",
-        content: content || "",
-      });
+    if (error || !newDoc) {
+      console.error("DB insert error:", error);
+      return { success: false, error: error?.message || "Failed to save document." };
     }
+
+    // Create initial version 1.0
+    await adminClient.from("workspace_document_versions").insert({
+      document_id: newDoc.id,
+      version_number: "1.0",
+      author_id: user?.id || null,
+      author_name: user?.user_metadata?.full_name || "Unknown",
+      note: "Initial document creation",
+      content: bodyContent,
+    });
+
+    // Add to runtime store so it appears immediately before the next server rerender
+    const runtimeDoc: DocumentItem = {
+      id: newDoc.id, // real UUID from DB
+      workspace_id: newDoc.workspace_id,
+      title: newDoc.title,
+      subtitle: newDoc.subtitle || null,
+      description: newDoc.description || null,
+      content: newDoc.content || "",
+      category: (newDoc.category || "HR") as DocumentItem["category"],
+      status: (newDoc.status || "Published") as DocumentItem["status"],
+      department_id: newDoc.department_id || null,
+      project_id: newDoc.project_id || null,
+      access_level: newDoc.access_level as DocumentItem["access_level"],
+      author_id: newDoc.author_id || null,
+      author_name: user?.user_metadata?.full_name || "Unknown",
+      author_avatar: null,
+      word_count: newDoc.word_count || words,
+      read_time_minutes: newDoc.read_time_minutes || readTime,
+      last_updated: "Just now",
+      created_at: newDoc.created_at,
+      updated_at: newDoc.updated_at,
+      versions: [],
+      comments: [],
+    };
+    addRuntimeDocument(runtimeDoc);
 
     revalidatePath("/app/documents");
     return { success: true, document: runtimeDoc };
   } catch (err: any) {
-    console.warn("DB insert error, kept in runtime store:", err);
-    revalidatePath("/app/documents");
-    return { success: true, document: runtimeDoc };
+    console.error("createDocumentAction error:", err);
+    return { success: false, error: err?.message || "Unexpected error saving document." };
   }
 }
 

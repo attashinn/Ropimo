@@ -20,6 +20,7 @@ import {
   X,
   ArrowRight,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import { Workspace } from "@/types/workspace";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +28,7 @@ import { AppBreadcrumbs, BreadcrumbItem } from "./app-breadcrumbs";
 import { RopimoCommandMenu } from "@/components/ropimo/ropimo-command-menu";
 import { ProfileModal } from "./profile-modal";
 import { NotificationCenter } from "./notification-center";
+import { AICopilotDrawer } from "./ai/ai-copilot-drawer";
 import { AppNotification } from "@/types/notification";
 import { cn } from "@/lib/utils";
 
@@ -44,8 +46,8 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     id: "notif-1",
     workspace_id: "",
     user_id: "",
-    title: "Jesmin Sikder requested Annual Leave",
-    subtitle: "Aug 25 - Aug 28 (4 days) · Awaiting approval",
+    title: "Team member requested Annual Leave",
+    subtitle: "Awaiting review and approval",
     type: "leave_requested",
     read: false,
     action_url: "/app/leave",
@@ -152,10 +154,23 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
   const router = useRouter();
   const supabase = createClient();
   const [commandMenuOpen, setCommandMenuOpen] = React.useState(false);
+  const [copilotOpen, setCopilotOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const [profileModalOpen, setProfileModalOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
+
+  // Global shortcut for Copilot (Cmd+J / Ctrl+J)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setCopilotOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const workspaceName = workspace?.name || "brnnd";
   const breadcrumbs = React.useMemo(
@@ -238,6 +253,20 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
 
         {/* Right Search & Controls */}
         <div className="flex items-center gap-2.5 shrink-0 ml-3">
+          {/* AI Copilot Quick Drawer Trigger */}
+          <button
+            type="button"
+            onClick={() => setCopilotOpen(true)}
+            className="flex h-9 items-center gap-1.5 rounded-[10px] bg-[#10251F] text-[#C7F34A] px-2.5 sm:px-3 text-xs font-semibold shadow-2xs hover:bg-[#18362d] transition-colors cursor-pointer shrink-0"
+            title="AI Copilot (⌘J)"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#C7F34A] shrink-0" />
+            <span className="text-xs hidden sm:inline">AI Copilot</span>
+            <kbd className="hidden md:inline-flex items-center rounded bg-white/10 px-1 py-0.2 font-mono text-[9px] text-[#C7F34A]">
+              ⌘J
+            </kbd>
+          </button>
+
           {/* Global Search / Command Menu Trigger */}
           <button
             type="button"
@@ -367,6 +396,15 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
         open={commandMenuOpen}
         onOpenChange={setCommandMenuOpen}
         workspaceId={workspace?.id}
+      />
+
+      {/* AI Copilot Drawer */}
+      <AICopilotDrawer
+        open={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        workspaceId={workspace?.id || ""}
+        workspaceName={workspaceName}
+        userName={displayName}
       />
     </>
   );

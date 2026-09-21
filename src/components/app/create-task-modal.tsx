@@ -35,7 +35,12 @@ import {
   Quote,
   Maximize2,
   Minimize2,
+  ListTodo,
+  Users,
+  Sparkles,
 } from "lucide-react";
+import { BrainQuickCreator } from "./ai/brain-quick-creator";
+import { RichDescriptionEditor } from "@/components/app/rich-description-editor";
 import {
   TaskStatus,
   TaskPriority,
@@ -55,6 +60,10 @@ import {
   ClickUpStatus,
   ClickUpPriority,
 } from "./clickup-property-dropdowns";
+import { DatePicker } from "@/components/ui/date-picker";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { cn } from "@/lib/utils";
+import { STRUCTURED_PROJECT_PHASES } from "@/lib/project/phases";
 
 export interface CreateTaskModalProps {
   isOpen: boolean;
@@ -66,6 +75,7 @@ export interface CreateTaskModalProps {
   defaultProjectId?: string;
   defaultDepartmentId?: string;
   defaultAssigneeId?: string;
+  defaultPhaseId?: string;
   onSuccess?: () => void;
 }
 
@@ -79,38 +89,61 @@ export function CreateTaskModal({
   defaultProjectId,
   defaultDepartmentId,
   defaultAssigneeId,
+  defaultPhaseId,
   onSuccess,
 }: CreateTaskModalProps) {
   const router = useRouter();
 
+  const [creationMode, setCreationMode] = React.useState<"manual" | "ai">("manual");
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [departmentId, setDepartmentId] = React.useState(defaultDepartmentId || "");
   const [projectId, setProjectId] = React.useState(defaultProjectId || "");
+  const [phaseId, setPhaseId] = React.useState(defaultPhaseId || "01");
+  const [collaborativeDeptIds, setCollaborativeDeptIds] = React.useState<string[]>(
+    defaultDepartmentId ? [defaultDepartmentId] : []
+  );
   const [assigneeId, setAssigneeId] = React.useState(defaultAssigneeId || "");
+
+  React.useEffect(() => {
+    if (defaultPhaseId) {
+      setPhaseId(defaultPhaseId);
+    }
+  }, [defaultPhaseId]);
+
+  React.useEffect(() => {
+    if (defaultDepartmentId) {
+      setDepartmentId(defaultDepartmentId);
+      setCollaborativeDeptIds((prev) =>
+        prev.includes(defaultDepartmentId) ? prev : [...prev, defaultDepartmentId]
+      );
+    }
+  }, [defaultDepartmentId]);
+
+  const handlePrimaryDeptChange = (newDeptId: string) => {
+    setDepartmentId(newDeptId);
+    if (newDeptId && !collaborativeDeptIds.includes(newDeptId)) {
+      setCollaborativeDeptIds((prev) => [...prev, newDeptId]);
+    }
+  };
   const [status, setStatus] = React.useState<ClickUpStatus>("todo");
   const [priority, setPriority] = React.useState<ClickUpPriority>("urgent");
   const [activeTab, setActiveTab] = React.useState<"details" | "subtasks" | "attachments" | "activity">("details");
   const [isBookmarked, setIsBookmarked] = React.useState(false);
 
   // Criteria State
-  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([
-    { id: "c1", text: "New hero section with headline and subtext", done: true },
-    { id: "c2", text: "Highlight 3 core features with icons", done: false },
-    { id: "c3", text: "Improve mobile responsiveness", done: false },
-    { id: "c4", text: "Review and optimize performance", done: false },
-  ]);
+  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([]);
   const [newCriteriaInput, setNewCriteriaInput] = React.useState("");
   const [showAddCriteria, setShowAddCriteria] = React.useState(false);
 
   // Time Tracking
-  const [loggedMinutes, setLoggedMinutes] = React.useState(204); // 03h 24m
-  const [estimatedMinutes, setEstimatedMinutes] = React.useState(480); // 08h 00m
+  const [loggedMinutes, setLoggedMinutes] = React.useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = React.useState(0);
   const [isLoggingTime, setIsLoggingTime] = React.useState(false);
   const [logTimeInput, setLogTimeInput] = React.useState("");
 
   // Tags
-  const [tags, setTags] = React.useState<string[]>(["Design", "Homepage"]);
+  const [tags, setTags] = React.useState<string[]>([]);
   const [isEditingTags, setIsEditingTags] = React.useState(false);
   const [newTagInput, setNewTagInput] = React.useState("");
 
@@ -125,30 +158,16 @@ export function CreateTaskModal({
       time: string;
       attachment?: { name: string; type: string; size: string };
     }[]
-  >([
-    {
-      id: "cm-1",
-      user: "Jesmin Sikder",
-      role: "HR Manager",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Please share the Figma file when you're done with the new hero section.",
-      time: "2 hours ago",
-    },
-    {
-      id: "cm-2",
-      user: "Morgan Sterling",
-      role: "Product Designer",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Here's the updated hero section for review.",
-      time: "1 hour ago",
-      attachment: {
-        name: "Homepage_Hero_v2.fig",
-        type: "Figma file",
-        size: "2.4 MB",
-      },
-    },
-  ]);
+  >([]);
   const [newComment, setNewComment] = React.useState("");
+  // Due date State (defaults to 7 days from now)
+  const [dueDate, setDueDate] = React.useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  });
+
+  const [reviewerId, setReviewerId] = React.useState("");
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -171,16 +190,17 @@ export function CreateTaskModal({
   // Reset form when opened
   React.useEffect(() => {
     if (isOpen) {
-      setTitle("Document Project Overview");
-      setDescription(
-        "Define the single source of truth for the engagement.\n\n" +
-        "Document the product summary, business context, current phase, target users, primary journeys, project goals, key deliverables, success measures, assumptions, stakeholders, and open questions."
+      setTitle("");
+      setDescription("");
+      const chosenProjId = defaultProjectId || (projects[0]?.id ?? "");
+      const targetProj = projects.find((p) => p.id === chosenProjId);
+      setProjectId(chosenProjId);
+      setDepartmentId(
+        defaultDepartmentId || targetProj?.department_id || (departments[0]?.id ?? "")
       );
-      setDepartmentId(defaultDepartmentId || (departments[0]?.id ?? ""));
-      setProjectId(defaultProjectId || (projects[0]?.id ?? ""));
       setAssigneeId(defaultAssigneeId || (people[0]?.user_id ?? ""));
       setStatus("todo");
-      setPriority("urgent");
+      setPriority("normal");
       setErrorMsg(null);
     }
   }, [isOpen, defaultDepartmentId, defaultProjectId, defaultAssigneeId, departments, projects, people]);
@@ -193,6 +213,75 @@ export function CreateTaskModal({
 
   const currentStatusObj = STATUS_LIST.find((s) => s.id === status) || STATUS_LIST[0];
   const currentPriorityObj = PRIORITY_OPTIONS.find((p) => p.id === priority) || PRIORITY_OPTIONS[0];
+
+  const currentOwner = people.find((p) => p.role === "owner") || people[0];
+  const currentUserName = currentOwner?.full_name || "Tashin Khan";
+  const createdOnText = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const daysLeft = React.useMemo(() => {
+    if (!dueDate) return null;
+    const target = new Date(dueDate).getTime();
+    const now = new Date().setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target - now) / 86400000);
+    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return "Due today";
+    return `${diff}d left`;
+  }, [dueDate]);
+
+  const projectSelectOptions = React.useMemo(() => {
+    return [
+      { value: "", label: "No Project", icon: <Folder className="w-3.5 h-3.5" /> },
+      ...projects.map((p) => ({
+        value: p.id,
+        label: p.name,
+        dotColor: p.color || "#10251F",
+      })),
+    ];
+  }, [projects]);
+
+  const departmentSelectOptions = React.useMemo(() => {
+    return [
+      { value: "", label: "No Department", icon: <Building2 className="w-3.5 h-3.5" /> },
+      ...departments.map((d) => ({
+        value: d.id,
+        label: d.name,
+        dotColor: d.color || "#10251F",
+      })),
+    ];
+  }, [departments]);
+
+  const assigneeSelectOptions = React.useMemo(() => {
+    return [
+      { value: "", label: "Unassigned", icon: <User className="w-3.5 h-3.5" /> },
+      ...people.map((p) => ({
+        value: p.user_id,
+        label: p.full_name || p.email,
+        initials: (p.full_name || p.email).slice(0, 2).toUpperCase(),
+      })),
+    ];
+  }, [people]);
+
+  const phaseSelectOptions = React.useMemo(() => {
+    return STRUCTURED_PROJECT_PHASES.map((p) => ({
+      value: p.id,
+      label: p.name,
+      icon: <ListTodo className="w-3.5 h-3.5 text-[#738079]" />,
+    }));
+  }, []);
+
+  const formattedDueDate = React.useMemo(() => {
+    if (!dueDate) return "No due date";
+    const [y, m, d] = dueDate.split("-");
+    if (!y || !m || !d) return dueDate;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }, [dueDate]);
 
   const handleAddCriteriaSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,6 +350,13 @@ export function CreateTaskModal({
     else if (priority === "normal") dbPriority = "medium";
     else if (priority === "low") dbPriority = "low";
 
+    const deptNames = collaborativeDeptIds
+      .map((id) => departments.find((d) => d.id === id)?.name || id)
+      .filter(Boolean)
+      .join(", ");
+
+    const selectedPhase = STRUCTURED_PROJECT_PHASES.find((p) => p.id === phaseId);
+
     try {
       const res = await createTaskAction({
         workspaceId,
@@ -268,10 +364,12 @@ export function CreateTaskModal({
         description: description.trim() || undefined,
         status: dbStatus,
         priority: dbPriority,
-        departmentId: departmentId || undefined,
+        departmentId: departmentId || collaborativeDeptIds[0] || undefined,
         projectId: projectId || undefined,
+        deliverableType: selectedPhase?.name || undefined,
+        expectedOutcome: deptNames || undefined,
         assigneeIds: assigneeId ? [assigneeId] : [],
-        dueDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
       });
 
       if (!res.success) {
@@ -385,8 +483,60 @@ export function CreateTaskModal({
             </div>
           )}
 
-          {/* ── SCROLLABLE BODY ──────────────────────────────────────────── */}
-          <div className="flex-1 overflow-y-auto px-8 pt-7 pb-8">
+          {/* Creation Mode Switcher: Manual vs ClickUp Brain */}
+          <div className="flex items-center justify-between px-7 py-2.5 bg-[#FAF9F5] border-b border-[#E7EADF] shrink-0 select-none">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#F0EFEA] border border-[#E2E1DC]">
+              <button
+                type="button"
+                onClick={() => setCreationMode("manual")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  creationMode === "manual"
+                    ? "bg-white text-[#18221E] shadow-xs"
+                    : "text-[#65706A] hover:text-[#18221E]"
+                )}
+              >
+                <span>📝</span>
+                <span>Create Manually</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode("ai")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  creationMode === "ai"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-xs font-bold"
+                    : "text-[#65706A] hover:text-emerald-700"
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Create with AI (Brain)</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-[#8A958F] hidden sm:inline">
+              {creationMode === "ai" ? "ClickUp Brain AI • Type natural language, mention @teammates, attach files" : "ClickUp-style manual properties, assignees & checklists"}
+            </span>
+          </div>
+
+          {/* ── CONDITIONAL BODY ────────────────────────────────────────── */}
+          {creationMode === "ai" ? (
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              <BrainQuickCreator
+                type="task"
+                workspaceId={workspaceId}
+                people={people}
+                defaultDepartmentId={departmentId}
+                defaultProjectId={projectId}
+                onSuccess={() => {
+                  onClose();
+                  router.refresh();
+                  if (onSuccess) onSuccess();
+                }}
+                onCancel={onClose}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-8 pt-7 pb-8">
             {/* ── TITLE & PRIMARY ACTIONS ROW ────────────────────────────── */}
             <div className="flex items-start justify-between gap-6 mb-6">
               <div className="space-y-3 flex-1">
@@ -395,7 +545,7 @@ export function CreateTaskModal({
                   autoFocus
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Document Project Overview"
+                  placeholder="e.g. Design hero section, API integration..."
                   className="w-full text-[26px] font-bold text-[#0F172A] placeholder:text-[#94A3B8] bg-transparent border-0 focus:outline-none tracking-tight"
                 />
 
@@ -485,12 +635,13 @@ export function CreateTaskModal({
                   </div>
 
                   {/* Due Date Badge */}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] text-[#475569] font-medium text-xs">
-                    <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
-                    <span>Sep 4, 2026</span>
-                    <span className="text-[#94A3B8] text-[11px] bg-white px-1.5 py-0.2 rounded font-normal">
-                      3 days left
-                    </span>
+                  <div className="relative">
+                    <DatePicker
+                      value={dueDate}
+                      onChange={setDueDate}
+                      placeholder="Due date"
+                      buttonClassName="h-7 px-2.5 rounded-full bg-[#F1F5F9] border-transparent text-[#475569] hover:bg-[#E2E8F0] shadow-none text-xs"
+                    />
                   </div>
                 </div>
               </div>
@@ -521,8 +672,8 @@ export function CreateTaskModal({
                   disabled={!isValid || loading}
                   className="inline-flex items-center gap-1.5 px-4.5 py-2 rounded-lg bg-[#10251F] hover:bg-[#18342C] text-[#F4F3EE] text-xs font-semibold shadow-xs transition-all disabled:opacity-40 cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{loading ? "Creating..." : "Mark as done"}</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{loading ? "Creating..." : "Create Task"}</span>
                 </button>
               </div>
             </div>
@@ -557,9 +708,6 @@ export function CreateTaskModal({
                 }`}
               >
                 <span>Subtasks</span>
-                <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                  4
-                </span>
                 {activeTab === "subtasks" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
@@ -578,9 +726,6 @@ export function CreateTaskModal({
                 }`}
               >
                 <span>Attachments</span>
-                <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                  3
-                </span>
                 {activeTab === "attachments" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
@@ -615,46 +760,11 @@ export function CreateTaskModal({
                 {/* Description */}
                 <div className="space-y-3">
                   <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
-                  <textarea
-                    rows={4}
+                  <RichDescriptionEditor
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(val) => setDescription(val)}
                     placeholder="Define the single source of truth for the engagement..."
-                    className="w-full text-[13.5px] leading-relaxed text-[#334155] placeholder:text-[#94A3B8] bg-transparent border-0 focus:outline-none resize-none"
                   />
-
-                  {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-1 pt-1 text-[#64748B]">
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Bold className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Italic className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Strikethrough className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <AlignLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <List className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <ListOrdered className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Code className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Quote className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
 
                 {/* Acceptance Criteria */}
@@ -852,42 +962,124 @@ export function CreateTaskModal({
 
                   <div className="space-y-3.5">
                     {/* Assignee */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Assignee</span>
                       </span>
-                      <div className="flex items-center gap-2 font-medium text-[#0F172A]">
-                        <div className="w-5 h-5 rounded-full bg-[#6366F1] text-white flex items-center justify-center text-[9px] font-bold">
-                          TK
-                        </div>
-                        <span>{selectedAssignee?.full_name || "Tashin Khan"}</span>
-                      </div>
-                    </div>
-
-                    {/* Department */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-[#94A3B8]" />
-                        <span>Department</span>
-                      </span>
-                      <div className="flex items-center gap-1.5 font-medium text-[#0F172A]">
-                        <Building2 className="w-3.5 h-3.5 text-[#64748B]" />
-                        <span>{activeDepartment ? activeDepartment.name : "Design"}</span>
-                      </div>
+                      <CustomSelect
+                        value={assigneeId}
+                        onChange={setAssigneeId}
+                        options={assigneeSelectOptions}
+                        placeholder="Unassigned"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px]"
+                        align="right"
+                      />
                     </div>
 
                     {/* Project */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                         <Folder className="w-4 h-4 text-[#94A3B8]" />
                         <span>Project</span>
                       </span>
-                      <div className="flex items-center gap-1.5 font-medium text-[#0F172A]">
-                        <Folder className="w-3.5 h-3.5 text-[#64748B]" />
-                        <span>{activeProject ? activeProject.name : "Development"}</span>
-                      </div>
+                      <CustomSelect
+                        value={projectId}
+                        onChange={(newProjId) => {
+                          setProjectId(newProjId);
+                          const chosenProj = projects.find((p) => p.id === newProjId);
+                          if (chosenProj?.department_id) {
+                            handlePrimaryDeptChange(chosenProj.department_id);
+                          }
+                        }}
+                        options={projectSelectOptions}
+                        placeholder="No Project"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px]"
+                        align="right"
+                      />
                     </div>
+
+                    {/* Workstream Phase */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
+                        <ListTodo className="w-4 h-4 text-[#94A3B8]" />
+                        <span>Phase</span>
+                      </span>
+                      <CustomSelect
+                        value={phaseId}
+                        onChange={setPhaseId}
+                        options={phaseSelectOptions}
+                        placeholder="Select Phase"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px]"
+                        align="right"
+                      />
+                    </div>
+
+                    {/* Primary Department */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
+                        <Building2 className="w-4 h-4 text-[#94A3B8]" />
+                        <span>Department</span>
+                      </span>
+                      <CustomSelect
+                        value={departmentId}
+                        onChange={handlePrimaryDeptChange}
+                        options={departmentSelectOptions}
+                        placeholder="No Department"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px]"
+                        align="right"
+                      />
+                    </div>
+
+                    {/* Collaborative Multi-Department Badges */}
+                    {departments.length > 0 && (
+                      <div className="pt-2 border-t border-[#F1F5F9] space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
+                            <Users className="w-3.5 h-3.5 text-[#94A3B8]" />
+                            <span>Collaborative Teams</span>
+                          </span>
+                          <span className="text-[10px] text-[#94A3B8] font-semibold">
+                            {collaborativeDeptIds.length} assigned
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {departments.map((dept) => {
+                            const isSelected = collaborativeDeptIds.includes(dept.id);
+                            return (
+                              <button
+                                key={dept.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    if (collaborativeDeptIds.length > 1) {
+                                      setCollaborativeDeptIds((prev) =>
+                                        prev.filter((id) => id !== dept.id)
+                                      );
+                                    }
+                                  } else {
+                                    setCollaborativeDeptIds((prev) => [...prev, dept.id]);
+                                  }
+                                }}
+                                className={cn(
+                                  "text-[10.5px] px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1",
+                                  isSelected
+                                    ? "bg-[#10251F] text-[#F4F3EE] border-[#10251F] font-medium"
+                                    : "bg-[#FAF9F5] text-[#55635D] border-[#D8DDD4] hover:border-[#10251F]/40"
+                                )}
+                              >
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: dept.color || "#10251F" }}
+                                />
+                                <span>{dept.name}</span>
+                                {isSelected && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Priority */}
                     <div className="flex items-center justify-between">
@@ -918,12 +1110,18 @@ export function CreateTaskModal({
                     </div>
 
                     {/* Due date */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                         <Calendar className="w-4 h-4 text-[#94A3B8]" />
                         <span>Due date</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">Sep 4, 2026</span>
+                      <DatePicker
+                        value={dueDate}
+                        onChange={setDueDate}
+                        placeholder="No due date"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#E2E8F0] shadow-none"
+                        align="right"
+                      />
                     </div>
 
                     {/* Created by */}
@@ -932,7 +1130,7 @@ export function CreateTaskModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created by</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">Morgan Sterling</span>
+                      <span className="font-medium text-[#0F172A]">{currentUserName}</span>
                     </div>
 
                     {/* Created on */}
@@ -941,7 +1139,7 @@ export function CreateTaskModal({
                         <Clock className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created on</span>
                       </span>
-                      <span className="text-[#475569] text-xs">Aug 18, 2026 11:12 AM</span>
+                      <span className="text-[#475569] text-xs">{createdOnText}</span>
                     </div>
 
                     {/* Reviewer */}
@@ -950,12 +1148,18 @@ export function CreateTaskModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Reviewer</span>
                       </span>
-                      <div className="flex items-center gap-2 font-medium text-[#0F172A]">
-                        <div className="w-5 h-5 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[9px] font-bold">
-                          JS
-                        </div>
-                        <span>Jesmin Sikder</span>
-                      </div>
+                      <select
+                        value={reviewerId}
+                        onChange={(e) => setReviewerId(e.target.value)}
+                        className="text-xs font-medium text-[#0F172A] bg-transparent border border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#0F172A] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
+                      >
+                        <option value="">Unassigned</option>
+                        {people.map((p) => (
+                          <option key={p.user_id} value={p.user_id}>
+                            {p.full_name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1071,6 +1275,7 @@ export function CreateTaskModal({
               </div>
             </div>
           </div>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

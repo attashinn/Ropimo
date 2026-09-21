@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
 export interface CreateWorkspaceResult {
   success: boolean;
@@ -284,4 +285,25 @@ export async function completeSmartOnboardingAction(
     slug: wsData.slug,
   };
 }
+
+/**
+ * Switch the user's active workspace by storing preference in cookie
+ */
+export async function switchActiveWorkspaceAction(
+  workspaceId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set("ropimo_active_workspace", workspaceId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+    revalidatePath("/app");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to switch workspace." };
+  }
+}
+
 

@@ -4,89 +4,121 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar as CalendarIcon,
-  ChevronLeft,
+  ChevronUp,
+  ChevronDown,
   ChevronRight,
   X,
-  ChevronDown,
+  Repeat,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DatePickerProps {
   value?: string | null; // ISO format: YYYY-MM-DD
   onChange?: (date: string) => void;
+  startDate?: string | null;
+  dueDate?: string | null;
+  onDateRangeChange?: (start: string, due: string) => void;
   placeholder?: string;
   minDate?: string;
   maxDate?: string;
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  buttonClassName?: string;
+  align?: "left" | "right";
   name?: string;
   id?: string;
 }
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
-const MONTH_SHORT_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const DAYS_OF_WEEK = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-type ViewMode = "days" | "months" | "years";
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseISODate(iso?: string | null): Date | null {
+  if (!iso) return null;
+  const parts = iso.split("-");
+  if (parts.length < 3) return null;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  return new Date(y, m - 1, d);
+}
 
 export function DatePicker({
   value,
   onChange,
-  placeholder = "Select date",
+  startDate,
+  dueDate,
+  onDateRangeChange,
+  placeholder,
   minDate,
   maxDate,
   disabled = false,
   required = false,
   className,
+  buttonClassName,
+  align = "left",
   name,
   id,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<ViewMode>("days");
+  const [activeInput, setActiveInput] = React.useState<"start" | "due">("due");
+  const [showBanner, setShowBanner] = React.useState(true);
+  const [isRecurringOpen, setIsRecurringOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  // Parse initial selected date or default to today
-  const selectedDate = React.useMemo(() => {
-    if (!value) return null;
-    const parts = value.split("-");
-    if (parts.length < 3) return null;
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    const d = parseInt(parts[2], 10);
-    if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
-    return new Date(y, m - 1, d);
-  }, [value]);
+  // Internal state for single vs range
+  const internalDue = value !== undefined ? value : dueDate || null;
+  const internalStart = startDate || null;
+
+  const selectedDueDate = React.useMemo(() => parseISODate(internalDue), [internalDue]);
+  const selectedStartDate = React.useMemo(() => parseISODate(internalStart), [internalStart]);
 
   const [viewDate, setViewDate] = React.useState<Date>(() => {
-    return selectedDate ? new Date(selectedDate) : new Date();
+    return selectedDueDate ? new Date(selectedDueDate) : new Date();
   });
 
-  // Keep viewDate in sync whenever value or isOpen changes
+  // Sync view date on open
   React.useEffect(() => {
     if (isOpen) {
-      if (selectedDate) {
-        setViewDate(new Date(selectedDate));
+      if (activeInput === "start" && selectedStartDate) {
+        setViewDate(new Date(selectedStartDate));
+      } else if (selectedDueDate) {
+        setViewDate(new Date(selectedDueDate));
       } else {
         setViewDate(new Date());
       }
-      setViewMode("days");
     }
-  }, [isOpen, selectedDate]);
+  }, [isOpen, activeInput, selectedStartDate, selectedDueDate]);
 
-  // Close popover when clicking outside
+  // Click outside listener
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setIsRecurringOpen(false);
       }
     }
     if (isOpen) {
@@ -98,278 +130,422 @@ export function DatePicker({
   const viewYear = viewDate.getFullYear();
   const viewMonth = viewDate.getMonth();
 
-  // Year range calculation for years view
-  const yearRangeStart = Math.floor(viewYear / 12) * 12;
-  const yearsList = Array.from({ length: 12 }, (_, i) => yearRangeStart + i);
-
-  const handlePrev = (e: React.MouseEvent) => {
+  const handlePrevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (viewMode === "days") {
-      setViewDate(new Date(viewYear, viewMonth - 1, 1));
-    } else if (viewMode === "months") {
-      setViewDate(new Date(viewYear - 1, viewMonth, 1));
-    } else if (viewMode === "years") {
-      setViewDate(new Date(viewYear - 12, viewMonth, 1));
-    }
+    setViewDate(new Date(viewYear, viewMonth - 1, 1));
   };
 
-  const handleNext = (e: React.MouseEvent) => {
+  const handleNextMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (viewMode === "days") {
-      setViewDate(new Date(viewYear, viewMonth + 1, 1));
-    } else if (viewMode === "months") {
-      setViewDate(new Date(viewYear + 1, viewMonth, 1));
-    } else if (viewMode === "years") {
-      setViewDate(new Date(viewYear + 12, viewMonth, 1));
-    }
+    setViewDate(new Date(viewYear, viewMonth + 1, 1));
   };
 
-  const handleSelectDay = (day: number, monthOffset: number = 0) => {
-    const target = new Date(viewYear, viewMonth + monthOffset, day);
-    const yStr = target.getFullYear();
-    const mStr = String(target.getMonth() + 1).padStart(2, "0");
-    const dStr = String(target.getDate()).padStart(2, "0");
-    const isoString = `${yStr}-${mStr}-${dStr}`;
-
-    onChange?.(isoString);
-    setIsOpen(false);
-  };
-
-  const handleSelectMonth = (monthIndex: number) => {
-    setViewDate(new Date(viewYear, monthIndex, 1));
-    setViewMode("days");
-  };
-
-  const handleSelectYear = (year: number) => {
-    setViewDate(new Date(year, viewMonth, 1));
-    setViewMode("months");
-  };
-
-  const handleSelectToday = (e: React.MouseEvent) => {
+  const handleTodayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     const today = new Date();
-    const yStr = today.getFullYear();
-    const mStr = String(today.getMonth() + 1).padStart(2, "0");
-    const dStr = String(today.getDate()).padStart(2, "0");
-    const isoString = `${yStr}-${mStr}-${dStr}`;
-
-    onChange?.(isoString);
     setViewDate(today);
-    setIsOpen(false);
+    applyDate(toISODate(today));
+  };
+
+  const applyDate = (isoStr: string) => {
+    if (activeInput === "start") {
+      if (onDateRangeChange) {
+        onDateRangeChange(isoStr, internalDue || "");
+      }
+      // auto advance to due date
+      setActiveInput("due");
+    } else {
+      if (onChange) {
+        onChange(isoStr);
+      }
+      if (onDateRangeChange) {
+        onDateRangeChange(internalStart || "", isoStr);
+      }
+      setIsOpen(false);
+    }
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange?.("");
+    if (onDateRangeChange) {
+      onDateRangeChange("", "");
+    }
     setIsOpen(false);
   };
 
-  // Generate calendar grid for days view
+  // Calendar Grid calculations
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayIndex = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sunday
   const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
 
-  // Days from previous month
-  const prevDays = [];
+  const prevDays: number[] = [];
   for (let i = firstDayIndex - 1; i >= 0; i--) {
     prevDays.push(prevMonthDays - i);
   }
 
-  // Days of current month
-  const currentDays = [];
+  const currentDays: number[] = [];
   for (let i = 1; i <= daysInMonth; i++) {
     currentDays.push(i);
   }
 
-  // Days from next month
   const totalCells = prevDays.length + currentDays.length > 35 ? 42 : 35;
   const nextDaysCount = totalCells - (prevDays.length + currentDays.length);
-  const nextDays = [];
+  const nextDays: number[] = [];
   for (let i = 1; i <= nextDaysCount; i++) {
     nextDays.push(i);
   }
 
-  const today = new Date();
+  const now = new Date();
   const isToday = (day: number, month: number, year: number) => {
     return (
-      today.getDate() === day &&
-      today.getMonth() === month &&
-      today.getFullYear() === year
+      now.getDate() === day &&
+      now.getMonth() === month &&
+      now.getFullYear() === year
     );
   };
 
-  const isSelected = (day: number, month: number, year: number) => {
-    if (!selectedDate) return false;
+  const isSelectedDue = (day: number, month: number, year: number) => {
+    if (!selectedDueDate) return false;
     return (
-      selectedDate.getDate() === day &&
-      selectedDate.getMonth() === month &&
-      selectedDate.getFullYear() === year
+      selectedDueDate.getDate() === day &&
+      selectedDueDate.getMonth() === month &&
+      selectedDueDate.getFullYear() === year
     );
   };
 
-  const formattedDisplay = React.useMemo(() => {
-    if (!selectedDate) return null;
-    return selectedDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }, [selectedDate]);
+  const isSelectedStart = (day: number, month: number, year: number) => {
+    if (!selectedStartDate) return false;
+    return (
+      selectedStartDate.getDate() === day &&
+      selectedStartDate.getMonth() === month &&
+      selectedStartDate.getFullYear() === year
+    );
+  };
+
+  // ClickUp dynamic presets
+  const presets = React.useMemo(() => {
+    const today = new Date(now);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+
+    const currentDay = now.getDay();
+    const daysUntilSaturday = (6 - currentDay + 7) % 7 || 7;
+    const thisWeekend = new Date(now);
+    thisWeekend.setDate(now.getDate() + daysUntilSaturday);
+
+    const daysUntilNextMonday = (1 - currentDay + 7) % 7 || 7;
+    const nextWeek = new Date(now);
+    nextWeek.setDate(now.getDate() + daysUntilNextMonday);
+
+    const nextWeekend = new Date(thisWeekend);
+    nextWeekend.setDate(thisWeekend.getDate() + 7);
+
+    const twoWeeks = new Date(now);
+    twoWeeks.setDate(now.getDate() + 14);
+
+    const fourWeeks = new Date(now);
+    fourWeeks.setDate(now.getDate() + 28);
+
+    // Format relative times
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const ampm = hours >= 12 ? "pm" : "am";
+    const formattedHours = hours % 12 || 12;
+    const laterTimeStr = `${formattedHours}:${String(minutes).padStart(2, "0")} ${ampm}`;
+
+    return [
+      {
+        label: "Today",
+        date: toISODate(today),
+        right: today.toLocaleDateString("en-US", { weekday: "short" }),
+      },
+      {
+        label: "Later",
+        date: toISODate(today),
+        right: laterTimeStr,
+      },
+      {
+        label: "Tomorrow",
+        date: toISODate(tomorrow),
+        right: tomorrow.toLocaleDateString("en-US", { weekday: "short" }),
+      },
+      {
+        label: "This weekend",
+        date: toISODate(thisWeekend),
+        right: "Sat",
+      },
+      {
+        label: "Next week",
+        date: toISODate(nextWeek),
+        right: "Mon",
+      },
+      {
+        label: "Next weekend",
+        date: toISODate(nextWeekend),
+        right: nextWeekend.toLocaleDateString("en-US", { day: "numeric", month: "short" }),
+      },
+      {
+        label: "2 weeks",
+        date: toISODate(twoWeeks),
+        right: twoWeeks.toLocaleDateString("en-US", { day: "numeric", month: "short" }),
+      },
+      {
+        label: "4 weeks",
+        date: toISODate(fourWeeks),
+        right: fourWeeks.toLocaleDateString("en-US", { day: "numeric", month: "short" }),
+      },
+    ];
+  }, []);
+
+  // Format trigger label
+  const formattedTriggerDisplay = React.useMemo(() => {
+    if (internalStart && internalDue) {
+      const s = parseISODate(internalStart);
+      const d = parseISODate(internalDue);
+      if (s && d) {
+        return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} → ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+      }
+    }
+    if (selectedDueDate) {
+      return selectedDueDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return null;
+  }, [internalStart, internalDue, selectedDueDate]);
 
   return (
-    <div ref={containerRef} className={cn("relative inline-block w-full text-xs", className)}>
-      {/* Hidden input for native form submission */}
-      <input
-        type="hidden"
-        name={name}
-        id={id}
-        value={value || ""}
-        required={required}
-      />
+    <div ref={containerRef} className={cn("relative inline-block text-xs select-none", className)}>
+      <input type="hidden" name={name} id={id} value={internalDue || ""} required={required} />
 
-      {/* Trigger Button */}
+      {/* ── TRIGGER BUTTON (ClickUp Pill Style) ─────────────────────────── */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={cn(
-          "flex h-9 w-full items-center justify-between gap-2 rounded-[10px] border border-[#D8DDD4] bg-white px-3 py-1.5 text-xs font-medium text-[#18221E] shadow-2xs transition-all hover:border-[#10251F] hover:bg-[#FAF9F5] focus:border-[#10251F] focus:outline-none cursor-pointer",
-          disabled && "opacity-50 cursor-not-allowed bg-[#FAF9F5]",
-          isOpen && "border-[#10251F] ring-1 ring-[#10251F]/10 bg-[#FAF9F5]"
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5]/70 hover:bg-[#FAF9F5] hover:border-[#10251F] text-xs font-medium text-[#18221E] shadow-2xs transition-all cursor-pointer",
+          disabled && "opacity-50 cursor-not-allowed bg-slate-50",
+          isOpen && "border-[#10251F] ring-2 ring-[#10251F]/10 bg-white",
+          buttonClassName
         )}
       >
-        <div className="flex items-center gap-2 truncate">
-          <CalendarIcon className="h-3.5 w-3.5 text-[#65706A] shrink-0" />
-          <span className={cn("truncate font-semibold", !formattedDisplay && "text-[#8A958F] font-normal")}>
-            {formattedDisplay || placeholder}
-          </span>
-        </div>
+        <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <span className={cn("truncate font-medium", !formattedTriggerDisplay && "text-slate-500 font-normal")}>
+          {formattedTriggerDisplay || placeholder || "Start → Due"}
+        </span>
 
-        {value && !disabled && (
+        {internalDue && !disabled && (
           <div
             onClick={handleClear}
-            className="flex h-4 w-4 items-center justify-center rounded-full text-[#8A958F] hover:bg-[#EAE8DE] hover:text-[#18221E] transition-colors cursor-pointer"
+            className="ml-1 p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
             title="Clear date"
           >
-            <X className="h-3 w-3" />
+            <X className="w-3 h-3" />
           </div>
         )}
       </button>
 
-      {/* Popover Calendar Dropdown */}
+      {/* ── CLICKUP CALENDAR POPOVER ────────────────────────────────────── */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
+            initial={{ opacity: 0, y: 6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-[14px] border border-[#D8DDD4] bg-white p-3.5 shadow-xl select-none"
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.14, ease: "easeOut" }}
+            className={cn(
+              "absolute top-full mt-2 z-50 w-[94vw] max-w-[530px] rounded-2xl border border-[#E2E8F0] bg-white p-3.5 shadow-2xl font-sans text-[#18221E]",
+              align === "right" ? "right-0" : "left-0"
+            )}
           >
-            {/* Header: Month / Year / Range Navigation */}
-            <div className="flex items-center justify-between pb-2.5 border-b border-[#E7EADF]">
-              <div className="flex items-center gap-1">
-                {viewMode === "days" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("months")}
-                      className="flex items-center gap-1 rounded-[6px] px-1.5 py-0.5 font-bold text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
-                    >
-                      <span>{MONTH_NAMES[viewMonth]}</span>
-                      <ChevronDown className="h-3 w-3 text-[#65706A]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("years")}
-                      className="flex items-center gap-1 rounded-[6px] px-1.5 py-0.5 font-semibold text-xs text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors cursor-pointer"
-                    >
-                      <span>{viewYear}</span>
-                      <ChevronDown className="h-3 w-3 text-[#65706A]" />
-                    </button>
-                  </>
+            {/* 1. TOP START / DUE DATE DUAL INPUTS */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {/* Start Date Input Pill */}
+              <button
+                type="button"
+                onClick={() => setActiveInput("start")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs text-left transition-all cursor-pointer",
+                  activeInput === "start"
+                    ? "border-2 border-slate-900 bg-white font-semibold shadow-xs"
+                    : "border-slate-200 bg-slate-50/70 text-slate-600 hover:bg-slate-100"
                 )}
+              >
+                <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span className="truncate">
+                  {selectedStartDate
+                    ? selectedStartDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                    : "Start date"}
+                </span>
+              </button>
 
-                {viewMode === "months" && (
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("years")}
-                    className="flex items-center gap-1 rounded-[6px] px-1.5 py-0.5 font-bold text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
-                  >
-                    <span>{viewYear}</span>
-                    <ChevronDown className="h-3 w-3 text-[#65706A]" />
-                  </button>
+              {/* Due Date Input Pill */}
+              <button
+                type="button"
+                onClick={() => setActiveInput("due")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl border text-xs text-left transition-all cursor-pointer",
+                  activeInput === "due"
+                    ? "border-2 border-slate-900 bg-white font-semibold shadow-xs"
+                    : "border-slate-200 bg-slate-50/70 text-slate-600 hover:bg-slate-100"
                 )}
-
-                {viewMode === "years" && (
-                  <span className="font-bold text-xs text-[#18221E] px-1.5 py-0.5">
-                    {yearRangeStart} – {yearRangeStart + 11}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors cursor-pointer"
-                  aria-label="Previous"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors cursor-pointer"
-                  aria-label="Next"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              >
+                <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span className="truncate">
+                  {selectedDueDate
+                    ? selectedDueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    : "Due date"}
+                </span>
+              </button>
             </div>
 
-            {/* 1. DAYS VIEW */}
-            {viewMode === "days" && (
-              <>
-                <div className="grid grid-cols-7 gap-1 pt-2 pb-1 text-center">
-                  {DAYS_OF_WEEK.map((d) => (
-                    <span
-                      key={d}
-                      className="text-[10px] font-bold text-[#8A958F] uppercase"
+            {/* 2. TWO-COLUMN LAYOUT: SHORTCUTS ON LEFT, MONTH CALENDAR ON RIGHT */}
+            <div className="grid grid-cols-12 gap-3 pt-1">
+              {/* ── LEFT COLUMN (Shortcuts / Presets) ────────────────── */}
+              <div className="col-span-5 pr-2 border-r border-slate-100 space-y-0.5">
+                {presets.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      applyDate(preset.date);
+                      setViewDate(new Date(preset.date));
+                    }}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-[#F1F5F9] transition-colors cursor-pointer group text-left"
+                  >
+                    <span className="font-medium text-slate-700 group-hover:text-slate-900">
+                      {preset.label}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal group-hover:text-slate-600">
+                      {preset.right}
+                    </span>
+                  </button>
+                ))}
+
+                <div className="pt-1.5 pb-0.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsRecurringOpen(!isRecurringOpen)}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-[#F1F5F9] text-slate-700 font-medium transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Repeat className="w-3 h-3 text-slate-400" />
+                      <span>Set Recurring</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
+
+                {isRecurringOpen && (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
+                    <p className="font-bold text-slate-800">Repeat frequency</p>
+                    {(["Daily", "Weekly", "Monthly", "Yearly"] as const).map((rec) => (
+                      <button
+                        key={rec}
+                        type="button"
+                        onClick={() => setIsRecurringOpen(false)}
+                        className="w-full text-left px-2 py-1 rounded hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
+                      >
+                        {rec}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── RIGHT COLUMN (Month Calendar Grid) ───────────────── */}
+              <div className="col-span-7 pl-1">
+                {/* Header: Month Name + Today link + Up/Down Chevrons */}
+                <div className="flex items-center justify-between pb-2 mb-1">
+                  <span className="font-bold text-sm text-slate-900">
+                    {MONTH_NAMES[viewMonth]} {viewYear}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTodayClick}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer px-1 py-0.5 rounded"
                     >
+                      Today
+                    </button>
+
+                    {/* Up / Down chevrons just like in ClickUp */}
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Previous Month"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        className="p-1 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Next Month"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Day of week labels */}
+                <div className="grid grid-cols-7 text-center pb-1">
+                  {DAYS_OF_WEEK.map((d) => (
+                    <span key={d} className="text-[11px] font-semibold text-slate-400 py-1">
                       {d}
                     </span>
                   ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {prevDays.map((d, idx) => (
+                {/* Calendar Days Matrix */}
+                <div className="grid grid-cols-7 gap-y-1 text-center text-xs">
+                  {/* Previous Month Days */}
+                  {prevDays.map((d) => (
                     <button
-                      key={`prev-${idx}-${d}`}
+                      key={`prev-${d}`}
                       type="button"
-                      onClick={() => handleSelectDay(d, -1)}
-                      className="flex h-7 w-7 mx-auto items-center justify-center rounded-[7px] text-[11px] text-[#C4CAC0] hover:bg-[#FAF9F5] hover:text-[#65706A] transition-colors cursor-pointer"
+                      onClick={() => {
+                        const prevM = viewMonth === 0 ? 11 : viewMonth - 1;
+                        const prevY = viewMonth === 0 ? viewYear - 1 : viewYear;
+                        const dateObj = new Date(prevY, prevM, d);
+                        applyDate(toISODate(dateObj));
+                      }}
+                      className="w-7 h-7 flex items-center justify-center mx-auto text-slate-300 hover:bg-slate-50 rounded-full transition-colors cursor-pointer"
                     >
                       {d}
                     </button>
                   ))}
 
-                  {currentDays.map((d, idx) => {
-                    const selected = isSelected(d, viewMonth, viewYear);
-                    const todayCurrent = isToday(d, viewMonth, viewYear);
+                  {/* Current Month Days */}
+                  {currentDays.map((d) => {
+                    const isDue = isSelectedDue(d, viewMonth, viewYear);
+                    const isStart = isSelectedStart(d, viewMonth, viewYear);
+                    const currentIsToday = isToday(d, viewMonth, viewYear);
+
+                    // ClickUp Coral-Red Highlight
+                    const isHighlighted = isDue || isStart || (currentIsToday && !selectedDueDate);
 
                     return (
                       <button
-                        key={`cur-${idx}-${d}`}
+                        key={`curr-${d}`}
                         type="button"
-                        onClick={() => handleSelectDay(d, 0)}
+                        onClick={() => {
+                          const dateObj = new Date(viewYear, viewMonth, d);
+                          applyDate(toISODate(dateObj));
+                        }}
                         className={cn(
-                          "flex h-7 w-7 mx-auto items-center justify-center rounded-[7px] text-[11px] font-medium transition-all cursor-pointer",
-                          selected
-                            ? "bg-[#10251F] text-white font-bold shadow-2xs"
-                            : todayCurrent
-                            ? "border border-[#10251F] font-bold text-[#10251F] hover:bg-[#FAF9F5]"
-                            : "text-[#18221E] hover:bg-[#FAF9F5]"
+                          "w-7 h-7 rounded-full flex items-center justify-center mx-auto text-xs transition-all font-medium cursor-pointer",
+                          isHighlighted
+                            ? "bg-[#EF4444] text-white font-bold shadow-xs scale-105"
+                            : "text-slate-800 hover:bg-slate-100"
                         )}
                       >
                         {d}
@@ -377,85 +553,53 @@ export function DatePicker({
                     );
                   })}
 
-                  {nextDays.map((d, idx) => (
+                  {/* Next Month Days */}
+                  {nextDays.map((d) => (
                     <button
-                      key={`next-${idx}-${d}`}
+                      key={`next-${d}`}
                       type="button"
-                      onClick={() => handleSelectDay(d, 1)}
-                      className="flex h-7 w-7 mx-auto items-center justify-center rounded-[7px] text-[11px] text-[#C4CAC0] hover:bg-[#FAF9F5] hover:text-[#65706A] transition-colors cursor-pointer"
+                      onClick={() => {
+                        const nextM = viewMonth === 11 ? 0 : viewMonth + 1;
+                        const nextY = viewMonth === 11 ? viewYear + 1 : viewYear;
+                        const dateObj = new Date(nextY, nextM, d);
+                        applyDate(toISODate(dateObj));
+                      }}
+                      className="w-7 h-7 flex items-center justify-center mx-auto text-slate-300 hover:bg-slate-50 rounded-full transition-colors cursor-pointer"
                     >
                       {d}
                     </button>
                   ))}
                 </div>
-              </>
-            )}
-
-            {/* 2. MONTHS PICKER VIEW */}
-            {viewMode === "months" && (
-              <div className="grid grid-cols-3 gap-2 pt-3 pb-1">
-                {MONTH_SHORT_NAMES.map((mName, idx) => {
-                  const isCurrentMonth = idx === viewMonth;
-                  return (
-                    <button
-                      key={mName}
-                      type="button"
-                      onClick={() => handleSelectMonth(idx)}
-                      className={cn(
-                        "rounded-[8px] py-2 text-xs font-semibold transition-colors cursor-pointer",
-                        isCurrentMonth
-                          ? "bg-[#10251F] text-white font-bold"
-                          : "text-[#18221E] hover:bg-[#FAF9F5]"
-                      )}
-                    >
-                      {mName}
-                    </button>
-                  );
-                })}
               </div>
-            )}
-
-            {/* 3. YEARS PICKER VIEW */}
-            {viewMode === "years" && (
-              <div className="grid grid-cols-3 gap-2 pt-3 pb-1">
-                {yearsList.map((y) => {
-                  const isCurrentYear = y === viewYear;
-                  return (
-                    <button
-                      key={y}
-                      type="button"
-                      onClick={() => handleSelectYear(y)}
-                      className={cn(
-                        "rounded-[8px] py-2 text-xs font-semibold transition-colors cursor-pointer",
-                        isCurrentYear
-                          ? "bg-[#10251F] text-white font-bold"
-                          : "text-[#18221E] hover:bg-[#FAF9F5]"
-                      )}
-                    >
-                      {y}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Footer: Quick Actions */}
-            <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-[#E7EADF] text-[11px]">
-              <button
-                type="button"
-                onClick={handleClear}
-                className="font-medium text-[#65706A] hover:text-[#18221E] hover:underline cursor-pointer"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                onClick={handleSelectToday}
-                className="font-bold text-[#10251F] hover:underline cursor-pointer"
-              >
-                Today
-              </button>
             </div>
+
+            {/* 3. SIGNATURE CLICKUP BOTTOM WORK SCHEDULE BANNER */}
+            {showBanner && (
+              <div className="mt-3 p-2.5 rounded-xl border border-[#E7EADF] bg-[#FAF9F5] flex items-center justify-between text-xs animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🏖️</span>
+                  <div>
+                    <p className="font-bold text-[#0F172A] text-[11px] leading-snug">
+                      Set up your work schedule
+                    </p>
+                    <p className="text-[10px] text-[#64748B]">
+                      Set working days/hours and holidays for your workspace.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowBanner(false);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-md transition-colors cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

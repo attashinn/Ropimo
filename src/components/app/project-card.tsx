@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Project, ProjectStatus } from "@/types/project";
 import { ArrowRightIcon } from "@/components/landing/icons";
+import { stripHtml } from "@/lib/utils";
 
 export interface ProjectCardProps {
   project: Project;
@@ -93,7 +94,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {/* Description */}
         {project.description ? (
           <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-[#65706A]">
-            {project.description}
+            {stripHtml(project.description)}
           </p>
         ) : (
           <p className="mt-1.5 text-xs italic text-[#65706A]/70">

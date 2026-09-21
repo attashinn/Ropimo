@@ -45,6 +45,17 @@ import {
   Quote,
 } from "lucide-react";
 import {
+  StatusMenu,
+  PriorityMenu,
+  AssigneesMenu,
+  STATUS_LIST,
+  PRIORITY_OPTIONS,
+  ClickUpStatus,
+  ClickUpPriority,
+} from "./clickup-property-dropdowns";
+import { DatePicker } from "@/components/ui/date-picker";
+import { RichDescriptionEditor } from "@/components/app/rich-description-editor";
+import {
   Task,
   TaskStatus,
   TaskPriority,
@@ -156,24 +167,26 @@ export function TaskDetailView({
   const router = useRouter();
 
   // Task States
+  const [description, setDescription] = React.useState(task.description || "");
   const [status, setStatus] = React.useState<TaskStatus>(task.status);
   const [priority, setPriority] = React.useState<TaskPriority>(task.priority);
   const [activeTab, setActiveTab] = React.useState<"details" | "subtasks" | "attachments" | "activity">("details");
-  const [isBookmarked, setIsBookmarked] = React.useState(false);
+  // Task States
+  const [dueDate, setDueDate] = React.useState<string>(task.due_date ? task.due_date.split("T")[0] : "");
+  const [reviewerId, setReviewerId] = React.useState<string>((task as any).reviewer_id || "");
 
   // Criteria State
-  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([
-    { id: "c1", text: "New hero section with headline and subtext", done: true },
-    { id: "c2", text: "Highlight 3 core features with icons", done: false },
-    { id: "c3", text: "Improve mobile responsiveness", done: false },
-    { id: "c4", text: "Review and optimize performance", done: false },
-  ]);
+  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>(
+    (task as any).acceptance_criteria && Array.isArray((task as any).acceptance_criteria)
+      ? (task as any).acceptance_criteria
+      : []
+  );
   const [newCriteriaInput, setNewCriteriaInput] = React.useState("");
   const [showAddCriteria, setShowAddCriteria] = React.useState(false);
 
   // Time Tracking
-  const [loggedMinutes, setLoggedMinutes] = React.useState(204); // 03h 24m
-  const [estimatedMinutes, setEstimatedMinutes] = React.useState(480); // 08h 00m
+  const [loggedMinutes, setLoggedMinutes] = React.useState((task as any).logged_minutes || 0);
+  const [estimatedMinutes, setEstimatedMinutes] = React.useState((task as any).estimated_minutes || 0);
   const [isLoggingTime, setIsLoggingTime] = React.useState(false);
   const [logTimeInput, setLogTimeInput] = React.useState("");
 
@@ -188,30 +201,20 @@ export function TaskDetailView({
       time: string;
       attachment?: { name: string; type: string; size: string };
     }[]
-  >([
-    {
-      id: "cm-1",
-      user: "Jesmin Sikder",
-      role: "HR Manager",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Please share the Figma file when you're done with the new hero section.",
-      time: "2 hours ago",
-    },
-    {
-      id: "cm-2",
-      user: "Morgan Sterling",
-      role: "Product Designer",
-      avatarBg: "bg-[#1E1B4B]",
-      text: "Here's the updated hero section for review.",
-      time: "1 hour ago",
-      attachment: {
-        name: "Homepage_Hero_v2.fig",
-        type: "Figma file",
-        size: "2.4 MB",
-      },
-    },
-  ]);
+  >(
+    task.comments && task.comments.length > 0
+      ? task.comments.map((cm) => ({
+          id: cm.id,
+          user: (cm as any).author_name || (cm as any).author?.name || "Member",
+          role: "Team Member",
+          avatarBg: "bg-[#1E1B4B]",
+          text: cm.content,
+          time: new Date(cm.created_at).toLocaleDateString(),
+        }))
+      : []
+  );
   const [newComment, setNewComment] = React.useState("");
+  const [isBookmarked, setIsBookmarked] = React.useState(false);
 
   // Dropdown menus
   const [openDropdown, setOpenDropdown] = React.useState<string | null>(null);
@@ -230,7 +233,56 @@ export function TaskDetailView({
   const department = departments.find((d) => d.id === task.department_id);
   const project = projects.find((p) => p.id === task.project_id);
   const assignee = people.find((p) => task.assignees.some((a) => a.user_id === p.user_id));
-  const reviewer = people.find((p) => p.user_id === task.approver_id) || people[1] || people[0];
+  const reviewer = people.find((p) => p.user_id === reviewerId) || people.find((p) => p.user_id === task.approver_id);
+
+  const currentOwner = people.find((p) => p.role === "owner") || people[0];
+  const creatorName =
+    (task as any).creator_name ||
+    (task as any).creator?.full_name ||
+    currentOwner?.full_name ||
+    "Tashin Khan";
+
+  const createdOnText = task.created_at
+    ? new Date(task.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Recently";
+
+  const daysLeft = React.useMemo(() => {
+    if (!dueDate) return null;
+    const target = new Date(dueDate).getTime();
+    const now = new Date().setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target - now) / 86400000);
+    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return "Due today";
+    return `${diff}d left`;
+  }, [dueDate]);
+
+  const formattedDueDate = React.useMemo(() => {
+    if (!dueDate) return "No due date";
+    const [y, m, d] = dueDate.split("-");
+    if (!y || !m || !d) return dueDate;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }, [dueDate]);
+
+  const handleDueDateUpdate = async (newDueDateStr: string) => {
+    setDueDate(newDueDateStr);
+    await updateTaskAction({
+      taskId: task.id,
+      workspaceId: workspace.id,
+      dueDate: newDueDateStr ? new Date(newDueDateStr).toISOString() : undefined,
+    });
+    router.refresh();
+  };
 
   const handleStatusUpdate = async (newStatus: TaskStatus) => {
     setStatus(newStatus);
@@ -250,6 +302,16 @@ export function TaskDetailView({
       taskId: task.id,
       workspaceId: workspace.id,
       priority: newPriority,
+    });
+    router.refresh();
+  };
+
+  const handleDescriptionUpdate = async (newDesc: string) => {
+    setDescription(newDesc);
+    await updateTaskAction({
+      taskId: task.id,
+      workspaceId: workspace.id,
+      description: newDesc,
     });
     router.refresh();
   };
@@ -438,13 +500,14 @@ export function TaskDetailView({
                 )}
               </div>
 
-              {/* Due Date Pill */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] text-[#475569] font-medium">
-                <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
-                <span>Sep 4, 2026</span>
-                <span className="text-[#94A3B8] text-[11px] bg-white px-1.5 py-0.2 rounded font-normal">
-                  3 days left
-                </span>
+              {/* Due Date Badge */}
+              <div className="relative">
+                <DatePicker
+                  value={dueDate}
+                  onChange={handleDueDateUpdate}
+                  placeholder="Due date"
+                  buttonClassName="h-7 px-2.5 rounded-full bg-[#F1F5F9] border-transparent text-[#475569] hover:bg-[#E2E8F0] shadow-none text-xs"
+                />
               </div>
             </div>
           </div>
@@ -515,9 +578,6 @@ export function TaskDetailView({
             }`}
           >
             <span>Subtasks</span>
-            <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-              4
-            </span>
             {activeTab === "subtasks" && (
               <motion.div
                 layoutId="activeTabIndicator"
@@ -536,9 +596,6 @@ export function TaskDetailView({
             }`}
           >
             <span>Attachments</span>
-            <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-              3
-            </span>
             {activeTab === "attachments" && (
               <motion.div
                 layoutId="activeTabIndicator"
@@ -573,43 +630,12 @@ export function TaskDetailView({
             {/* Description Section */}
             <div className="space-y-3">
               <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
-              <p className="text-[13.5px] leading-relaxed text-[#334155]">
-                {task.description ||
-                  "We need to redesign the homepage to improve clarity, highlight key features, and improve conversion.\nFocus on a clean hero section, clear value proposition, and better mobile responsiveness."}
-              </p>
-
-              {/* Rich Text Editor Toolbar */}
-              <div className="flex items-center gap-1 pt-2 text-[#64748B]">
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <Bold className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <Italic className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <Strikethrough className="w-3.5 h-3.5" />
-                </button>
-                <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <AlignLeft className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <List className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <ListOrdered className="w-3.5 h-3.5" />
-                </button>
-                <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <LinkIcon className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <Code className="w-3.5 h-3.5" />
-                </button>
-                <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                  <Quote className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <RichDescriptionEditor
+                value={description}
+                onChange={(val) => setDescription(val)}
+                onBlur={(val) => handleDescriptionUpdate(val)}
+                placeholder="Add detailed task description, notes, and guidelines..."
+              />
             </div>
 
             {/* Acceptance Criteria Section */}
@@ -870,12 +896,18 @@ export function TaskDetailView({
                 </div>
 
                 {/* Due date */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[#64748B] flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                     <Calendar className="w-4 h-4 text-[#94A3B8]" />
                     <span>Due date</span>
                   </span>
-                  <span className="font-medium text-[#0F172A]">Sep 4, 2026</span>
+                  <DatePicker
+                    value={dueDate}
+                    onChange={handleDueDateUpdate}
+                    placeholder="No due date"
+                    buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#E2E8F0] shadow-none"
+                    align="right"
+                  />
                 </div>
 
                 {/* Created by */}
@@ -884,7 +916,7 @@ export function TaskDetailView({
                     <User className="w-4 h-4 text-[#94A3B8]" />
                     <span>Created by</span>
                   </span>
-                  <span className="font-medium text-[#0F172A]">Morgan Sterling</span>
+                  <span className="font-medium text-[#0F172A]">{creatorName}</span>
                 </div>
 
                 {/* Created on */}
@@ -893,7 +925,7 @@ export function TaskDetailView({
                     <Clock className="w-4 h-4 text-[#94A3B8]" />
                     <span>Created on</span>
                   </span>
-                  <span className="text-[#475569] text-xs">Aug 18, 2026 11:12 AM</span>
+                  <span className="text-[#475569] text-xs">{createdOnText}</span>
                 </div>
 
                 {/* Reviewer */}
@@ -902,12 +934,18 @@ export function TaskDetailView({
                     <User className="w-4 h-4 text-[#94A3B8]" />
                     <span>Reviewer</span>
                   </span>
-                  <div className="flex items-center gap-2 font-medium text-[#0F172A]">
-                    <div className="w-5 h-5 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[9px] font-bold">
-                      JS
-                    </div>
-                    <span>{reviewer?.full_name || "Jesmin Sikder"}</span>
-                  </div>
+                  <select
+                    value={reviewerId}
+                    onChange={(e) => setReviewerId(e.target.value)}
+                    className="text-xs font-medium text-[#0F172A] bg-transparent border border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#0F172A] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
+                  >
+                    <option value="">Unassigned</option>
+                    {people.map((p) => (
+                      <option key={p.user_id} value={p.user_id}>
+                        {p.full_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

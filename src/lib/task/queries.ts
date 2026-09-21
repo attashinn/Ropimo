@@ -60,7 +60,7 @@ interface AssigneeRow {
 async function enrichTasks(
   rawTasks: RawTaskRow[],
   workspaceId: string,
-  includeDetails: boolean = false
+  includeDetails: boolean = true
 ): Promise<Task[]> {
   if (!rawTasks || rawTasks.length === 0) return [];
 
@@ -591,8 +591,8 @@ export const getWorkspaceRecentActivities = cache(
       tasks.forEach((t) => {
         const actorName = t.created_by ? peopleMap.get(t.created_by) || "You" : "You";
         activities.push({
-          id: `task-created-${t.id}`,
-          type: "task_created",
+          id: `task-${t.id}`,
+          type: t.status === "completed" ? "task_completed" : "task_created",
           targetName: t.title,
           createdAt: t.created_at,
           actorName,

@@ -5,8 +5,8 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     "https://placeholder-project.supabase.co";
   const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder-anon-key";
 
   return createBrowserClient(url, key);

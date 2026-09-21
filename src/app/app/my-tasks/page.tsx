@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getDefaultWorkspace } from "@/lib/workspace/queries";
-import { getMyTasks } from "@/lib/task/queries";
+import { getMyTasks, getWorkspaceTasks } from "@/lib/task/queries";
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { getWorkspaceProjects } from "@/lib/project/queries";
 import { getWorkspaceDepartments } from "@/lib/department/queries";
@@ -35,6 +35,7 @@ export default async function MyTasksPage() {
           noDueDate: [],
           completed: [],
         }}
+        initialTasks={[]}
         people={[]}
         projects={[]}
         departments={[]}
@@ -42,7 +43,7 @@ export default async function MyTasksPage() {
     );
   }
 
-  const [categorized, people, projects, departments] = await Promise.all([
+  const [categorized, workspaceTasks, people, projects, departments] = await Promise.all([
     userId
       ? getMyTasks(userId, workspaceId)
       : {
@@ -52,6 +53,7 @@ export default async function MyTasksPage() {
           noDueDate: [],
           completed: [],
         },
+    getWorkspaceTasks(workspaceId),
     getWorkspacePeople(workspaceId),
     getWorkspaceProjects(workspaceId),
     getWorkspaceDepartments(workspaceId),
@@ -63,6 +65,7 @@ export default async function MyTasksPage() {
       workspaceName={workspace?.name || "brnnd"}
       currentUserId={userId}
       categorized={categorized}
+      initialTasks={workspaceTasks}
       people={people}
       projects={projects}
       departments={departments}

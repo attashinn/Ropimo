@@ -3,6 +3,7 @@ import { getDefaultWorkspace } from "@/lib/workspace/queries";
 import { getWorkspaceProjects } from "@/lib/project/queries";
 import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { getWorkspacePeople } from "@/lib/people/queries";
+import { getWorkspaceTasks } from "@/lib/task/queries";
 import { ProjectsDirectory } from "@/components/app/projects-directory";
 
 export const metadata = {
@@ -22,15 +23,17 @@ export default async function ProjectsPage() {
         projects={[]}
         departments={[]}
         people={[]}
+        tasks={[]}
         userRole="member"
       />
     );
   }
 
-  const [projects, departments, people] = await Promise.all([
+  const [projects, departments, people, tasks] = await Promise.all([
     getWorkspaceProjects(workspaceId),
     getWorkspaceDepartments(workspaceId),
     getWorkspacePeople(workspaceId),
+    getWorkspaceTasks(workspaceId),
   ]);
 
   return (
@@ -40,6 +43,7 @@ export default async function ProjectsPage() {
       projects={projects}
       departments={departments}
       people={people}
+      tasks={tasks}
       userRole={workspace?.role || "owner"}
     />
   );

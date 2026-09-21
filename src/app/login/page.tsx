@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signInWithPasswordAction, signInWithOtpAction } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/client";
 import { LogoIcon, SparklesIcon } from "@/components/landing/icons";
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -11,16 +12,21 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/app";
+  const emailParam = searchParams.get("email");
 
   const [authMode, setAuthMode] = React.useState<"password" | "magic-link">("password");
-  const [email, setEmail] = React.useState("");
+  const [email, setEmail] = React.useState(emailParam || "");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
 
-  const supabase = createClient();
+  React.useEffect(() => {
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [emailParam]);
 
   // Detect and display auth errors passed via URL (e.g. expired magic link)
   React.useEffect(() => {
@@ -44,7 +50,6 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -52,31 +57,41 @@ function LoginForm() {
     setSuccessMsg(null);
 
     try {
+      const supabase = createClient();
+
       if (authMode === "password") {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim().toLowerCase(),
           password,
         });
 
         if (error) {
-          setErrorMsg(error.message);
+          const err = error.message;
+          if (err.toLowerCase().includes("invalid login credentials") || err.toLowerCase().includes("invalid credentials")) {
+            setErrorMsg(
+              "Incorrect password. If you originally signed in using Magic Link, please switch to the 'Magic Link' tab above to sign in without a password."
+            );
+          } else {
+            setErrorMsg(err);
+          }
           setLoading(false);
           return;
         }
 
-        router.push(redirectPath);
-        router.refresh();
+        // Navigate with full refresh to ensure all session cookies are recognized
+        window.location.href = redirectPath || "/app";
       } else {
         // Magic link / passwordless OTP
+        const origin = window.location.origin;
         const { error } = await supabase.auth.signInWithOtp({
-          email,
+          email: email.trim().toLowerCase(),
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${redirectPath}`,
+            emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectPath || "/app")}`,
           },
         });
 
         if (error) {
-          setErrorMsg(error.message);
+          setErrorMsg(error.message || "Failed to send magic link.");
           setLoading(false);
           return;
         }
@@ -84,8 +99,8 @@ function LoginForm() {
         setSuccessMsg("Magic sign-in link sent! Please check your email inbox.");
         setLoading(false);
       }
-    } catch {
-      setErrorMsg("An unexpected error occurred. Please try again.");
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Sign-in could not be completed. Please try again.");
       setLoading(false);
     }
   };

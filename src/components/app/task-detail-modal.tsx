@@ -36,7 +36,10 @@ import {
   Maximize2,
   Minimize2,
   Trash2,
+  UploadCloud,
+  FileText,
 } from "lucide-react";
+import { RichDescriptionEditor } from "@/components/app/rich-description-editor";
 import {
   Task,
   TaskStatus,
@@ -61,6 +64,7 @@ import {
   ClickUpStatus,
   ClickUpPriority,
 } from "./clickup-property-dropdowns";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export interface TaskDetailModalProps {
   isOpen: boolean;
@@ -95,29 +99,36 @@ export function TaskDetailModal({
   const [projectId, setProjectId] = React.useState("");
   const [assigneeId, setAssigneeId] = React.useState("");
   const [dueDate, setDueDate] = React.useState("");
-  const [activeTab, setActiveTab] = React.useState<"details" | "subtasks" | "attachments" | "activity">("details");
+  const [activeTab, setActiveTab] = React.useState<"details" | "attachments">("details");
   const [isBookmarked, setIsBookmarked] = React.useState(false);
 
+  // File Attachments State
+  const [attachments, setAttachments] = React.useState<{
+    id: string;
+    name: string;
+    size: string;
+    type: string;
+    uploadedAt: string;
+    url?: string;
+  }[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Criteria State
-  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([
-    { id: "c1", text: "New hero section with headline and subtext", done: true },
-    { id: "c2", text: "Highlight 3 core features with icons", done: false },
-    { id: "c3", text: "Improve mobile responsiveness", done: false },
-    { id: "c4", text: "Review and optimize performance", done: false },
-  ]);
+  const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([]);
   const [newCriteriaInput, setNewCriteriaInput] = React.useState("");
   const [showAddCriteria, setShowAddCriteria] = React.useState(false);
 
   // Time Tracking
-  const [loggedMinutes, setLoggedMinutes] = React.useState(204);
-  const [estimatedMinutes, setEstimatedMinutes] = React.useState(480);
+  const [loggedMinutes, setLoggedMinutes] = React.useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = React.useState(0);
   const [isLoggingTime, setIsLoggingTime] = React.useState(false);
   const [logTimeInput, setLogTimeInput] = React.useState("");
 
   // Tags
-  const [tags, setTags] = React.useState<string[]>(["Design", "Homepage"]);
+  const [tags, setTags] = React.useState<string[]>([]);
   const [isEditingTags, setIsEditingTags] = React.useState(false);
   const [newTagInput, setNewTagInput] = React.useState("");
+  const [reviewerId, setReviewerId] = React.useState("");
 
   // Comments
   const [comments, setComments] = React.useState<
@@ -176,6 +187,34 @@ export function TaskDetailModal({
       setAssigneeId(task.assignees?.[0]?.user_id || "");
       setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
 
+      // Initial criteria
+      if ((task as any).acceptance_criteria && Array.isArray((task as any).acceptance_criteria)) {
+        setCriteria((task as any).acceptance_criteria);
+      } else {
+        setCriteria([]);
+      }
+
+      setLoggedMinutes((task as any).logged_minutes || 0);
+      setEstimatedMinutes((task as any).estimated_minutes || 0);
+      setTags((task as any).tags || []);
+      setReviewerId((task as any).reviewer_id || "");
+
+      // Initial attachments
+      if (task.attachments && task.attachments.length > 0) {
+        setAttachments(
+          task.attachments.map((a) => ({
+            id: a.id,
+            name: a.file_name,
+            size: a.file_size ? `${(a.file_size / 1024).toFixed(1)} KB` : "File",
+            type: a.file_type || "Document",
+            uploadedAt: new Date(a.created_at).toLocaleDateString(),
+            url: a.file_url,
+          }))
+        );
+      } else {
+        setAttachments([]);
+      }
+
       // Initial comments
       if (task.comments && task.comments.length > 0) {
         setComments(
@@ -189,29 +228,7 @@ export function TaskDetailModal({
           }))
         );
       } else {
-        setComments([
-          {
-            id: "cm-1",
-            user: "Jesmin Sikder",
-            role: "HR Manager",
-            avatarBg: "bg-[#1E1B4B]",
-            text: "Please share the Figma file when you're done with the update.",
-            time: "2 hours ago",
-          },
-          {
-            id: "cm-2",
-            user: "Morgan Sterling",
-            role: "Product Designer",
-            avatarBg: "bg-[#1E1B4B]",
-            text: "Here's the latest update for review.",
-            time: "1 hour ago",
-            attachment: {
-              name: "Homepage_Hero_v2.fig",
-              type: "Figma file",
-              size: "2.4 MB",
-            },
-          },
-        ]);
+        setComments([]);
       }
     }
   }, [task]);
@@ -224,6 +241,66 @@ export function TaskDetailModal({
 
   const currentStatusObj = STATUS_LIST.find((s) => s.id === status) || STATUS_LIST[0];
   const currentPriorityObj = PRIORITY_OPTIONS.find((p) => p.id === priority) || PRIORITY_OPTIONS[0];
+
+  const currentOwner = people.find((p) => p.role === "owner") || people[0];
+  const creatorName =
+    (task as any).creator_name ||
+    (task as any).creator?.full_name ||
+    currentOwner?.full_name ||
+    "Tashin Khan";
+
+  const createdOnText = task.created_at
+    ? new Date(task.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Recently";
+
+  const daysLeft = (() => {
+    if (!dueDate) return null;
+    const target = new Date(dueDate).getTime();
+    const now = new Date().setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target - now) / 86400000);
+    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return "Due today";
+    return `${diff}d left`;
+  })();
+
+  const formattedDueDate = (() => {
+    if (!dueDate) return "No due date";
+    const [y, m, d] = dueDate.split("-");
+    if (!y || !m || !d) return dueDate;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  })();
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newItems = Array.from(files).map((f) => {
+      const sizeInMb = (f.size / (1024 * 1024)).toFixed(1);
+      return {
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: f.name,
+        size: `${sizeInMb} MB`,
+        type: f.type || "Document",
+        uploadedAt: "Just now",
+      };
+    });
+    setAttachments((prev) => [...newItems, ...prev]);
+    e.target.value = "";
+  };
+
+  const handleDeleteAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const handleUpdateField = async (fields: {
     title?: string;
@@ -529,12 +606,16 @@ export function TaskDetailModal({
                   </div>
 
                   {/* Due Date Badge */}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] text-[#475569] font-medium text-xs">
-                    <Calendar className="w-3.5 h-3.5 text-[#64748B]" />
-                    <span>{dueDate || "Sep 4, 2026"}</span>
-                    <span className="text-[#94A3B8] text-[11px] bg-white px-1.5 py-0.2 rounded font-normal">
-                      3 days left
-                    </span>
+                  <div className="relative">
+                    <DatePicker
+                      value={dueDate}
+                      onChange={(newDate) => {
+                        setDueDate(newDate);
+                        handleUpdateField({ dueDate: newDate ? new Date(newDate).toISOString() : undefined });
+                      }}
+                      placeholder="Due date"
+                      buttonClassName="h-7 px-2.5 rounded-full bg-[#F1F5F9] border-transparent text-[#475569] hover:bg-[#E2E8F0] shadow-none text-xs"
+                    />
                   </div>
                 </div>
               </div>
@@ -574,12 +655,12 @@ export function TaskDetailModal({
               </div>
             </div>
 
-            {/* ── HORIZONTAL TABS ────────────────────────────────────────── */}
+            {/* ── HORIZONTAL TABS (Specifically Task Details & Attachments) ── */}
             <div className="flex items-center gap-8 border-b border-[#F1F5F9] mb-7 text-[13.5px]">
               <button
                 type="button"
                 onClick={() => setActiveTab("details")}
-                className={`pb-3 font-semibold transition-all relative ${
+                className={`pb-3 font-semibold transition-all relative cursor-pointer ${
                   activeTab === "details"
                     ? "text-[#0F172A]"
                     : "text-[#64748B] hover:text-[#0F172A]"
@@ -596,57 +677,21 @@ export function TaskDetailModal({
 
               <button
                 type="button"
-                onClick={() => setActiveTab("subtasks")}
-                className={`pb-3 flex items-center gap-1.5 font-medium transition-all relative ${
-                  activeTab === "subtasks"
-                    ? "text-[#0F172A] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
-              >
-                <span>Subtasks</span>
-                <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                  4
-                </span>
-                {activeTab === "subtasks" && (
-                  <motion.div
-                    layoutId="taskPopupActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
-                  />
-                )}
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setActiveTab("attachments")}
-                className={`pb-3 flex items-center gap-1.5 font-medium transition-all relative ${
+                className={`pb-3 flex items-center gap-2 font-medium transition-all relative cursor-pointer ${
                   activeTab === "attachments"
                     ? "text-[#0F172A] font-semibold"
                     : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
-                <span>Attachments</span>
-                <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                  3
+                <div className="flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5" />
+                  <span>Attachments</span>
+                </div>
+                <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700">
+                  {attachments.length}
                 </span>
                 {activeTab === "attachments" && (
-                  <motion.div
-                    layoutId="taskPopupActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
-                  />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("activity")}
-                className={`pb-3 font-medium transition-all relative ${
-                  activeTab === "activity"
-                    ? "text-[#0F172A] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
-              >
-                <span>Activity</span>
-                {activeTab === "activity" && (
                   <motion.div
                     layoutId="taskPopupActiveTab"
                     className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
@@ -657,230 +702,291 @@ export function TaskDetailModal({
 
             {/* ── 2-COLUMN GRID BODY ─────────────────────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* ── LEFT COLUMN (Description, Criteria, Comments) ───────── */}
+              {/* ── LEFT COLUMN ─────────────────────────────────────────── */}
               <div className="lg:col-span-8 space-y-8">
-                {/* Description */}
-                <div className="space-y-3">
-                  <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
-                  <textarea
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    onBlur={() => handleUpdateField({ description })}
-                    placeholder="Add detailed task description, notes, and guidelines..."
-                    className="w-full text-[13.5px] leading-relaxed text-[#334155] placeholder:text-[#94A3B8] bg-transparent border-0 focus:outline-none resize-none"
-                  />
-
-                  {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-1 pt-1 text-[#64748B]">
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Bold className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Italic className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Strikethrough className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <AlignLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <List className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <ListOrdered className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-px h-3.5 bg-[#E2E8F0] mx-1" />
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <LinkIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Code className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1.5 hover:bg-[#F1F5F9] rounded hover:text-[#0F172A]">
-                      <Quote className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Acceptance Criteria */}
-                <div className="space-y-3.5 pt-2">
-                  <h2 className="text-[14px] font-bold text-[#0F172A]">Acceptance criteria</h2>
-
-                  <div className="space-y-2.5">
-                    {criteria.map((c) => (
-                      <div
-                        key={c.id}
-                        onClick={() =>
-                          setCriteria(
-                            criteria.map((item) =>
-                              item.id === c.id ? { ...item, done: !item.done } : item
-                            )
-                          )
-                        }
-                        className="flex items-center gap-3 text-[13.5px] cursor-pointer group select-none"
-                      >
-                        <div
-                          className={`w-4.5 h-4.5 rounded flex items-center justify-center transition-all ${
-                            c.done
-                              ? "bg-[#10B981] text-white"
-                              : "border border-[#CBD5E1] bg-white group-hover:border-[#94A3B8]"
-                          }`}
-                        >
-                          {c.done && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                        <span
-                          className={
-                            c.done
-                              ? "line-through text-[#94A3B8]"
-                              : "text-[#334155] group-hover:text-[#0F172A]"
-                          }
-                        >
-                          {c.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {showAddCriteria ? (
-                    <form onSubmit={handleAddCriteriaSubmit} className="flex items-center gap-2 pt-2">
-                      <input
-                        type="text"
-                        autoFocus
-                        value={newCriteriaInput}
-                        onChange={(e) => setNewCriteriaInput(e.target.value)}
-                        placeholder="Type acceptance criteria..."
-                        className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#CBD5E1] focus:outline-none focus:border-[#0F172A]"
+                {activeTab === "details" ? (
+                  <>
+                    {/* Description */}
+                    <div className="space-y-3">
+                      <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
+                      <RichDescriptionEditor
+                        value={description}
+                        onChange={(val) => setDescription(val)}
+                        onBlur={(val) => handleUpdateField({ description: val })}
+                        placeholder="Add detailed task description, notes, and guidelines..."
                       />
-                      <button
-                        type="submit"
-                        className="px-3 py-2 rounded-lg bg-[#0F172A] text-white text-xs font-semibold"
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCriteria(false)}
-                        className="px-2 py-2 text-xs text-[#64748B] hover:text-[#0F172A]"
-                      >
-                        Cancel
-                      </button>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCriteria(true)}
-                      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#10B981] hover:text-[#059669] pt-1 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add criteria</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Comments Thread */}
-                <div className="space-y-4 pt-4 border-t border-[#F1F5F9]">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-bold text-[#0F172A]">Comments</h2>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                      {comments.length}
-                    </span>
-                  </div>
-
-                  {/* Comment Input */}
-                  <form
-                    onSubmit={handleAddCommentSubmit}
-                    className="flex items-center gap-3 p-2 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs"
-                  >
-                    <div className="w-7 h-7 rounded-full bg-[#0F172A] text-white flex items-center justify-center text-[10px] font-bold shrink-0 ml-1">
-                      TK
                     </div>
-                    <input
-                      type="text"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Write a comment..."
-                      className="flex-1 text-xs bg-transparent text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
-                    />
-                    <div className="flex items-center gap-1 text-[#94A3B8] mr-1">
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <Smile className="w-4 h-4" />
-                      </button>
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <Paperclip className="w-4 h-4" />
-                      </button>
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <AtSign className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={!newComment.trim()}
-                        className="p-1.5 rounded-lg bg-[#0F172A] text-white disabled:opacity-20 hover:bg-[#1E293B] transition-colors ml-1"
-                      >
-                        <Send className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </form>
 
-                  {/* Thread Comments */}
-                  <div className="space-y-5 pt-2">
-                    {comments.map((cm) => (
-                      <div key={cm.id} className="flex items-start gap-3 text-xs">
-                        <div className="w-8 h-8 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-                          {cm.user.split(" ").map((n) => n[0]).join("")}
-                        </div>
+                    {/* Acceptance Criteria */}
+                    <div className="space-y-3.5 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-[14px] font-bold text-[#0F172A]">Acceptance criteria</h2>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCriteria(!showAddCriteria)}
+                          className="text-xs font-semibold text-[#0D9488] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add criteria</span>
+                        </button>
+                      </div>
 
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#0F172A] text-[13px]">{cm.user}</span>
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#F1F5F9] text-[#64748B]">
-                              {cm.role}
+                      <div className="space-y-2.5">
+                        {criteria.map((c) => (
+                          <div
+                            key={c.id}
+                            onClick={() =>
+                              setCriteria(
+                                criteria.map((item) =>
+                                  item.id === c.id ? { ...item, done: !item.done } : item
+                                )
+                              )
+                            }
+                            className="flex items-center gap-3 text-[13.5px] cursor-pointer group select-none"
+                          >
+                            <div
+                              className={`w-4.5 h-4.5 rounded flex items-center justify-center transition-all ${
+                                c.done
+                                  ? "bg-[#10B981] text-white"
+                                  : "border border-[#CBD5E1] bg-white group-hover:border-[#94A3B8]"
+                              }`}
+                            >
+                              {c.done && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span
+                              className={
+                                c.done
+                                  ? "line-through text-[#94A3B8]"
+                                  : "text-[#334155] group-hover:text-[#0F172A]"
+                              }
+                            >
+                              {c.text}
                             </span>
                           </div>
+                        ))}
+                      </div>
 
-                          <p className="text-[13px] text-[#334155] leading-normal">{cm.text}</p>
+                      {showAddCriteria && (
+                        <form onSubmit={handleAddCriteriaSubmit} className="flex items-center gap-2 pt-2">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={newCriteriaInput}
+                            onChange={(e) => setNewCriteriaInput(e.target.value)}
+                            placeholder="Type acceptance criteria..."
+                            className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#CBD5E1] focus:outline-none focus:border-[#0F172A]"
+                          />
+                          <button
+                            type="submit"
+                            className="px-3 py-2 rounded-lg bg-[#0F172A] text-white text-xs font-semibold"
+                          >
+                            Add
+                          </button>
+                        </form>
+                      )}
+                    </div>
 
-                          {cm.attachment && (
-                            <div className="flex items-center justify-between p-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] max-w-sm mt-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-center shadow-2xs">
-                                  <svg className="w-4 h-4" viewBox="0 0 38 57" fill="none">
-                                    <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
-                                    <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
-                                    <path d="M19 0V19H28.5C33.7467 19 38 14.7467 38 9.5C38 4.25329 33.7467 0 28.5 0H19Z" fill="#FF7262"/>
-                                    <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
-                                    <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
-                                  </svg>
+                    {/* Comments */}
+                    <div className="space-y-6 pt-4 border-t border-[#F1F5F9]">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-[14px] font-bold text-[#0F172A]">
+                          Comments <span className="text-neutral-400 font-normal ml-1">({comments.length})</span>
+                        </h2>
+                      </div>
+
+                      {/* Comment Input */}
+                      <form
+                        onSubmit={handleAddCommentSubmit}
+                        className="rounded-xl border border-[#E2E8F0] p-4 space-y-4 focus-within:border-[#0F172A] transition-all bg-white"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#0F172A] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                            TK
+                          </div>
+                          <textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder="Write a comment..."
+                            rows={2}
+                            className="w-full resize-none border-none outline-none text-xs text-[#0F172A] placeholder:text-[#94A3B8] p-0"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3 text-[#64748B]">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="p-1.5 hover:bg-[#F8FAFC] rounded-lg transition-colors"
+                            >
+                              <Smile className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="p-1.5 hover:bg-[#F8FAFC] rounded-lg transition-colors"
+                              title="Attach file"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="p-1.5 hover:bg-[#F8FAFC] rounded-lg transition-colors"
+                            >
+                              <AtSign className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={!newComment.trim()}
+                            className="px-3 py-1.5 rounded-lg bg-[#0F172A] text-white text-xs font-semibold hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Comments List */}
+                      <div className="space-y-4">
+                        {comments.map((cm) => (
+                          <div key={cm.id} className="flex items-start gap-3.5 group">
+                            <div
+                              className={`w-8 h-8 rounded-full ${cm.avatarBg} text-white flex items-center justify-center text-xs font-bold shrink-0`}
+                            >
+                              {cm.user
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </div>
+                            <div className="space-y-2 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-[#0F172A]">{cm.user}</span>
+                                <span className="text-[11px] text-[#94A3B8]">{cm.role}</span>
+                              </div>
+                              <div className="p-3.5 rounded-2xl rounded-tl-none bg-[#F8FAFC] border border-[#F1F5F9] text-xs text-[#334155] leading-relaxed space-y-3">
+                                <p>{cm.text}</p>
+                              </div>
+
+                              <div className="flex items-center gap-3 pt-1 text-[11px] text-[#94A3B8]">
+                                <span>{cm.time}</span>
+                                <button type="button" className="hover:text-[#0F172A] font-medium">
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* ── ATTACHMENTS TAB CONTENT ───────────────────────────── */
+                  <div className="space-y-6 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <h2 className="text-[15px] font-bold text-[#0F172A]">Files & Attachments</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Upload briefs, assets, and project files specifically for this task.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#10251F] text-[#C7F34A] text-xs font-semibold hover:bg-[#19362e] transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Attach File</span>
+                      </button>
+                    </div>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+
+                    {/* Drag & Drop Upload Zone */}
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-200 hover:border-[#10251F] hover:bg-slate-50/60 rounded-2xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-[#10251F] group-hover:text-[#C7F34A] transition-all">
+                        <UploadCloud className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#0F172A]">
+                          Click to upload <span className="font-normal text-slate-500">or drag and drop</span>
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          PDF, DOCX, PNG, JPG, ZIP (up to 50MB per file)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Attachments List */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Attached Deliverables & Files ({attachments.length})
+                        </h3>
+                      </div>
+
+                      {attachments.length === 0 ? (
+                        <div className="py-10 text-center text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                          No files attached to this task yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {attachments.map((att) => (
+                            <div
+                              key={att.id}
+                              className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs transition-all group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                                  <FileText className="w-5 h-5" />
                                 </div>
-                                <div>
-                                  <p className="font-semibold text-[#0F172A] text-xs">{cm.attachment.name}</p>
-                                  <p className="text-[10px] text-[#64748B]">
-                                    {cm.attachment.type} • {cm.attachment.size}
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-semibold text-[#0F172A] truncate">
+                                    {att.name}
+                                  </p>
+                                  <p className="text-[11px] text-slate-400">
+                                    {att.size} • Uploaded {att.uploadedAt}
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                className="p-1.5 rounded-lg hover:bg-white text-[#64748B] hover:text-[#0F172A] transition-colors"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
 
-                          <div className="flex items-center gap-3 pt-1 text-[11px] text-[#94A3B8]">
-                            <span>{cm.time}</span>
-                            <button type="button" className="hover:text-[#0F172A] font-medium">
-                              Reply
-                            </button>
-                          </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <a
+                                  href="#"
+                                  download={att.name}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    alert(`Downloading ${att.name}`);
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-[#0F172A] transition-colors cursor-pointer"
+                                  title="Download file"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAttachment(att.id)}
+                                  className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                                  title="Remove file"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* ── RIGHT COLUMN (Task Details, Time Tracking, Tags) ─────── */}
@@ -965,12 +1071,21 @@ export function TaskDetailModal({
                     </div>
 
                     {/* Due date */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
                         <Calendar className="w-4 h-4 text-[#94A3B8]" />
                         <span>Due date</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">{dueDate || "Sep 4, 2026"}</span>
+                      <DatePicker
+                        value={dueDate}
+                        onChange={(newDate) => {
+                          setDueDate(newDate);
+                          handleUpdateField({ dueDate: newDate ? new Date(newDate).toISOString() : undefined });
+                        }}
+                        placeholder="No due date"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#E2E8F0] shadow-none"
+                        align="right"
+                      />
                     </div>
 
                     {/* Created by */}
@@ -979,7 +1094,7 @@ export function TaskDetailModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created by</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">Morgan Sterling</span>
+                      <span className="font-medium text-[#0F172A]">{creatorName}</span>
                     </div>
 
                     {/* Created on */}
@@ -988,7 +1103,7 @@ export function TaskDetailModal({
                         <Clock className="w-4 h-4 text-[#94A3B8]" />
                         <span>Created on</span>
                       </span>
-                      <span className="text-[#475569] text-xs">Aug 18, 2026 11:12 AM</span>
+                      <span className="text-[#475569] text-xs">{createdOnText}</span>
                     </div>
 
                     {/* Reviewer */}
@@ -997,12 +1112,18 @@ export function TaskDetailModal({
                         <User className="w-4 h-4 text-[#94A3B8]" />
                         <span>Reviewer</span>
                       </span>
-                      <div className="flex items-center gap-2 font-medium text-[#0F172A]">
-                        <div className="w-5 h-5 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[9px] font-bold">
-                          JS
-                        </div>
-                        <span>Jesmin Sikder</span>
-                      </div>
+                      <select
+                        value={reviewerId}
+                        onChange={(e) => setReviewerId(e.target.value)}
+                        className="text-xs font-medium text-[#0F172A] bg-transparent border border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#0F172A] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
+                      >
+                        <option value="">Unassigned</option>
+                        {people.map((p) => (
+                          <option key={p.user_id} value={p.user_id}>
+                            {p.full_name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

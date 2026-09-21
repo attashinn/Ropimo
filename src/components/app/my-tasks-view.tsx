@@ -3,12 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CategorizedTasks, Task, TaskPriority, TaskStatus } from "@/types/task";
+import { CategorizedTasks, Task, TaskPriority, TaskStatus, TaskAttachment, TaskComment } from "@/types/task";
 import { WorkspacePerson } from "@/types/people";
 import { Project } from "@/types/project";
 import { Department } from "@/types/department";
 import { CreateTaskModal } from "@/components/app/create-task-modal";
-import { updateTaskAction, deleteTaskAction } from "@/lib/task/actions";
+import { updateTaskAction, deleteTaskAction, addTaskAttachmentAction, addTaskCommentAction } from "@/lib/task/actions";
 import { AppIcon } from "@/components/ui/app-icon";
 
 export interface MyTasksViewProps {
@@ -16,6 +16,7 @@ export interface MyTasksViewProps {
   workspaceName?: string;
   currentUserId: string;
   categorized?: CategorizedTasks;
+  initialTasks?: Task[];
   people: WorkspacePerson[];
   projects: Project[];
   departments: Department[];
@@ -25,111 +26,102 @@ interface DisplayTaskItem {
   id: string;
   title: string;
   description?: string;
-  project: { name: string; icon: string; color: string };
+  project: { id?: string; name: string; icon: string; color: string };
   departmentName?: string;
   priority: TaskPriority;
   status: TaskStatus;
   dueTimeText: string;
   dueCategory: "today" | "week" | "later";
-  assignee: { name: string; initial: string; bg?: string };
+  dueDate?: string | null;
+  assignee: { name: string; initial: string; bg?: string; jobTitle?: string };
   completed: boolean;
-  order: number;
+  order?: number;
+  createdAt: string;
+  createdBy?: string | null;
+  creatorName?: string;
+  attachments: TaskAttachment[];
+  rawTask?: Task;
 }
 
-type GroupByOption = "due_date" | "project" | "priority" | "status" | "assignee";
+type GroupByOption = "due_date" | "project" | "priority" | "status";
 
-const INITIAL_DEMO_TASKS: DisplayTaskItem[] = [
-  {
-    id: "task-1",
-    title: "Fix authentication bug",
-    description: "Resolve login issue on mobile",
-    project: { name: "Ropimo Platform", icon: "R", color: "#10251F" },
-    departmentName: "Development",
-    priority: "high",
-    status: "in_progress",
-    dueTimeText: "Today 10:00 AM",
-    dueCategory: "today",
-    assignee: { name: "Tashin Khan", initial: "T", bg: "bg-[#10251F]" },
-    completed: false,
-    order: 1,
-  },
-  {
-    id: "task-2",
-    title: "Review homepage PR",
-    description: "Check and approve the latest changes",
-    project: { name: "Muntajar Website", icon: "M", color: "#EA580C" },
-    departmentName: "Design",
-    priority: "medium",
-    status: "in_progress",
-    dueTimeText: "Today 11:30 AM",
-    dueCategory: "today",
-    assignee: { name: "Sarah Ahmed", initial: "S", bg: "bg-[#246244]" },
-    completed: false,
-    order: 2,
-  },
-  {
-    id: "task-3",
-    title: "Implement API pagination",
-    description: "Add pagination to improve API performance",
-    project: { name: "Client Dashboard", icon: "C", color: "#1E293B" },
-    departmentName: "Development",
-    priority: "medium",
-    status: "todo",
-    dueTimeText: "Tomorrow 02:00 PM",
-    dueCategory: "week",
-    assignee: { name: "Arafath Hossain", initial: "A", bg: "bg-[#1E293B]" },
-    completed: false,
-    order: 3,
-  },
-  {
-    id: "task-4",
-    title: "Deploy new update to staging",
-    description: "Push and verify the latest build",
-    project: { name: "Ropimo Platform", icon: "R", color: "#10251F" },
-    departmentName: "Development",
-    priority: "low",
-    status: "todo",
-    dueTimeText: "Apr 26, 2026 04:30 PM",
-    dueCategory: "week",
-    assignee: { name: "Fatema Islam", initial: "F", bg: "bg-[#DB2777]" },
-    completed: false,
-    order: 4,
-  },
-  {
-    id: "task-5",
-    title: "Design settings page UI",
-    description: "Create responsive settings page",
-    project: { name: "Muntajar Website", icon: "M", color: "#EA580C" },
-    departmentName: "Design",
-    priority: "medium",
-    status: "in_progress",
-    dueTimeText: "Apr 27, 2026 03:00 PM",
-    dueCategory: "week",
-    assignee: { name: "Sarah Ahmed", initial: "S", bg: "bg-[#246244]" },
-    completed: false,
-    order: 5,
-  },
-  {
-    id: "task-6",
-    title: "Write API documentation",
-    description: "Document all authentication endpoints",
-    project: { name: "Client Dashboard", icon: "C", color: "#1E293B" },
-    departmentName: "Development",
-    priority: "low",
-    status: "todo",
-    dueTimeText: "Apr 30, 2026 01:00 PM",
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatDueText(dateStr?: string | null): { dueCategory: "today" | "week" | "later"; dueTimeText: string } {
+  if (!dateStr) return { dueCategory: "later", dueTimeText: "No due date" };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { dueCategory: "later", dueTimeText: "No due date" };
+
+  const today = new Date();
+  const isToday =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+
+  if (isToday) {
+    return { dueCategory: "today", dueTimeText: "Today" };
+  }
+
+  return {
     dueCategory: "later",
-    assignee: { name: "Rahim Hasan", initial: "R", bg: "bg-[#B58500]" },
-    completed: false,
-    order: 6,
-  },
-];
+    dueTimeText: `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`,
+  };
+}
+
+function formatDateDeterministic(dateStr?: string | null): string {
+  if (!dateStr) return "Recently";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "Recently";
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+function taskToDisplayItem(task: Task, currentUserId: string): DisplayTaskItem {
+  const assigneePerson = task.assignees?.[0];
+  const assigneeName = assigneePerson?.full_name || (task as unknown as { assignee_name?: string }).assignee_name || (task.created_by === currentUserId ? "Me" : "Unassigned");
+  const initial = assigneeName.charAt(0).toUpperCase();
+
+  const { dueCategory, dueTimeText } = formatDueText(task.due_date);
+
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description || "",
+    project: {
+      id: task.project?.id,
+      name: task.project?.name || "General",
+      icon: task.project?.icon || "P",
+      color: task.project?.color || "#10251F",
+    },
+    departmentName: task.department?.name || undefined,
+    priority: task.priority || "medium",
+    status: task.status || "todo",
+    dueDate: task.due_date,
+    dueTimeText,
+    dueCategory,
+    assignee: {
+      name: assigneeName,
+      initial,
+      bg: "bg-[#10251F]",
+      jobTitle: assigneePerson?.job_title || undefined,
+    },
+    completed: task.status === "completed",
+    order: 1,
+    createdAt: task.created_at || new Date().toISOString(),
+    createdBy: task.created_by,
+    creatorName: task.creator?.full_name || "Tashin Khan",
+    attachments: task.attachments || [],
+    rawTask: task,
+  };
+}
+
+const INITIAL_DEMO_TASKS: DisplayTaskItem[] = [];
 
 export function MyTasksView({
   workspaceId,
   workspaceName = "brnnd",
   currentUserId,
   categorized,
+  initialTasks = [],
   people = [],
   projects = [],
   departments = [],
@@ -150,15 +142,37 @@ export function MyTasksView({
   const [createModalOpen, setCreateModalOpen] = React.useState(false);
   const [organizerModalOpen, setOrganizerModalOpen] = React.useState(false);
   const [selectedTaskDetails, setSelectedTaskDetails] = React.useState<DisplayTaskItem | null>(null);
-  const [taskDetailTab, setTaskDetailTab] = React.useState<"overview" | "subtasks" | "activity" | "attachments" | "notes">("overview");
+  const [taskDetailTab, setTaskDetailTab] = React.useState<"overview" | "attachments" | "activity">("overview");
+  const [uploadingAttachment, setUploadingAttachment] = React.useState(false);
+  const [newCommentText, setNewCommentText] = React.useState("");
+  const [submittingComment, setSubmittingComment] = React.useState(false);
+  const modalFileInputRef = React.useRef<HTMLInputElement>(null);
   const [selectedTaskIds, setSelectedTaskIds] = React.useState<string[]>([]);
   const [actionMenuTaskId, setActionMenuTaskId] = React.useState<string | null>(null);
 
   // Group collapsing
   const [collapsedGroups, setCollapsedGroups] = React.useState<{ [key: string]: boolean }>({});
 
+  // Dynamic mapped tasks from DB or fallback
+  const mappedTasks = React.useMemo(() => {
+    const list = initialTasks && initialTasks.length > 0
+      ? initialTasks
+      : categorized
+      ? [...categorized.today, ...categorized.upcoming, ...categorized.overdue, ...categorized.noDueDate, ...categorized.completed]
+      : [];
+
+    if (list.length > 0) {
+      return list.map((t) => taskToDisplayItem(t, currentUserId));
+    }
+    return INITIAL_DEMO_TASKS;
+  }, [initialTasks, categorized, currentUserId]);
+
   // Tasks list
-  const [localTasks, setLocalTasks] = React.useState<DisplayTaskItem[]>(INITIAL_DEMO_TASKS);
+  const [localTasks, setLocalTasks] = React.useState<DisplayTaskItem[]>(mappedTasks);
+
+  React.useEffect(() => {
+    setLocalTasks(mappedTasks);
+  }, [mappedTasks]);
 
   React.useEffect(() => {
     function handleClickOutside() {
@@ -194,6 +208,120 @@ export function MyTasksView({
       router.refresh();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleModalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedTaskDetails) return;
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("workspaceId", workspaceId);
+      formData.append("folder", "attachments");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.success) {
+        throw new Error(uploadData.error || "Upload failed");
+      }
+
+      const fileUrl = uploadData.fileUrl;
+      await addTaskAttachmentAction(
+        selectedTaskDetails.id,
+        workspaceId,
+        file.name,
+        file.size,
+        file.type || "application/octet-stream",
+        fileUrl
+      );
+
+      const newAtt: TaskAttachment = {
+        id: `att-${Date.now()}`,
+        task_id: selectedTaskDetails.id,
+        workspace_id: workspaceId,
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type || "application/octet-stream",
+        file_url: fileUrl,
+        created_at: new Date().toISOString(),
+      };
+
+      setSelectedTaskDetails((prev) =>
+        prev ? { ...prev, attachments: [...prev.attachments, newAtt] } : null
+      );
+      setLocalTasks((prev) =>
+        prev.map((t) =>
+          t.id === selectedTaskDetails.id
+            ? { ...t, attachments: [...t.attachments, newAtt] }
+            : t
+        )
+      );
+      router.refresh();
+    } catch (err: any) {
+      console.error("Failed to upload attachment:", err);
+      alert(err.message || "Failed to upload file");
+    } finally {
+      setUploadingAttachment(false);
+      if (modalFileInputRef.current) modalFileInputRef.current.value = "";
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newCommentText.trim() || !selectedTaskDetails || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      const res = await addTaskCommentAction(
+        selectedTaskDetails.id,
+        workspaceId,
+        newCommentText.trim()
+      );
+      if (res.success) {
+        const newCommentObj: TaskComment = {
+          id: res.commentId || `c-${Date.now()}`,
+          task_id: selectedTaskDetails.id,
+          workspace_id: workspaceId,
+          user_id: currentUserId,
+          author: people.find((p) => p.user_id === currentUserId) || null,
+          content: newCommentText.trim(),
+          created_at: new Date().toISOString(),
+        };
+        setSelectedTaskDetails((prev) => {
+          if (!prev) return null;
+          const currentComments = prev.rawTask?.comments || [];
+          return {
+            ...prev,
+            rawTask: {
+              ...prev.rawTask!,
+              comments: [...currentComments, newCommentObj],
+            },
+          };
+        });
+        setNewCommentText("");
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteSelectedTask = async () => {
+    if (!selectedTaskDetails) return;
+    if (!confirm(`Are you sure you want to delete "${selectedTaskDetails.title}"?`)) return;
+    const taskId = selectedTaskDetails.id;
+    setSelectedTaskDetails(null);
+    setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
+    try {
+      await deleteTaskAction(taskId, workspaceId);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to delete task:", err);
     }
   };
 
@@ -253,6 +381,31 @@ export function MyTasksView({
       return matchesSearch && matchesProject && matchesStatus && matchesPriority;
     });
   }, [localTasks, searchQuery, selectedProject, selectedStatus, selectedPriority]);
+
+  const todayScheduleTasks = React.useMemo(() => {
+    return localTasks.filter((t) => t.dueCategory === "today" && !t.completed);
+  }, [localTasks]);
+
+  const priorityStats = React.useMemo(() => {
+    const total = localTasks.length;
+    const urgent = localTasks.filter((t) => t.priority === "urgent").length;
+    const high = localTasks.filter((t) => t.priority === "high").length;
+    const medium = localTasks.filter((t) => t.priority === "medium").length;
+    const low = localTasks.filter((t) => t.priority === "low").length;
+
+    const urgentPct = total > 0 ? Math.round((urgent / total) * 100) : 0;
+    const highPct = total > 0 ? Math.round((high / total) * 100) : 0;
+    const mediumPct = total > 0 ? Math.round((medium / total) * 100) : 0;
+    const lowPct = total > 0 ? Math.max(0, 100 - urgentPct - highPct - mediumPct) : 0;
+
+    return { total, urgent, high, medium, low, urgentPct, highPct, mediumPct, lowPct };
+  }, [localTasks]);
+
+  const upcomingDeadlineTasks = React.useMemo(() => {
+    return localTasks
+      .filter((t) => !t.completed && (t.dueCategory === "week" || t.dueCategory === "later"))
+      .slice(0, 4);
+  }, [localTasks]);
 
   // Grouped task computation
   const taskGroups = React.useMemo(() => {
@@ -768,7 +921,7 @@ export function MyTasksView({
                                 }`}
                               >
                                 <AppIcon name="calendar" size={12} className="text-[#65706A]" />
-                                <span className="truncate">{task.dueTimeText}</span>
+                                <span className="truncate" suppressHydrationWarning>{task.dueTimeText}</span>
                               </div>
                             </td>
                             <td className="py-3 px-1 text-center">
@@ -852,21 +1005,38 @@ export function MyTasksView({
             </div>
 
             <div className="space-y-3 text-xs">
-              {[
-                { time: "10:00 AM", color: "bg-red-500", title: "Fix authentication bug", project: "Ropimo Platform" },
-                { time: "11:30 AM", color: "bg-red-500", title: "Review homepage PR", project: "Muntajar Website" },
-                { time: "02:00 PM", color: "bg-blue-500", title: "Implement API pagination", project: "Client Dashboard" },
-                { time: "04:30 PM", color: "bg-blue-500", title: "Deploy new update", project: "Ropimo Platform" },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-1.5 rounded-[6px] hover:bg-[#FAF9F5] transition-colors">
-                  <span className="font-semibold text-[#65706A] w-16 shrink-0">{item.time}</span>
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${item.color}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-[#18221E] truncate">{item.title}</p>
-                    <p className="text-[11px] text-[#65706A] truncate">{item.project}</p>
-                  </div>
+              {todayScheduleTasks.length === 0 ? (
+                <div className="py-5 text-center text-[#65706A] text-xs">
+                  No tasks scheduled for today
                 </div>
-              ))}
+              ) : (
+                todayScheduleTasks.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedTaskDetails(item)}
+                    className="flex items-center gap-3 p-1.5 rounded-[6px] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
+                  >
+                    <span className="font-semibold text-[#65706A] w-16 shrink-0 text-[11px]" suppressHydrationWarning>
+                      {item.dueTimeText || "Today"}
+                    </span>
+                    <span
+                      className={`h-2 w-2 rounded-full shrink-0 ${
+                        item.priority === "urgent" || item.priority === "high"
+                          ? "bg-red-500"
+                          : item.priority === "medium"
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      }`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-[#18221E] truncate">{item.title}</p>
+                      <p className="text-[11px] text-[#65706A] truncate">
+                        {item.project?.name || item.departmentName || "No Project"}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -878,40 +1048,30 @@ export function MyTasksView({
               {/* Donut Chart SVG */}
               <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
-                  {/* High (21% - red) */}
+                  {/* Urgent/High (red) */}
                   <path
                     className="text-red-500"
-                    strokeDasharray="21, 100"
+                    strokeDasharray={`${priorityStats.highPct + priorityStats.urgentPct}, 100`}
                     strokeWidth="4"
                     stroke="currentColor"
                     fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
-                  {/* Medium (42% - amber) */}
+                  {/* Medium (amber) */}
                   <path
                     className="text-amber-500"
-                    strokeDasharray="42, 100"
-                    strokeDashoffset="-21"
+                    strokeDasharray={`${priorityStats.mediumPct}, 100`}
+                    strokeDashoffset={`-${priorityStats.highPct + priorityStats.urgentPct}`}
                     strokeWidth="4"
                     stroke="currentColor"
                     fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
-                  {/* Low (25% - green) */}
+                  {/* Low (green) */}
                   <path
                     className="text-emerald-500"
-                    strokeDasharray="25, 100"
-                    strokeDashoffset="-63"
-                    strokeWidth="4"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  {/* No Priority (12% - gray) */}
-                  <path
-                    className="text-[#B8C0B2]"
-                    strokeDasharray="12, 100"
-                    strokeDashoffset="-88"
+                    strokeDasharray={`${priorityStats.lowPct}, 100`}
+                    strokeDashoffset={`-${priorityStats.highPct + priorityStats.urgentPct + priorityStats.mediumPct}`}
                     strokeWidth="4"
                     stroke="currentColor"
                     fill="none"
@@ -920,7 +1080,7 @@ export function MyTasksView({
                 </svg>
                 <div className="absolute text-center">
                   <span className="text-xl font-bold text-[#18221E] block leading-none">
-                    24
+                    {priorityStats.total}
                   </span>
                   <span className="text-[9px] font-bold text-[#65706A] uppercase tracking-wider block mt-0.5">
                     Total
@@ -933,30 +1093,29 @@ export function MyTasksView({
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[#65706A]">
                     <span className="h-2 w-2 rounded-full bg-red-500" />
-                    High
+                    High/Urgent
                   </span>
-                  <span className="font-semibold text-[#18221E]">5 (21%)</span>
+                  <span className="font-semibold text-[#18221E]">
+                    {priorityStats.high + priorityStats.urgent} ({priorityStats.highPct + priorityStats.urgentPct}%)
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[#65706A]">
                     <span className="h-2 w-2 rounded-full bg-amber-500" />
                     Medium
                   </span>
-                  <span className="font-semibold text-[#18221E]">10 (42%)</span>
+                  <span className="font-semibold text-[#18221E]">
+                    {priorityStats.medium} ({priorityStats.mediumPct}%)
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[#65706A]">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     Low
                   </span>
-                  <span className="font-semibold text-[#18221E]">6 (25%)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[#65706A]">
-                    <span className="h-2 w-2 rounded-full bg-[#B8C0B2]" />
-                    No Priority
+                  <span className="font-semibold text-[#18221E]">
+                    {priorityStats.low} ({priorityStats.lowPct}%)
                   </span>
-                  <span className="font-semibold text-[#18221E]">3 (12%)</span>
                 </div>
               </div>
             </div>
@@ -966,39 +1125,49 @@ export function MyTasksView({
           <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#D8DDD4]/80">
               <h3 className="text-sm font-bold text-[#18221E]">Upcoming Deadlines</h3>
-              <button type="button" className="text-xs font-semibold text-[#18221E] hover:underline">
+              <Link href="/app/calendar" className="text-xs font-semibold text-[#18221E] hover:underline">
                 View All →
-              </button>
+              </Link>
             </div>
 
             <div className="space-y-3 text-xs">
-              {[
-                { title: "Finish API Integration", project: "Ropimo Platform", date: "Aug 25, 2026", priority: "High" },
-                { title: "Mobile Responsive Fixes", project: "Muntajar Website", date: "Aug 27, 2026", priority: "Medium" },
-                { title: "Client Portal Release", project: "Client Dashboard", date: "Aug 30, 2026", priority: "High" },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2 rounded-[8px] hover:bg-[#FAF9F5] transition-colors">
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <AppIcon name="calendar" size={13} className="text-[#65706A] mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[#18221E] truncate">{item.title}</p>
-                      <p className="text-[11px] text-[#65706A] truncate">{item.project}</p>
+              {upcomingDeadlineTasks.length === 0 ? (
+                <div className="py-5 text-center text-[#65706A] text-xs">
+                  No upcoming deadlines
+                </div>
+              ) : (
+                upcomingDeadlineTasks.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedTaskDetails(item)}
+                    className="flex items-center justify-between p-2 rounded-[8px] hover:bg-[#FAF9F5] transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <AppIcon name="calendar" size={13} className="text-[#65706A] mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#18221E] truncate">{item.title}</p>
+                        <p className="text-[11px] text-[#65706A] truncate">
+                          {item.project?.name || item.departmentName || "General"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="text-[11px] text-[#65706A]">{item.dueTimeText || "Upcoming"}</p>
+                      <span
+                        className={`inline-block mt-0.5 rounded px-1.5 py-0.2 text-[9px] font-bold uppercase ${
+                          item.priority === "urgent" || item.priority === "high"
+                            ? "bg-red-50 text-red-700"
+                            : item.priority === "medium"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-emerald-50 text-emerald-800"
+                        }`}
+                      >
+                        {item.priority}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[11px] text-[#65706A]">{item.date}</p>
-                    <span
-                      className={`inline-block mt-0.5 rounded px-1.5 py-0.2 text-[9px] font-bold uppercase ${
-                        item.priority === "High"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {item.priority}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1186,10 +1355,11 @@ export function MyTasksView({
                     </span>
                   </div>
 
-                  <p className="text-sm text-[#65706A] leading-relaxed max-w-3xl">
-                    {selectedTaskDetails.description ||
-                      "Resolve login issue on mobile after 5–10 minutes of inactivity even when “Remember me” is enabled."}
-                  </p>
+                  {selectedTaskDetails.description && (
+                    <p className="text-sm text-[#65706A] leading-relaxed max-w-3xl whitespace-pre-wrap">
+                      {selectedTaskDetails.description}
+                    </p>
+                  )}
                 </div>
 
                 {/* Compact Information Cards Grid */}
@@ -1206,7 +1376,7 @@ export function MyTasksView({
                       <span>Due Date</span>
                     </div>
                     <p className="text-sm font-bold text-[#18221E]">
-                      {selectedTaskDetails.dueTimeText || "Today, 10:00 AM"}
+                      {selectedTaskDetails.dueTimeText || "No due date"}
                     </p>
                   </div>
 
@@ -1221,14 +1391,16 @@ export function MyTasksView({
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-[9px] font-bold text-white shadow-2xs">
-                        {selectedTaskDetails.assignee.name[0]}
+                        {selectedTaskDetails.assignee.initial || selectedTaskDetails.assignee.name[0] || "U"}
                       </div>
                       <span className="text-sm font-bold text-[#18221E] truncate">
                         {selectedTaskDetails.assignee.name}
                       </span>
-                      <span className="text-xs text-[#65706A] hidden md:inline truncate">
-                        • Head of Development
-                      </span>
+                      {selectedTaskDetails.assignee.jobTitle && (
+                        <span className="text-xs text-[#65706A] hidden md:inline truncate">
+                          • {selectedTaskDetails.assignee.jobTitle}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1243,10 +1415,47 @@ export function MyTasksView({
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-[#B58500]" />
-                        <span className="text-sm font-bold text-[#18221E] capitalize">
-                          {selectedTaskDetails.status.replace("_", " ")}
-                        </span>
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            selectedTaskDetails.status === "completed"
+                              ? "bg-[#246244]"
+                              : selectedTaskDetails.status === "in_progress"
+                              ? "bg-blue-600"
+                              : selectedTaskDetails.status === "blocked"
+                              ? "bg-red-500"
+                              : "bg-[#B58500]"
+                          }`}
+                        />
+                        <select
+                          value={selectedTaskDetails.status}
+                          onChange={async (e) => {
+                            const newStatus = e.target.value as TaskStatus;
+                            const isCompleted = newStatus === "completed";
+                            setSelectedTaskDetails((prev) =>
+                              prev ? { ...prev, status: newStatus, completed: isCompleted } : null
+                            );
+                            setLocalTasks((prev) =>
+                              prev.map((t) =>
+                                t.id === selectedTaskDetails.id
+                                  ? { ...t, status: newStatus, completed: isCompleted }
+                                  : t
+                              )
+                            );
+                            await updateTaskAction({
+                              taskId: selectedTaskDetails.id,
+                              workspaceId,
+                              status: newStatus,
+                            });
+                            router.refresh();
+                          }}
+                          className="text-sm font-bold text-[#18221E] capitalize bg-transparent border-0 focus:ring-0 p-0 cursor-pointer"
+                        >
+                          <option value="todo">Todo</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="in_review">In Review</option>
+                          <option value="blocked">Blocked</option>
+                          <option value="completed">Completed</option>
+                        </select>
                       </div>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#65706A]">
                         <polyline points="6 9 12 15 18 9" />
@@ -1282,10 +1491,13 @@ export function MyTasksView({
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-[#18221E] font-mono">
-                        RP-TASK-0234
+                        RP-{selectedTaskDetails.id.slice(0, 8).toUpperCase()}
                       </span>
                       <button
                         type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`RP-${selectedTaskDetails.id.slice(0, 8).toUpperCase()}`);
+                        }}
                         className="flex h-6 w-6 items-center justify-center rounded-[5px] border border-[#D8DDD4] bg-white text-[#65706A] hover:text-[#18221E] transition-colors"
                         title="Copy Task ID"
                       >
@@ -1303,10 +1515,10 @@ export function MyTasksView({
                       Created
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#18221E]">
-                        Aug 20, 2026
+                      <span className="text-sm font-bold text-[#18221E]" suppressHydrationWarning>
+                        {formatDateDeterministic(selectedTaskDetails.createdAt)}
                       </span>
-                      <span className="text-xs text-[#65706A]">by Tashin Khan</span>
+                      <span className="text-xs text-[#65706A]">by {selectedTaskDetails.creatorName || "Workspace Member"}</span>
                     </div>
                   </div>
                 </div>
@@ -1316,10 +1528,8 @@ export function MyTasksView({
               <div className="px-6 sm:px-8 border-b border-[#D8DDD4]/80 flex items-center gap-8 text-sm font-semibold h-[52px] shrink-0 bg-white overflow-x-auto whitespace-nowrap">
                 {[
                   { key: "overview", label: "Overview" },
-                  { key: "subtasks", label: "Subtasks", count: 3 },
+                  { key: "attachments", label: "Files & Attachments", count: selectedTaskDetails.attachments?.length || 0 },
                   { key: "activity", label: "Activity" },
-                  { key: "attachments", label: "Files", count: 2 },
-                  { key: "notes", label: "Notes", count: 1 },
                 ].map((tab) => {
                   const isActive = taskDetailTab === tab.key;
                   return (
@@ -1349,247 +1559,331 @@ export function MyTasksView({
                 })}
               </div>
 
-              {/* Main Content Layout: Two Columns (65% / 35%) */}
-              <div className="px-6 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-8 bg-white">
-                {/* Left Column: Details, Description, Screenshots (~65%) */}
-                <div className="space-y-8 min-w-0">
-                  {/* 1. DETAILS DEFINITION LIST */}
-                  <div className="space-y-3">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
-                      Details
-                    </h2>
-                    <dl className="space-y-3.5 text-sm">
-                      <div className="grid grid-cols-[120px_1fr] items-center">
-                        <dt className="text-xs text-[#65706A]">Type</dt>
-                        <dd className="font-semibold text-[#18221E] flex items-center gap-1.5">
-                          <span>🐛</span>
-                          <span>Bug Fix</span>
-                        </dd>
+              {/* Hidden file input for uploading attachments */}
+              <input
+                type="file"
+                ref={modalFileInputRef}
+                onChange={handleModalFileUpload}
+                className="hidden"
+              />
+
+              {/* Main Content Layout */}
+              <div className="px-6 sm:px-8 py-6 bg-white min-h-[320px]">
+                {/* TAB 1: OVERVIEW */}
+                {taskDetailTab === "overview" && (
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-8">
+                    {/* Left Column: Description & Attachments */}
+                    <div className="space-y-8 min-w-0">
+                      {/* Description */}
+                      <div className="space-y-2">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
+                          Description
+                        </h2>
+                        <div className="rounded-xl border border-[#D8DDD4]/80 bg-[#FAF9F5]/40 p-4 text-sm text-[#18221E] leading-relaxed whitespace-pre-wrap min-h-[90px]">
+                          {selectedTaskDetails.description ? (
+                            selectedTaskDetails.description
+                          ) : (
+                            <span className="text-[#8A958F] italic">No description provided for this task.</span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-[120px_1fr] items-center">
-                        <dt className="text-xs text-[#65706A]">Category</dt>
-                        <dd className="font-semibold text-[#18221E]">Authentication</dd>
-                      </div>
-
-                      <div className="grid grid-cols-[120px_1fr] items-center">
-                        <dt className="text-xs text-[#65706A]">Environment</dt>
-                        <dd className="font-semibold text-[#18221E]">Production</dd>
-                      </div>
-
-                      <div className="grid grid-cols-[120px_1fr] items-center">
-                        <dt className="text-xs text-[#65706A]">Platform</dt>
-                        <dd className="font-semibold text-[#18221E]">Mobile — iOS, Android</dd>
-                      </div>
-
-                      <div className="grid grid-cols-[120px_1fr] items-center">
-                        <dt className="text-xs text-[#65706A]">Labels</dt>
-                        <dd className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-[#FAF9F5] border border-[#D8DDD4] px-3 py-1 text-xs font-medium text-[#18221E]">
-                            auth
-                          </span>
-                          <span className="rounded-full bg-[#FAF9F5] border border-[#D8DDD4] px-3 py-1 text-xs font-medium text-[#18221E]">
-                            mobile
-                          </span>
-                          <span className="rounded-full bg-[#FAF9F5] border border-[#D8DDD4] px-3 py-1 text-xs font-medium text-[#18221E]">
-                            urgent
-                          </span>
+                      {/* Attached Files Section */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
+                            Attached Files ({selectedTaskDetails.attachments?.length || 0})
+                          </h2>
                           <button
                             type="button"
-                            className="rounded-full bg-[#FAF9F5] border border-[#D8DDD4] h-6 w-6 flex items-center justify-center text-xs text-[#65706A] hover:text-[#18221E] transition-colors"
+                            onClick={() => setTaskDetailTab("attachments")}
+                            className="text-xs font-semibold text-[#246244] hover:underline"
                           >
-                            +
+                            Manage all files →
                           </button>
-                        </dd>
+                        </div>
+                        {selectedTaskDetails.attachments && selectedTaskDetails.attachments.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {selectedTaskDetails.attachments.map((file) => {
+                              const isImage = file.file_type?.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(file.file_name);
+                              return (
+                                <a
+                                  key={file.id}
+                                  href={file.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-3 p-3 rounded-xl border border-[#D8DDD4] bg-white hover:bg-[#FAF9F5] hover:border-[#10251F] transition-all shadow-2xs group"
+                                >
+                                  {isImage ? (
+                                    <img
+                                      src={file.file_url}
+                                      alt={file.file_name}
+                                      className="w-12 h-12 rounded-lg object-cover border border-[#D8DDD4] shrink-0 bg-slate-100"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-[#EAEFE6] text-[#10251F] flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                                      {file.file_name.split(".").pop() || "file"}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-[#18221E] truncate group-hover:text-[#246244]">
+                                      {file.file_name}
+                                    </p>
+                                    <p className="text-[11px] text-[#65706A]">
+                                      {file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : "Attached file"} • Click to view
+                                    </p>
+                                  </div>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#65706A] group-hover:text-[#18221E] shrink-0">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                    <polyline points="15 3 21 3 21 9" />
+                                    <line x1="10" y1="14" x2="21" y2="3" />
+                                  </svg>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-xl border border-dashed border-[#D8DDD4] text-center text-xs text-[#65706A] bg-[#FAF9F5]">
+                            No files attached yet.{" "}
+                            <button
+                              type="button"
+                              onClick={() => setTaskDetailTab("attachments")}
+                              className="text-[#246244] font-semibold hover:underline"
+                            >
+                              Attach a file
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </dl>
-                  </div>
+                    </div>
 
-                  {/* 2. DESCRIPTION */}
-                  <div className="space-y-3">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
-                      Description
-                    </h2>
-                    <div className="text-sm text-[#18221E] leading-relaxed max-w-2xl space-y-3">
-                      <p>
-                        Users are being logged out unexpectedly on mobile devices after 5–10 minutes of
-                        inactivity, even when “Remember me” is enabled.
-                      </p>
-                      <p>
-                        This affects both Android and iOS applications. Investigate the authentication
-                        token/session lifecycle and implement a permanent fix.
-                      </p>
+                    {/* Right Column: Properties & Quick Actions */}
+                    <div className="space-y-6">
+                      <div className="rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] p-5 space-y-4 shadow-2xs">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A958F] pb-2 border-b border-[#D8DDD4]/70">
+                          Task Information
+                        </h3>
+
+                        <div className="space-y-3 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#65706A]">Priority</span>
+                            <span className="capitalize font-semibold text-[#18221E]">
+                              {selectedTaskDetails.priority}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#65706A]">Project</span>
+                            <span className="font-semibold text-[#18221E]">
+                              {selectedTaskDetails.project.name}
+                            </span>
+                          </div>
+                          {selectedTaskDetails.departmentName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[#65706A]">Department</span>
+                              <span className="font-semibold text-[#18221E]">
+                                {selectedTaskDetails.departmentName}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#65706A]">Due Date</span>
+                            <span className="font-semibold text-[#18221E]">
+                              {selectedTaskDetails.dueTimeText || "None"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#65706A]">Assignee</span>
+                            <span className="font-semibold text-[#18221E]">
+                              {selectedTaskDetails.assignee.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-[#D8DDD4]/70 space-y-2">
+                          <button
+                            type="button"
+                            disabled={uploadingAttachment}
+                            onClick={() => modalFileInputRef.current?.click()}
+                            className="w-full rounded-[10px] border border-[#D8DDD4] bg-white py-2 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                          >
+                            <span>📎</span>
+                            <span>{uploadingAttachment ? "Uploading..." : "Attach File"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeleteSelectedTask}
+                            className="w-full rounded-[10px] border border-red-200 bg-red-50/50 py-2 text-xs font-semibold text-red-600 hover:bg-red-100/60 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            Delete Task
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* 3. SCREENSHOTS */}
-                  <div className="space-y-3">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
-                      Screenshots
-                    </h2>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      {/* Screenshot Card 1 */}
-                      <div className="w-[200px] h-[150px] rounded-xl border border-[#D8DDD4] bg-[#F4F3EE] p-3 flex flex-col justify-between shadow-2xs group relative overflow-hidden">
-                        <div className="space-y-1">
-                          <div className="font-bold text-xs text-[#18221E]">Sign In Screen</div>
-                          <div className="h-2 rounded bg-[#D8DDD4] w-full" />
-                          <div className="h-2 rounded bg-[#D8DDD4] w-3/4" />
-                        </div>
-                        <div className="h-5 rounded bg-[#10251F] text-white flex items-center justify-center font-bold text-[9px]">
-                          Sign In
-                        </div>
-                      </div>
-
-                      {/* Screenshot Card 2 */}
-                      <div className="w-[200px] h-[150px] rounded-xl border border-[#10251F] bg-[#18221E] text-white p-3 flex flex-col justify-between shadow-2xs group relative overflow-hidden">
-                        <div className="flex justify-center pt-2">
-                          <span className="text-lg">🔒</span>
-                        </div>
-                        <div className="text-center space-y-0.5">
-                          <div className="font-bold text-xs">Logged out</div>
-                          <div className="text-[10px] text-white/60">Session timed out</div>
-                        </div>
-                        <div className="h-4 rounded bg-white/20 w-full" />
-                      </div>
-
-                      {/* Add Attachment Card */}
-                      <div className="w-[200px] h-[150px] rounded-xl border-2 border-dashed border-[#D8DDD4] bg-[#FAF9F5] flex flex-col items-center justify-center gap-1.5 text-[#65706A] hover:border-[#10251F] hover:bg-white transition-colors cursor-pointer">
-                        <span className="text-xl font-bold">+</span>
-                        <span className="text-xs font-semibold">Add attachment</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Task Sidebar Panel (~35% / 360px) */}
-                <div className="space-y-8">
-                  {/* SUBTASKS (ClickUp/Linear style) */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-[#D8DDD4]/80">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
-                        Subtasks (3)
-                      </h3>
-                      <button type="button" className="text-xs font-semibold text-[#18221E] hover:underline">
-                        View all →
-                      </button>
-                    </div>
-
-                    <div className="divide-y divide-[#D8DDD4]/60 text-xs">
-                      {/* Subtask 1 */}
-                      <div className="min-h-[48px] py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="h-4 w-4 rounded-full border border-[#D8DDD4] shrink-0" />
-                          <span className="text-[#18221E] font-medium truncate">
-                            Reproduce issue on Android
-                          </span>
-                        </div>
-                        <span className="rounded-full bg-[#FEF6E4] border border-[#F8E3B6] px-2.5 py-0.5 text-[10px] font-semibold text-[#B58500] shrink-0">
-                          Medium
-                        </span>
-                      </div>
-
-                      {/* Subtask 2 */}
-                      <div className="min-h-[48px] py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#246244] text-[9px] text-white shrink-0">
-                            ✓
-                          </span>
-                          <span className="text-[#65706A] line-through truncate">
-                            Reproduce issue on iOS
-                          </span>
-                        </div>
-                        <span className="rounded-full bg-[#EAF4E2] px-2.5 py-0.5 text-[10px] font-semibold text-[#246244] shrink-0">
-                          Done
-                        </span>
-                      </div>
-
-                      {/* Subtask 3 */}
-                      <div className="min-h-[48px] py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="h-4 w-4 rounded-full border border-[#D8DDD4] shrink-0" />
-                          <span className="text-[#18221E] font-medium truncate">
-                            Implement fix for session timeout
-                          </span>
-                        </div>
-                        <span className="rounded-full bg-[#FDECE8] border border-[#F8CBC2] px-2.5 py-0.5 text-[10px] font-semibold text-[#D9383A] shrink-0">
-                          High
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-[#246244] hover:underline flex items-center gap-1.5 pt-1"
+                {/* TAB 2: FILES & ATTACHMENTS */}
+                {taskDetailTab === "attachments" && (
+                  <div className="space-y-6">
+                    {/* Upload Dropzone */}
+                    <div
+                      onClick={() => modalFileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#D8DDD4] rounded-2xl p-6 text-center bg-[#FAF9F5]/60 hover:bg-white hover:border-[#10251F] transition-all cursor-pointer space-y-2 group"
                     >
-                      <span className="text-sm font-bold">+</span>
-                      <span>Add subtask</span>
-                    </button>
-                  </div>
+                      <div className="w-10 h-10 rounded-full bg-[#EAEFE6] text-[#10251F] mx-auto flex items-center justify-center font-bold text-lg group-hover:scale-110 transition-transform">
+                        +
+                      </div>
+                      <p className="text-xs font-bold text-[#18221E]">
+                        {uploadingAttachment ? "Uploading file..." : "Click to upload an attachment to this task"}
+                      </p>
+                      <p className="text-[11px] text-[#65706A]">
+                        Supports images, documents (PDF, DOCX), archives, and logos
+                      </p>
+                    </div>
 
-                  {/* ACTIVITY TIMELINE */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-[#D8DDD4]/80">
+                    {/* Files Grid */}
+                    {selectedTaskDetails.attachments && selectedTaskDetails.attachments.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {selectedTaskDetails.attachments.map((file) => {
+                          const isImage = file.file_type?.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(file.file_name);
+                          return (
+                            <div
+                              key={file.id}
+                              className="rounded-xl border border-[#D8DDD4] bg-white p-3.5 space-y-2.5 shadow-2xs hover:border-[#10251F] transition-colors"
+                            >
+                              {isImage ? (
+                                <div className="w-full h-36 rounded-lg overflow-hidden border border-[#D8DDD4] bg-slate-50 flex items-center justify-center">
+                                  <img
+                                    src={file.file_url}
+                                    alt={file.file_name}
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full h-36 rounded-lg bg-[#FAF9F5] border border-[#D8DDD4] flex flex-col items-center justify-center gap-1.5 text-[#65706A]">
+                                  <span className="text-2xl font-bold uppercase">{file.file_name.split(".").pop() || "FILE"}</span>
+                                  <span className="text-xs">Document</span>
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-[#18221E] truncate" title={file.file_name}>
+                                  {file.file_name}
+                                </p>
+                                <p className="text-[11px] text-[#65706A]">
+                                  {file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : "File"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 pt-2 border-t border-[#D8DDD4]/60">
+                                <a
+                                  href={file.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 rounded-[8px] border border-[#D8DDD4] bg-white py-1.5 text-center text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
+                                >
+                                  View Full
+                                </a>
+                                <a
+                                  href={file.file_url}
+                                  download={file.file_name}
+                                  className="flex-1 rounded-[8px] bg-[#10251F] py-1.5 text-center text-xs font-semibold text-white hover:bg-[#18221E]"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-xs text-[#65706A] bg-[#FAF9F5]/40 rounded-xl border border-dashed border-[#D8DDD4]">
+                        No files attached to this task yet.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 3: ACTIVITY */}
+                {taskDetailTab === "activity" && (
+                  <div className="space-y-6 max-w-2xl">
+                    {/* Add Comment Form */}
+                    <div className="space-y-2">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
-                        Activity
+                        Add Comment or Update
                       </h3>
-                      <button type="button" className="text-xs font-semibold text-[#18221E] hover:underline">
-                        View all →
-                      </button>
-                    </div>
-
-                    <div className="space-y-4 pt-1 text-xs">
-                      {/* Activity 1 */}
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-[10px] font-bold text-white shadow-2xs mt-0.5">
-                          T
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[#18221E] font-semibold">Tashin Khan</p>
-                            <span className="text-[11px] text-[#8A958F] shrink-0">2h ago</span>
-                          </div>
-                          <p className="text-[#65706A] text-[11px] mt-0.5">updated the status to In Progress</p>
-                        </div>
-                      </div>
-
-                      {/* Activity 2 */}
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#7E22CE] text-[10px] font-bold text-white shadow-2xs mt-0.5">
-                          S
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[#18221E] font-semibold">Sarah Ahmed</p>
-                            <span className="text-[11px] text-[#8A958F] shrink-0">5h ago</span>
-                          </div>
-                          <p className="text-[#65706A] text-[11px] mt-0.5">added a comment: “Please check the session logs.”</p>
-                        </div>
-                      </div>
-
-                      {/* Activity 3 */}
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#B58500] text-[10px] font-bold text-white shadow-2xs mt-0.5">
-                          R
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[#18221E] font-semibold">Rahim Hasan</p>
-                            <span className="text-[11px] text-[#8A958F] shrink-0">Yesterday</span>
-                          </div>
-                          <p className="text-[#65706A] text-[11px] mt-0.5">attached file: session-timeout-log.txt</p>
+                      <div className="space-y-2">
+                        <textarea
+                          rows={3}
+                          value={newCommentText}
+                          onChange={(e) => setNewCommentText(e.target.value)}
+                          placeholder="Write a message or update on this task..."
+                          className="w-full rounded-xl border border-[#D8DDD4] bg-white p-3 text-xs text-[#18221E] placeholder:text-[#8A958F] focus:border-[#10251F] focus:outline-none"
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            disabled={!newCommentText.trim() || submittingComment}
+                            onClick={handleAddComment}
+                            className="rounded-[8px] bg-[#10251F] text-white px-4 py-2 text-xs font-semibold hover:bg-[#18221E] disabled:opacity-50 transition-colors cursor-pointer"
+                          >
+                            {submittingComment ? "Posting..." : "Post Comment"}
+                          </button>
                         </div>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-[#246244] hover:underline flex items-center gap-1.5 pt-1"
-                    >
-                      <span className="text-sm font-bold">+</span>
-                      <span>Add comment</span>
-                    </button>
+                    {/* Timeline */}
+                    <div className="space-y-3 pt-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#8A958F]">
+                        Activity History
+                      </h3>
+                      <div className="space-y-3 text-xs">
+                        {/* Task Creation event */}
+                        <div className="flex items-start gap-3 p-3 rounded-xl bg-[#FAF9F5] border border-[#D8DDD4]/60">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-[10px] font-bold text-white shadow-2xs mt-0.5">
+                            {(selectedTaskDetails.creatorName || "T")[0]}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[#18221E] font-semibold">
+                                {selectedTaskDetails.creatorName || "Workspace Member"}
+                              </p>
+                              <span className="text-[11px] text-[#8A958F] shrink-0" suppressHydrationWarning>
+                                {formatDateDeterministic(selectedTaskDetails.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-[#65706A] text-[11px] mt-0.5">
+                              Created this task in project {selectedTaskDetails.project.name}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Real comments if any */}
+                        {selectedTaskDetails.rawTask?.comments && selectedTaskDetails.rawTask.comments.length > 0 ? (
+                          selectedTaskDetails.rawTask.comments.map((c) => (
+                            <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-[#D8DDD4]">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#246244] text-[10px] font-bold text-white shadow-2xs mt-0.5">
+                                {c.author?.full_name ? c.author.full_name[0] : "M"}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-[#18221E] font-semibold">
+                                    {c.author?.full_name || "Team Member"}
+                                  </p>
+                                  <span className="text-[11px] text-[#8A958F] shrink-0" suppressHydrationWarning>
+                                    {formatDateDeterministic(c.created_at)}
+                                  </span>
+                                </div>
+                                <p className="text-[#18221E] text-xs mt-1 whitespace-pre-wrap">
+                                  {c.content}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -1599,7 +1893,7 @@ export function MyTasksView({
                 <button
                   type="button"
                   onClick={() => handleToggleTask(selectedTaskDetails)}
-                  className="rounded-[10px] bg-[#10251F] text-white px-5 py-2.5 text-xs font-semibold flex items-center gap-2 hover:bg-[#18221E] shadow-2xs transition-colors"
+                  className="rounded-[10px] bg-[#10251F] text-white px-5 py-2.5 text-xs font-semibold flex items-center gap-2 hover:bg-[#18221E] shadow-2xs transition-colors cursor-pointer"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
@@ -1609,19 +1903,29 @@ export function MyTasksView({
 
                 <button
                   type="button"
-                  className="rounded-[10px] border border-[#D8DDD4] bg-white px-4 py-2.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] shadow-2xs transition-colors"
+                  onClick={() => modalFileInputRef.current?.click()}
+                  className="rounded-[10px] border border-[#D8DDD4] bg-white px-4 py-2.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] shadow-2xs transition-colors cursor-pointer"
                 >
-                  Edit Task
+                  Attach File
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedTaskDetails(null)}
-                className="rounded-[10px] border border-[#D8DDD4] bg-white px-5 py-2.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] shadow-2xs transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteSelectedTask}
+                  className="rounded-[10px] border border-red-200 bg-white px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 shadow-2xs transition-colors cursor-pointer"
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskDetails(null)}
+                  className="rounded-[10px] border border-[#D8DDD4] bg-white px-5 py-2.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] shadow-2xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -499,7 +499,7 @@ export async function submitEmployeeOnboardingAction(input: {
         cv_url: cvUrl || null,
         cv_file_name: cvFileName || null,
         employment_type: invitation.employment_type || "Full-time",
-        employment_status: invitation.role === "member" ? "Pending Approval" : "Active",
+        employment_status: "Active",
       },
     });
 
@@ -511,6 +511,7 @@ export async function submitEmployeeOnboardingAction(input: {
     // Update metadata & password
     await adminClient.auth.admin.updateUserById(authUser.id, {
       password: password || undefined,
+      email_confirm: true,
       user_metadata: {
         ...authUser.user_metadata,
         full_name: fullName,
@@ -520,7 +521,7 @@ export async function submitEmployeeOnboardingAction(input: {
         avatar_url: avatarUrl || authUser.user_metadata?.avatar_url || null,
         cv_url: cvUrl || authUser.user_metadata?.cv_url || null,
         cv_file_name: cvFileName || authUser.user_metadata?.cv_file_name || null,
-        employment_status: invitation.role === "member" ? "Pending Approval" : "Active",
+        employment_status: "Active",
       },
     });
   }
@@ -528,48 +529,88 @@ export async function submitEmployeeOnboardingAction(input: {
   const { recruitmentStore } = await import("@/lib/recruitment/store");
   const employeeId = recruitmentStore.getNextEmployeeId(workspaceId);
 
-  // 2. Special Access vs Member Branching
-  if (invitation.role !== "member") {
-    // Direct instant access for Admin/Manager
-    await adminClient.from("workspace_members").upsert(
-      {
-        workspace_id: workspaceId,
-        user_id: authUser.id,
-        role: invitation.role,
-        full_name: fullName,
-        job_title: invitation.job_title || null,
-      },
-      { onConflict: "workspace_id,user_id" }
-    );
+  // 2. Add member directly to workspace_members table in Database
+  await adminClient.from("workspace_members").upsert(
+    {
+      workspace_id: workspaceId,
+      user_id: authUser.id,
+      role: invitation.role || "member",
+      full_name: fullName?.trim() || (authUser.user_metadata?.full_name as string) || authUser.email?.split("@")[0] || "Team Member",
+      job_title: invitation.job_title || null,
+      avatar_url: avatarUrl || null,
+      phone: phone || null,
+      location: address || null,
+      bio: bio || null,
+      employee_id: employeeId || null,
+      employment_type: invitation.employment_type || "Full-time",
+      employment_status: "Active",
+      hire_date: new Date().toISOString().split("T")[0],
+    },
+    { onConflict: "workspace_id,user_id" }
+  );
 
-    if (invitation.department_id) {
+  // 3. Add to department_members if department was assigned
+  if (invitation.department_id) {
+    try {
       await adminClient.from("department_members").upsert(
         {
           workspace_id: workspaceId,
           department_id: invitation.department_id,
           user_id: authUser.id,
           job_title: invitation.job_title || null,
+          role: invitation.role || "member",
         },
-        { onConflict: "workspace_id,department_id,user_id" }
+        { onConflict: "department_id,user_id" }
       );
+    } catch (deptErr) {
+      console.warn("Department member assignment warning:", deptErr);
     }
-
-    try {
-      await adminClient.from("workspace_invitations").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", invitation.id);
-    } catch {}
-
-    const updatedInv = { ...invitation, status: "Accepted" as any, accepted_at: new Date().toISOString() };
-    (recruitmentStore as any).saveInvitation?.(updatedInv);
-
-    return { success: true, data: { directAccess: true, role: invitation.role } };
   }
 
-  // 3. Standard Member: Create pending onboarding application
-  const defaultChecklist = [
+  // 4. Mark invitation as accepted in database
+  try {
+    if (invitation.id) {
+      await adminClient
+        .from("workspace_invitations")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", invitation.id);
+    }
+    if (token) {
+      await adminClient
+        .from("workspace_invitations")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("token", token);
+    }
+    if (email) {
+      await adminClient
+        .from("workspace_invitations")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("email", email);
+    }
+  } catch {}
+
+  const updatedInv = {
+    ...invitation,
+    status: "Accepted" as any,
+    accepted_at: new Date().toISOString(),
+  };
+  (recruitmentStore as any).saveInvitation?.(updatedInv);
+
+  // 5. Complete recruitment onboarding record
+  const completedChecklist = [
     {
       id: `chk-1-${authUser.id}`,
       title: "Accept Workspace Invitation",
-      description: "Invitation confirmed and profile details submitted.",
+      description: "Invitation confirmed and account profile created.",
       category: "profile",
       required: true,
       status: "completed",
@@ -596,19 +637,11 @@ export async function submitEmployeeOnboardingAction(input: {
     {
       id: `chk-4-${authUser.id}`,
       title: "Upload Resume / CV Document",
-      description: cvFileName ? `Uploaded file: ${cvFileName}` : "CV submitted for administrative review.",
+      description: cvFileName ? `Uploaded file: ${cvFileName}` : "Profile setup complete.",
       category: "documents",
-      required: true,
+      required: false,
       status: cvUrl ? "completed" : "pending",
       completed_at: cvUrl ? new Date().toISOString() : undefined,
-    },
-    {
-      id: `chk-5-${authUser.id}`,
-      title: "Admin Review & Department Assignment",
-      description: "Workspace administrator review and approval required.",
-      category: "workspace",
-      required: true,
-      status: "pending",
     },
   ];
 
@@ -617,54 +650,73 @@ export async function submitEmployeeOnboardingAction(input: {
     workspace_id: workspaceId,
     user_id: authUser.id,
     employee_id: employeeId,
-    status: "In Progress" as const,
-    progress_percentage: 60,
-    checklist: defaultChecklist as any,
+    status: "Completed" as const,
+    progress_percentage: 100,
+    checklist: completedChecklist as any,
     started_at: new Date().toISOString(),
-    completed_at: null,
+    completed_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   recruitmentStore.saveOnboarding(onboardingObj);
 
-  // Create member record in workspace_members
-  await adminClient.from("workspace_members").upsert(
-    {
-      workspace_id: workspaceId,
-      user_id: authUser.id,
-      role: "member",
-      full_name: fullName,
-      job_title: invitation.job_title || null,
-    },
-    { onConflict: "workspace_id,user_id" }
-  );
-
-  // Notify Admins in Notification Center
+  // 6. Notify workspace owner / inviter
   try {
     const { notificationStore } = await import("@/lib/notifications/store");
     notificationStore.addNotification({
       workspace_id: workspaceId,
       user_id: invitation.invited_by || "admin",
       type: "invitation_accepted",
-      title: "Employee Onboarding Submitted",
-      subtitle: `${fullName} (${email}) has submitted their profile and CV for approval.`,
-      action_url: `/app/people/onboarding/${authUser.id}`,
+      title: "New Team Member Joined!",
+      subtitle: `${fullName} (${email}) has completed onboarding and joined the workspace.`,
+      action_url: `/app/people/${authUser.id}`,
       entity_type: "invitation",
       entity_id: invitation.id,
+    });
+  } catch {}
+
+  // 7. Auto-sign-in the newly registered user so they can immediately access /app
+  try {
+    if (password) {
+      const userClient = await createClient();
+      await userClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+    }
+  } catch (authErr) {
+    console.warn("[Onboarding Auto-login notice]", authErr);
+  }
+
+  // 8. Send Welcome Email via Resend
+  try {
+    const { sendWelcomeEmail } = await import("@/lib/email/resend");
+    const { data: ws } = await adminClient
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .maybeSingle();
+
+    await sendWelcomeEmail({
+      workspaceName: ws?.name || "Ropimo Workspace",
+      recipientEmail: email,
+      recipientName: fullName,
+      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/app`,
     });
   } catch {}
 
   try {
     revalidatePath("/app/people");
     revalidatePath("/app/team");
+    revalidatePath("/app");
   } catch {}
 
   return {
     success: true,
     data: {
-      directAccess: false,
-      status: "In Review",
+      directAccess: true,
+      role: invitation.role || "member",
       employeeId,
       userId: authUser.id,
     },
@@ -727,7 +779,7 @@ export async function approveEmployeeOnboardingAction(input: {
         user_id: userId,
         job_title: jobTitle?.trim() || null,
       },
-      { onConflict: "workspace_id,department_id,user_id" }
+      { onConflict: "department_id,user_id" }
     );
   }
 

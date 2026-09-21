@@ -19,6 +19,7 @@ import {
   Video,
   Settings,
   ChevronDown,
+  ChevronRight,
   LogOut,
   Briefcase,
   HelpCircle,
@@ -26,12 +27,17 @@ import {
   BookOpen,
   Plus,
   Check,
+  ListTodo,
+  User as UserIcon,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Workspace } from "@/types/workspace";
 import { UserContext } from "@/types/permissions";
 import type { NavVisibility } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
+import { Project } from "@/types/project";
+import { switchActiveWorkspaceAction } from "@/lib/workspace/actions";
 
 export interface SidebarProps {
   user: {
@@ -39,8 +45,10 @@ export interface SidebarProps {
     fullName?: string | null;
   } | null;
   workspace?: Workspace | null;
+  allWorkspaces?: Workspace[];
   userContext?: UserContext | null;
   navVisibility?: NavVisibility;
+  projects?: Project[];
   onCloseMobile?: () => void;
 }
 
@@ -69,6 +77,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Operations",
     items: [
+      { label: "AI Copilot", href: "/app/agent", icon: Sparkles, key: "agent", badge: "AI" },
       { label: "Attendance", href: "/app/attendance", icon: Clock3, key: "attendance" },
       { label: "Leave", href: "/app/leave", icon: CalendarDays, key: "leave" },
       { label: "Projects", href: "/app/projects", icon: FolderKanban, key: "projects" },
@@ -87,12 +96,35 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-export function Sidebar({ user, workspace, userContext, navVisibility, onCloseMobile }: SidebarProps) {
+export function Sidebar({
+  user,
+  workspace,
+  allWorkspaces = [],
+  userContext,
+  navVisibility,
+  projects = [],
+  onCloseMobile,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [loggingOut, setLoggingOut] = React.useState(false);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = React.useState(false);
+  const [switchingWorkspaceId, setSwitchingWorkspaceId] = React.useState<string | null>(null);
+
+  const handleSwitchWorkspace = async (targetId: string) => {
+    if (targetId === workspace?.id) {
+      setWorkspaceMenuOpen(false);
+      return;
+    }
+    setSwitchingWorkspaceId(targetId);
+    try {
+      await switchActiveWorkspaceAction(targetId);
+      window.location.href = "/app";
+    } catch {
+      setSwitchingWorkspaceId(null);
+    }
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -243,16 +275,49 @@ export function Sidebar({ user, workspace, userContext, navVisibility, onCloseMo
                 {/* All Workspaces Section */}
                 <div className="space-y-1">
                   <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-[#8A958F]">
-                    All workspaces
+                    All workspaces ({allWorkspaces.length || 1})
                   </p>
-                  <div className="flex items-center justify-between p-1.5 rounded-[6px] bg-[#FAF9F5] text-xs font-medium text-[#18221E]">
-                    <div className="flex items-center gap-2 truncate">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#10251F] text-[9px] font-bold text-white">
-                        {workspaceMonogram}
-                      </div>
-                      <span className="truncate">{workspaceName}</span>
-                    </div>
-                    <Check size={14} className="text-[#246244] shrink-0" />
+                  
+                  <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                    {(allWorkspaces.length > 0 ? allWorkspaces : workspace ? [workspace] : []).map((ws) => {
+                      const isActive = ws.id === workspace?.id;
+                      const monogram = ws.name ? ws.name.slice(0, 1).toUpperCase() : "W";
+                      const isSwitching = switchingWorkspaceId === ws.id;
+
+                      return (
+                        <button
+                          key={ws.id}
+                          type="button"
+                          disabled={isSwitching}
+                          onClick={() => handleSwitchWorkspace(ws.id)}
+                          className={cn(
+                            "w-full flex items-center justify-between p-1.5 rounded-[6px] text-xs font-medium transition-colors text-left cursor-pointer",
+                            isActive
+                              ? "bg-[#FAF9F5] text-[#18221E] font-semibold"
+                              : "hover:bg-[#FAF9F5] text-[#65706A] hover:text-[#18221E]"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 truncate min-w-0">
+                            <div className={cn(
+                              "flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold shrink-0",
+                              isActive ? "bg-[#10251F] text-[#C7F34A]" : "bg-[#E2E6DE] text-[#18221E]"
+                            )}>
+                              {monogram}
+                            </div>
+                            <span className="truncate">{ws.name}</span>
+                          </div>
+                          {isSwitching ? (
+                            <div className="h-3 w-3 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin shrink-0" />
+                          ) : isActive ? (
+                            <Check size={14} className="text-[#246244] shrink-0" />
+                          ) : ws.role ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#ECEBE4] text-[#65706A] shrink-0 capitalize">
+                              {ws.role}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <button
@@ -369,6 +434,18 @@ export function Sidebar({ user, workspace, userContext, navVisibility, onCloseMo
                       />
                       <span className="truncate font-medium">{item.label}</span>
                     </div>
+                    {item.badge && (
+                      <span
+                        className={cn(
+                          "text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide",
+                          isActive
+                            ? "bg-[#C7F34A] text-[#10251F]"
+                            : "bg-[#10251F]/10 text-[#10251F]"
+                        )}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

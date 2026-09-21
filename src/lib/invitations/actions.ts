@@ -151,6 +151,8 @@ export async function inviteEmployeeAction(params: {
           employee_id: params.employeeId || null,
           full_name: fullName,
           job_title: params.jobTitle || null,
+          department_id: params.departmentId || null,
+          employment_type: params.employmentType || "Full-time",
           invited_by: user.id,
           expires_at: expiresAt,
           created_at: new Date().toISOString(),

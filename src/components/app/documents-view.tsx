@@ -236,7 +236,7 @@ export function DocumentsView({
         </div>
 
         {/* Right-side actions */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Primary Dark Green Button */}
           <PrimaryButton
             size="sm"
@@ -874,51 +874,36 @@ export function DocumentsView({
             {/* PAGINATION BAR */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-[#D8DDD4] bg-[#FAF9F5] text-xs gap-3">
               <span className="text-[#65706A]">
-                Showing 1 to {Math.min(10, filteredDocuments.length)} of {documentStats.totalDocuments} documents
+                {filteredDocuments.length === 0
+                  ? "No documents"
+                  : `Showing ${filteredDocuments.length} document${filteredDocuments.length !== 1 ? "s" : ""}`}
               </span>
 
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className="rounded-[6px] border border-[#D8DDD4] bg-white p-1.5 text-[#65706A] hover:bg-[#FAF9F5] disabled:opacity-50"
-                  disabled
-                >
-                  <ChevronLeftIcon size={13} />
-                </button>
+              {filteredDocuments.length > 0 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="rounded-[6px] border border-[#D8DDD4] bg-white p-1.5 text-[#65706A] hover:bg-[#FAF9F5] disabled:opacity-50"
+                    disabled
+                  >
+                    <ChevronLeftIcon size={13} />
+                  </button>
 
-                <button
-                  type="button"
-                  className="h-7 w-7 rounded-[6px] bg-[#10251F] font-bold text-[#F4F3EE]"
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  className="h-7 w-7 rounded-[6px] border border-[#D8DDD4] bg-white font-medium text-[#18221E] hover:bg-[#FAF9F5]"
-                >
-                  2
-                </button>
-                <button
-                  type="button"
-                  className="h-7 w-7 rounded-[6px] border border-[#D8DDD4] bg-white font-medium text-[#18221E] hover:bg-[#FAF9F5]"
-                >
-                  3
-                </button>
-                <span className="px-1 text-[#65706A]">...</span>
-                <button
-                  type="button"
-                  className="h-7 w-8 rounded-[6px] border border-[#D8DDD4] bg-white font-medium text-[#18221E] hover:bg-[#FAF9F5]"
-                >
-                  33
-                </button>
+                  <button
+                    type="button"
+                    className="h-7 w-7 rounded-[6px] bg-[#10251F] font-bold text-[#F4F3EE]"
+                  >
+                    1
+                  </button>
 
-                <button
-                  type="button"
-                  className="rounded-[6px] border border-[#D8DDD4] bg-white p-1.5 text-[#18221E] hover:bg-[#FAF9F5]"
-                >
-                  <ChevronRightIcon size={13} />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    className="rounded-[6px] border border-[#D8DDD4] bg-white p-1.5 text-[#18221E] hover:bg-[#FAF9F5]"
+                  >
+                    <ChevronRightIcon size={13} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -967,34 +952,33 @@ export function DocumentsView({
           {/* SECTION 2: RECENT ACTIVITY */}
           <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-4 shadow-2xs">
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#D8DDD4]">
-              <span className="text-xs font-bold text-[#18221E]">Recent Activity</span>
-              <button
-                type="button"
-                className="text-[11px] font-semibold text-[#65706A] hover:text-[#18221E]"
-              >
-                View all →
-              </button>
+              <span className="text-xs font-bold text-[#18221E]">Recent Documents</span>
             </div>
 
             <div className="space-y-3">
-              {[
-                { name: "Company Policy Handbook.pdf", action: "Uploaded by Tashin Khan", time: "2 hours ago", color: "#DC2626" },
-                { name: "Q3 Budget Report 2026.xlsx", action: "Edited by Arafath Hossain", time: "Yesterday", color: "#16A34A" },
-                { name: "Project Management Playbook.docx", action: "Created by Fatema Islam", time: "Yesterday", color: "#2563EB" },
-                { name: "Brand Guidelines 2026.pptx", action: "Edited by Sarah Ahmed", time: "2 days ago", color: "#EA580C" },
-                { name: "Client Contract Template.pdf", action: "Downloaded by Munshi Tanjir", time: "2 days ago", color: "#D97706" },
-              ].map((act, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4]">
-                    <DocumentIcon size={14} color={act.color} />
-                  </div>
-                  <div className="min-w-0 flex-1 truncate">
-                    <p className="truncate text-xs font-bold text-[#18221E]">{act.name}</p>
-                    <p className="text-[10px] text-[#65706A]">{act.action}</p>
-                    <p className="text-[9px] text-[#65706A]/75">{act.time}</p>
-                  </div>
-                </div>
-              ))}
+              {documents.filter((d) => !d.is_trash).slice(0, 5).length === 0 ? (
+                <p className="text-[11px] text-[#65706A] text-center py-4">
+                  No documents yet. Create your first one!
+                </p>
+              ) : (
+                documents.filter((d) => !d.is_trash).slice(0, 5).map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => router.push(`/app/documents/${doc.id}`)}
+                    className="w-full flex items-start gap-2.5 text-left"
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#FAF9F5] border border-[#D8DDD4]">
+                      <DocumentIcon size={14} color={getCategoryColor(doc.category)} />
+                    </div>
+                    <div className="min-w-0 flex-1 truncate">
+                      <p className="truncate text-xs font-bold text-[#18221E] hover:underline">{doc.title}</p>
+                      <p className="text-[10px] text-[#65706A]">{doc.category} · {doc.status}</p>
+                      <p className="text-[9px] text-[#65706A]/75">{doc.author_name}</p>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -1209,60 +1193,52 @@ function CreateDocumentModal({
     if (!title.trim()) return;
     setLoading(true);
 
-    const selectedDept = departments.find((d) => d.id === departmentId);
-    const selectedProj = projects.find((p) => p.id === projectId);
-
-    const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}`,
-      workspace_id: workspaceId,
-      title: title.trim(),
-      subtitle: subtitle.trim() || null,
-      description: subtitle.trim() || null,
-      content: content || `# ${title}\n\nStart writing document content here...`,
-      category,
-      status: publishStatus,
-      department_id: departmentId || null,
-      department_name: selectedDept?.name || null,
-      project_id: projectId || null,
-      project_name: selectedProj?.name || null,
-      author_id: "u-tashin",
-      author_name: "Tashin Khan",
-      author_avatar: null,
-      access_level: accessLevel,
-      word_count: content.split(/\s+/).filter(Boolean).length || 50,
-      read_time_minutes: 1,
-      last_updated: "Just now",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      versions: [
-        {
-          id: `v-${Date.now()}`,
-          version_number: "1.0",
-          author_name: "Tashin Khan",
-          created_at: "Just now",
-          note: "Initial version",
-          content: content,
-        },
-      ],
-      comments: [],
-    };
-
     try {
-      await createDocumentAction({
+      const result = await createDocumentAction({
         workspaceId,
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
-        content: newDoc.content,
+        content: content || `# ${title.trim()}\n\nStart writing here...`,
         category,
         status: publishStatus,
         departmentId: departmentId || undefined,
         projectId: projectId || undefined,
         accessLevel,
       });
-      onSuccess(newDoc);
+
+      if (result.success && result.document) {
+        onSuccess(result.document);
+      } else {
+        console.error("Create document failed:", result.error);
+        // Still close modal so user isn't stuck
+        onSuccess({
+          id: `local-${Date.now()}`,
+          workspace_id: workspaceId,
+          title: title.trim(),
+          subtitle: subtitle.trim() || null,
+          description: subtitle.trim() || null,
+          content: content || `# ${title.trim()}\n\nStart writing here...`,
+          category,
+          status: publishStatus,
+          department_id: departmentId || null,
+          department_name: departments.find((d) => d.id === departmentId)?.name || null,
+          project_id: projectId || null,
+          project_name: projects.find((p) => p.id === projectId)?.name || null,
+          author_id: null,
+          author_name: "You",
+          author_avatar: null,
+          access_level: accessLevel,
+          word_count: (content || "").split(/\s+/).filter(Boolean).length || 5,
+          read_time_minutes: 1,
+          last_updated: "Just now",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          versions: [],
+          comments: [],
+        });
+      }
     } catch (err) {
       console.error(err);
-      onSuccess(newDoc);
     } finally {
       setLoading(false);
     }
@@ -1633,37 +1609,40 @@ function UploadDocumentModal({
           docContent += `\n\n[Download Original Document](${fileUrl})`;
         }
 
-        const newDoc: DocumentItem = {
-          id: `doc-${Date.now()}-${i}`,
-          workspace_id: workspaceId,
-          title: fileTitle,
-          subtitle: `${item.ext} Document`,
-          description: `Uploaded file: ${currentFile.name} (${item.sizeFormatted})`,
-          content: docContent,
-          category,
-          status: "Published",
-          author_id: "u-tashin",
-          author_name: "Tashin Khan",
-          access_level: "company",
-          word_count: 50,
-          read_time_minutes: 1,
-          last_updated: "Just now",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          versions: [],
-          comments: [],
-        };
-
-        await createDocumentAction({
+        const result = await createDocumentAction({
           workspaceId,
           title: fileTitle,
-          subtitle: newDoc.subtitle || undefined,
-          content: newDoc.content,
+          subtitle: `${item.ext} Document`,
+          content: docContent,
           category,
           status: "Published",
         });
 
-        createdDocuments.push(newDoc);
+        if (result.success && result.document) {
+          createdDocuments.push(result.document);
+        } else {
+          // Fallback with local ID for immediate UI update
+          createdDocuments.push({
+            id: `local-${Date.now()}-${i}`,
+            workspace_id: workspaceId,
+            title: fileTitle,
+            subtitle: `${item.ext} Document`,
+            description: `Uploaded file: ${currentFile.name} (${item.sizeFormatted})`,
+            content: docContent,
+            category,
+            status: "Published",
+            author_id: null,
+            author_name: "You",
+            access_level: "company",
+            word_count: 50,
+            read_time_minutes: 1,
+            last_updated: "Just now",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            versions: [],
+            comments: [],
+          });
+        }
       }
 
       setUploadProgress(100);

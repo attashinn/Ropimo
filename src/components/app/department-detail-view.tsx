@@ -501,7 +501,7 @@ export function DepartmentDetailView({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* Card 1: Open */}
                 <div className="rounded-[10px] border border-[#E7EADF] bg-[#FAF9F5] p-3 space-y-1">
-                  <span className="text-xl font-bold text-[#18221E]">{openTasks.length || 3}</span>
+                  <span className="text-xl font-bold text-[#18221E]">{openTasks.length}</span>
                   <span className="text-[11px] text-[#65706A] block">Open</span>
                   <div className="w-full bg-[#D8DDD4] h-1 rounded-full overflow-hidden mt-2">
                     <div className="bg-[#3B82F6] h-full w-3/4 rounded-full" />
@@ -510,7 +510,7 @@ export function DepartmentDetailView({
 
                 {/* Card 2: In progress */}
                 <div className="rounded-[10px] border border-[#E7EADF] bg-[#FAF9F5] p-3 space-y-1">
-                  <span className="text-xl font-bold text-[#18221E]">{inProgressTasks.length || 0}</span>
+                  <span className="text-xl font-bold text-[#18221E]">{inProgressTasks.length}</span>
                   <span className="text-[11px] text-[#65706A] block">In progress</span>
                   <div className="w-full bg-[#D8DDD4] h-1 rounded-full overflow-hidden mt-2">
                     <div className="bg-[#F59E0B] h-full w-1/3 rounded-full" />
@@ -519,7 +519,7 @@ export function DepartmentDetailView({
 
                 {/* Card 3: Overdue */}
                 <div className="rounded-[10px] border border-[#E7EADF] bg-[#FAF9F5] p-3 space-y-1">
-                  <span className="text-xl font-bold text-[#18221E]">{overdueTasks.length || 2}</span>
+                  <span className="text-xl font-bold text-[#18221E]">{overdueTasks.length}</span>
                   <span className="text-[11px] text-[#65706A] block">Overdue</span>
                   <div className="w-full bg-[#D8DDD4] h-1 rounded-full overflow-hidden mt-2">
                     <div className="bg-[#EF4444] h-full w-full rounded-full" />
@@ -528,7 +528,7 @@ export function DepartmentDetailView({
 
                 {/* Card 4: Completed */}
                 <div className="rounded-[10px] border border-[#E7EADF] bg-[#FAF9F5] p-3 space-y-1">
-                  <span className="text-xl font-bold text-[#18221E]">{completedTasks.length || 0}</span>
+                  <span className="text-xl font-bold text-[#18221E]">{completedTasks.length}</span>
                   <span className="text-[11px] text-[#65706A] block">Completed</span>
                   <div className="w-full bg-[#D8DDD4] h-1 rounded-full overflow-hidden mt-2">
                     <div className="bg-[#10B981] h-full w-1/2 rounded-full" />
@@ -548,20 +548,13 @@ export function DepartmentDetailView({
                   onClick={() => setCreateTaskModalOpen(true)}
                   className="text-xs font-semibold text-[#10251F] hover:underline cursor-pointer"
                 >
-                  + New Task
+                  + Add task
                 </button>
               </div>
 
               {tasks.length === 0 ? (
-                <div className="rounded-[12px] border border-dashed border-[#D8DDD4] bg-[#FAF9F5] p-5 text-center">
-                  <p className="text-xs text-[#65706A]">No tasks scheduled for {department.name}.</p>
-                  <button
-                    type="button"
-                    onClick={() => setCreateTaskModalOpen(true)}
-                    className="mt-2.5 rounded-[8px] bg-[#10251F] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#18342C] transition-colors"
-                  >
-                    Create Task
-                  </button>
+                <div className="text-center py-6 text-xs text-[#65706A]">
+                  No tasks assigned to this department yet.
                 </div>
               ) : (
                 <div className="divide-y divide-[#E7EADF]">
@@ -569,8 +562,10 @@ export function DepartmentDetailView({
                     const isDone = task.status === "completed";
                     const assignee = (task.assignees || [])[0];
                     const assigneePerson = allWorkspacePeople.find((p) => p.user_id === assignee?.user_id) || assignee;
-                    const assigneeName = assigneePerson?.full_name || (idx === 1 ? "Jesmin Sikder" : "Tashin Khan");
-                    const dueLabel = idx === 0 ? "May 8 · 3 days left" : idx === 1 ? "May 15 · 10 days left" : "May 22 · 17 days left";
+                    const assigneeName = assigneePerson?.full_name || (assignee as any)?.name || "Unassigned";
+                    const dueLabel = task.due_date
+                      ? new Date(task.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                      : "No deadline";
 
                     return (
                       <div
@@ -688,41 +683,40 @@ export function DepartmentDetailView({
               </div>
 
               <div className="space-y-3">
-                {/* Member 1 */}
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1E1B4B] text-[10px] font-bold text-white">
-                      JS
-                    </div>
-                    <div className="min-w-0">
-                      <span className="font-bold text-[#18221E] truncate block">Jesmin Sikder</span>
-                      <span className="text-[10px] text-[#65706A] truncate block">
-                        Principal Fullstack Engineer 2099
-                      </span>
-                    </div>
+                {members.length === 0 ? (
+                  <div className="text-center py-4 text-xs text-[#65706A]">
+                    No members in this department
                   </div>
-                  <span className="rounded bg-[#FAF9F5] px-2 py-0.5 text-[10px] font-semibold text-[#65706A] border border-[#D8DDD4] shrink-0">
-                    Member
-                  </span>
-                </div>
-
-                {/* Member 2 */}
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-[10px] font-bold text-white">
-                      TK
-                    </div>
-                    <div className="min-w-0">
-                      <span className="font-bold text-[#18221E] truncate block">Tashin Khan</span>
-                      <span className="text-[10px] text-[#65706A] truncate block">
-                        Department Lead
-                      </span>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-[#10251F] text-white px-2 py-0.5 text-[10px] font-bold shrink-0">
-                    Lead
-                  </span>
-                </div>
+                ) : (
+                  members.slice(0, 5).map((m) => {
+                    const fullName = m.person?.full_name || "Team Member";
+                    const isLead = m.user_id === department.lead_id || m.role === "lead" || m.role === "manager";
+                    return (
+                      <div key={m.user_id} className="flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-[10px] font-bold text-white">
+                            {fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-[#18221E] truncate block">{fullName}</span>
+                            <span className="text-[10px] text-[#65706A] truncate block">
+                              {m.job_title || (isLead ? "Department Lead" : "Team Member")}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded px-2 py-0.5 text-[10px] font-semibold shrink-0 ${
+                            isLead
+                              ? "bg-[#10251F] text-white font-bold"
+                              : "bg-[#FAF9F5] text-[#65706A] border border-[#D8DDD4]"
+                          }`}
+                        >
+                          {isLead ? "Lead" : "Member"}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -929,7 +923,7 @@ export function DepartmentDetailView({
                 return (
                   <div
                     key={proj.id}
-                    onClick={() => setSelectedProject(proj)}
+                    onClick={() => router.push(`/app/projects/${proj.id}`)}
                     className="rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-4 space-y-3 hover:border-[#10251F] hover:bg-white hover:shadow-xs transition-all cursor-pointer group"
                   >
                     <div className="flex items-start justify-between">
