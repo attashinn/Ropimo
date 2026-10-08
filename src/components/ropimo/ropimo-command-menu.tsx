@@ -2,386 +2,631 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { Command } from "cmdk";
 import {
   Search,
-  LayoutDashboard,
-  FolderKanban,
-  Building2,
-  Users,
-  Clock3,
-  Calendar,
-  FileText,
-  Folder,
-  Settings,
   Plus,
+  FolderKanban,
+  Video,
+  Briefcase,
+  Upload,
+  LayoutDashboard,
+  CheckSquare,
+  Calendar,
+  Folder,
+  Users,
+  Building2,
+  Clock3,
+  CalendarDays,
+  Settings,
+  MessageSquare,
+  Clock,
   ArrowRight,
-  X,
+  User,
+  FileText,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-export interface CommandItem {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon?: React.ReactNode;
-  shortcut?: string;
-  onSelect: () => void;
-  keywords?: string[];
-}
-
-export interface CommandGroup {
-  id: string;
-  title: string;
-  items: CommandItem[];
-}
+import { searchWorkspaceAction, WorkspaceSearchResults } from "@/lib/workspace/search";
+import { CreateTaskModal } from "@/components/app/create-task-modal";
+import { CreateProjectModal } from "@/components/app/create-project-modal";
+import { AICopilotDrawer } from "@/components/app/ai/ai-copilot-drawer";
 
 export interface RopimoCommandMenuProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  groups?: CommandGroup[];
   workspaceId?: string;
-  placeholder?: string;
-  className?: string;
+  workspaceName?: string;
+  userName?: string;
 }
+
+interface RecentItem {
+  id: string;
+  title: string;
+  type: "page" | "task" | "project";
+  href: string;
+}
+
+const DEFAULT_RECENT: RecentItem[] = [
+  { id: "rec-1", title: "Overview", type: "page", href: "/app" },
+  { id: "rec-2", title: "Tasks", type: "page", href: "/app/my-tasks" },
+  { id: "rec-3", title: "Projects", type: "page", href: "/app/projects" },
+];
 
 export function RopimoCommandMenu({
   open: controlledOpen,
   onOpenChange,
-  groups,
-  workspaceId,
-  placeholder = "Type a command or search...",
-  className,
+  workspaceId = "",
+  workspaceName = "Workspace",
+  userName = "User",
 }: RopimoCommandMenuProps) {
+  const router = useRouter();
   const [internalOpen, setInternalOpen] = React.useState(false);
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
-  const setIsOpen = (next: boolean) => {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
 
-  const router = useRouter();
+  const setIsOpen = React.useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange]
+  );
+
   const [search, setSearch] = React.useState("");
-  const [selectedIndex, setSelectedIndex] = React.useState(0);
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [dbResults, setDbResults] = React.useState<WorkspaceSearchResults>({
+    tasks: [],
+    projects: [],
+    people: [],
+    files: [],
+  });
+  const [isSearching, setIsSearching] = React.useState(false);
 
-  // Global Cmd+K / Ctrl+K listener
+  // Modals & Side Panels
+  const [createTaskOpen, setCreateTaskOpen] = React.useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = React.useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = React.useState(false);
+
+  // Debounced database search
   React.useEffect(() => {
+    if (!search.trim() || !workspaceId) {
+      setDbResults({ tasks: [], projects: [], people: [], files: [] });
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await searchWorkspaceAction(workspaceId, search.trim());
+        setDbResults(res);
+      } catch (err) {
+        console.error("Command palette search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [search, workspaceId]);
+
+  // Global Keyboard Shortcuts:
+  // - Cmd+K / Ctrl+K: open/close palette
+  // - /: focus search (open palette)
+  // - C: new task
+  // - G then O: overview
+  // - G then T: tasks
+  React.useEffect(() => {
+    let gPressedTimeout: NodeJS.Timeout | null = null;
+    let isGPressed = false;
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      // Cmd+K / Ctrl+K
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsOpen(!isOpen);
+        return;
       }
+
+      // If open, handle escape
       if (isOpen && e.key === "Escape") {
         e.preventDefault();
         setIsOpen(false);
+        return;
+      }
+
+      // If focused inside an input or dialog, do not trigger single key or sequence shortcuts
+      if (isInput || isOpen) return;
+
+      // '/' shortcut to focus search
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setIsOpen(true);
+        return;
+      }
+
+      // 'c' or 'C' shortcut to trigger New Task
+      if (e.key.toLowerCase() === "c" && !e.metaKey && !e.ctrlKey && !isGPressed) {
+        e.preventDefault();
+        setCreateTaskOpen(true);
+        return;
+      }
+
+      // 'g' or 'G' sequence
+      if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey) {
+        isGPressed = true;
+        if (gPressedTimeout) clearTimeout(gPressedTimeout);
+        gPressedTimeout = setTimeout(() => {
+          isGPressed = false;
+        }, 1000);
+        return;
+      }
+
+      if (isGPressed) {
+        if (e.key.toLowerCase() === "o") {
+          e.preventDefault();
+          isGPressed = false;
+          if (gPressedTimeout) clearTimeout(gPressedTimeout);
+          router.push("/app");
+          return;
+        }
+        if (e.key.toLowerCase() === "t") {
+          e.preventDefault();
+          isGPressed = false;
+          if (gPressedTimeout) clearTimeout(gPressedTimeout);
+          router.push("/app/my-tasks");
+          return;
+        }
+        // Any other key cancels the sequence
+        isGPressed = false;
+        if (gPressedTimeout) clearTimeout(gPressedTimeout);
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (gPressedTimeout) clearTimeout(gPressedTimeout);
+    };
+  }, [isOpen, router, setIsOpen]);
 
-  // Focus on open
-  React.useEffect(() => {
-    if (isOpen) {
-      setSearch("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [isOpen]);
+  // Navigation helper
+  const navigateTo = (href: string) => {
+    setIsOpen(false);
+    setSearch("");
+    router.push(href);
+  };
 
-  // Default system commands if none provided
-  const defaultGroups: CommandGroup[] = React.useMemo(() => {
-    if (groups) return groups;
-
-    const base = workspaceId ? `/app/${workspaceId}` : "/app";
-
-    return [
-      {
-        id: "navigation",
-        title: "Navigation",
-        items: [
-          {
-            id: "nav-overview",
-            title: "Overview Dashboard",
-            subtitle: "Main workspace hub",
-            icon: <LayoutDashboard className="h-4 w-4" />,
-            shortcut: "G O",
-            onSelect: () => router.push(base),
-          },
-          {
-            id: "nav-projects",
-            title: "Projects Directory",
-            subtitle: "All team projects and deliverables",
-            icon: <FolderKanban className="h-4 w-4" />,
-            shortcut: "G P",
-            onSelect: () => router.push(`${base}/projects`),
-          },
-          {
-            id: "nav-departments",
-            title: "Departments",
-            subtitle: "Squads and departmental hubs",
-            icon: <Building2 className="h-4 w-4" />,
-            shortcut: "G D",
-            onSelect: () => router.push(`${base}/departments`),
-          },
-          {
-            id: "nav-people",
-            title: "People & Directory",
-            subtitle: "Team members and roles",
-            icon: <Users className="h-4 w-4" />,
-            shortcut: "G T",
-            onSelect: () => router.push(`${base}/people`),
-          },
-          {
-            id: "nav-attendance",
-            title: "Attendance & Time",
-            subtitle: "Daily check-ins and logs",
-            icon: <Clock3 className="h-4 w-4" />,
-            shortcut: "G A",
-            onSelect: () => router.push(`${base}/attendance`),
-          },
-          {
-            id: "nav-calendar",
-            title: "Calendar & Schedule",
-            subtitle: "Deadlines, leaves, and events",
-            icon: <Calendar className="h-4 w-4" />,
-            shortcut: "G C",
-            onSelect: () => router.push(`${base}/calendar`),
-          },
-          {
-            id: "nav-documents",
-            title: "Documents",
-            subtitle: "Company docs and notes",
-            icon: <FileText className="h-4 w-4" />,
-            onSelect: () => router.push(`${base}/documents`),
-          },
-          {
-            id: "nav-files",
-            title: "Files & Storage",
-            subtitle: "Uploaded assets and deliverables",
-            icon: <Folder className="h-4 w-4" />,
-            onSelect: () => router.push(`${base}/files`),
-          },
-          {
-            id: "nav-settings",
-            title: "Workspace Settings",
-            subtitle: "Preferences and integrations",
-            icon: <Settings className="h-4 w-4" />,
-            shortcut: "G S",
-            onSelect: () => router.push(`${base}/settings`),
-          },
-        ],
-      },
-      {
-        id: "actions",
-        title: "Quick Actions",
-        items: [
-          {
-            id: "act-new-project",
-            title: "Create New Project",
-            subtitle: "Start a new team initiative",
-            icon: <Plus className="h-4 w-4" />,
-            shortcut: "C P",
-            onSelect: () => router.push(`${base}/projects?create=true`),
-          },
-          {
-            id: "act-new-task",
-            title: "Create New Task",
-            subtitle: "Add a task or deliverable",
-            icon: <Plus className="h-4 w-4" />,
-            shortcut: "C T",
-            onSelect: () => router.push(`${base}/tasks?create=true`),
-          },
-        ],
-      },
-    ];
-  }, [groups, workspaceId, router]);
-
-  // Filter items
-  const filteredGroups = React.useMemo(() => {
-    if (!search.trim()) return defaultGroups;
-    const q = search.toLowerCase();
-
-    return defaultGroups
-      .map((g) => ({
-        ...g,
-        items: g.items.filter((item) => {
-          const matchTitle = item.title.toLowerCase().includes(q);
-          const matchSub = item.subtitle?.toLowerCase().includes(q);
-          const matchKw = item.keywords?.some((k) => k.toLowerCase().includes(q));
-          return matchTitle || matchSub || matchKw;
-        }),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [defaultGroups, search]);
-
-  const flatItems = React.useMemo(() => {
-    return filteredGroups.flatMap((g) => g.items);
-  }, [filteredGroups]);
-
-  // Keyboard navigation inside menu
-  const handleInputKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % (flatItems.length || 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + flatItems.length) % (flatItems.length || 1));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const selected = flatItems[selectedIndex];
-      if (selected) {
-        selected.onSelect();
-        setIsOpen(false);
-      }
+  const handleOpenAction = (action: "task" | "project" | "meeting" | "candidate" | "file") => {
+    setIsOpen(false);
+    setSearch("");
+    switch (action) {
+      case "task":
+        setCreateTaskOpen(true);
+        break;
+      case "project":
+        setCreateProjectOpen(true);
+        break;
+      case "meeting":
+        router.push("/app/calendar");
+        break;
+      case "candidate":
+        router.push("/app/people");
+        break;
+      case "file":
+        router.push("/app/files");
+        break;
     }
   };
 
-  if (!isOpen) return null;
+  const handleAskAI = () => {
+    setIsOpen(false);
+    setSearch("");
+    setAiDrawerOpen(true);
+  };
+
+  if (!isOpen) {
+    return (
+      <>
+        {/* Modals rendered even when command menu closed */}
+        <CreateTaskModal
+          isOpen={createTaskOpen}
+          onClose={() => setCreateTaskOpen(false)}
+          workspaceId={workspaceId}
+          people={[]}
+          projects={[]}
+          departments={[]}
+          onSuccess={() => {
+            setCreateTaskOpen(false);
+            router.refresh();
+          }}
+        />
+
+        <CreateProjectModal
+          isOpen={createProjectOpen}
+          onClose={() => setCreateProjectOpen(false)}
+          workspaceId={workspaceId}
+          onSuccess={() => {
+            setCreateProjectOpen(false);
+            router.refresh();
+          }}
+        />
+
+        <AICopilotDrawer
+          open={aiDrawerOpen}
+          onClose={() => setAiDrawerOpen(false)}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          userName={userName}
+        />
+      </>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 bg-[#10251F]/40 backdrop-blur-xs animate-in fade-in duration-150"
-      onClick={() => setIsOpen(false)}
-    >
-      <div
-        className={cn(
-          "relative w-full max-w-xl overflow-hidden rounded-[16px] border border-[#D8DDD4] bg-white shadow-elevated animate-in zoom-in-95 duration-150",
-          className
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Search Input */}
-        <div className="relative flex items-center border-b border-[#D8DDD4] px-4 py-3 bg-[#FAF9F5]">
-          <Search className="h-4 w-4 text-[#65706A] shrink-0 mr-3" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={handleInputKeyDown}
-            placeholder={placeholder}
-            className="w-full bg-transparent text-sm text-[#18221E] placeholder:text-[#8A958F] focus:outline-none"
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="p-1 text-[#8A958F] hover:text-[#18221E] transition-colors"
+    <>
+      {/* Centered at top 15vh with backdrop */}
+      <div className="fixed inset-0 z-50 flex justify-center items-start pt-[15vh] px-4">
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black/25 transition-opacity duration-120"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+
+        {/* 12px radius, max-w-xl command palette */}
+        <Command
+          className="app-root relative z-50 w-full max-w-xl rounded-[12px] border border-hairline bg-surface bg-white text-ink shadow-[0_16px_40px_rgba(0,0,0,0.12)] overflow-hidden duration-120 animate-in fade-in-0 zoom-in-95 select-none outline-none"
+          loop
+        >
+          {/* Input at the top with NO border */}
+          <div className="flex items-center px-3.5 border-b border-hairline bg-surface">
+            <Search className="h-4 w-4 stroke-[1.5] text-ink-3 mr-2.5 shrink-0" />
+            <Command.Input
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Type a command or search..."
+              className="w-full h-12 bg-transparent text-[13px] text-ink placeholder:text-ink-3 outline-none border-none focus:outline-none focus:ring-0"
+              autoFocus
+            />
+          </div>
+
+          {/* Results list */}
+          <Command.List className="max-h-[380px] overflow-y-auto p-1.5 space-y-1 outline-none">
+            {/* Empty fallback */}
+            <Command.Empty className="px-3 py-6 text-center text-[13px] text-ink-3">
+              No direct matches found.
+            </Command.Empty>
+
+            {/* Group 1: Actions */}
+            <Command.Group
+              heading="Actions"
+              className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
             >
-              <X className="h-4 w-4" />
-            </button>
-          ) : (
-            <kbd className="hidden sm:inline-flex items-center rounded border border-[#D8DDD4] bg-white px-1.5 py-0.5 text-[10px] font-mono text-[#65706A]">
-              ESC
-            </kbd>
-          )}
-        </div>
+              <Command.Item
+                onSelect={() => handleOpenAction("task")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Plus className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">New task</span>
+                <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">
+                  C
+                </span>
+              </Command.Item>
 
-        {/* Command Items List */}
-        <div className="max-h-[360px] overflow-y-auto p-2 space-y-3">
-          {flatItems.length === 0 ? (
-            <div className="p-8 text-center text-xs text-[#65706A]">
-              No matching commands or pages found.
-            </div>
-          ) : (
-            filteredGroups.map((group) => (
-              <div key={group.id} className="space-y-1">
-                <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#8A958F]">
-                  {group.title}
-                </div>
-                {group.items.map((item) => {
-                  const globalIdx = flatItems.findIndex((fi) => fi.id === item.id);
-                  const isSelected = globalIdx === selectedIndex;
+              <Command.Item
+                onSelect={() => handleOpenAction("project")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <FolderKanban className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">New project</span>
+              </Command.Item>
 
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        item.onSelect();
-                        setIsOpen(false);
-                      }}
-                      onMouseEnter={() => setSelectedIndex(globalIdx)}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-[10px] px-3 py-2 text-xs transition-colors text-left group",
-                        isSelected
-                          ? "bg-[#10251F] text-white"
-                          : "text-[#18221E] hover:bg-[#FAF9F5]"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={cn(
-                            "flex h-7 w-7 items-center justify-center rounded-[6px] border shrink-0 transition-colors",
-                            isSelected
-                              ? "border-[#25463C] bg-[#18342C] text-[#C7F34A]"
-                              : "border-[#D8DDD4] bg-[#F4F3EE] text-[#10251F]"
-                          )}
-                        >
-                          {item.icon || <ArrowRight className="h-3.5 w-3.5" />}
-                        </div>
-                        <div className="min-w-0 space-y-0.5">
-                          <p className="font-semibold truncate leading-tight">
-                            {item.title}
-                          </p>
-                          {item.subtitle && (
-                            <p
-                              className={cn(
-                                "text-[11px] truncate",
-                                isSelected ? "text-[#D8DDD4]" : "text-[#65706A]"
-                              )}
-                            >
-                              {item.subtitle}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+              <Command.Item
+                onSelect={() => handleOpenAction("meeting")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Video className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Schedule meeting</span>
+              </Command.Item>
 
-                      {item.shortcut && (
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <kbd
-                            className={cn(
-                              "rounded border px-1.5 py-0.5 text-[10px] font-mono",
-                              isSelected
-                                ? "border-[#25463C] bg-[#18342C] text-[#C7F34A]"
-                                : "border-[#D8DDD4] bg-[#FAF9F5] text-[#65706A]"
-                            )}
-                          >
-                            {item.shortcut}
-                          </kbd>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
+              <Command.Item
+                onSelect={() => handleOpenAction("candidate")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Briefcase className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Add candidate</span>
+              </Command.Item>
 
-        {/* Footer Shortcut Hints */}
-        <div className="flex items-center justify-between border-t border-[#D8DDD4] bg-[#FAF9F5] px-4 py-2 text-[11px] text-[#65706A]">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1">
-              <kbd className="rounded border border-[#D8DDD4] bg-white px-1 font-mono">↑</kbd>
-              <kbd className="rounded border border-[#D8DDD4] bg-white px-1 font-mono">↓</kbd>
-              navigate
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <kbd className="rounded border border-[#D8DDD4] bg-white px-1.5 font-mono">↵</kbd>
-              select
-            </span>
+              <Command.Item
+                onSelect={() => handleOpenAction("file")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Upload className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Upload file</span>
+              </Command.Item>
+            </Command.Group>
+
+            {/* Database Search Results (Tasks) */}
+            {dbResults.tasks.length > 0 && (
+              <Command.Group
+                heading="Tasks"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+              >
+                {dbResults.tasks.map((task) => (
+                  <Command.Item
+                    key={task.id}
+                    onSelect={() => navigateTo("/app/my-tasks")}
+                    className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+                  >
+                    <CheckSquare className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                    <span className="truncate">{task.title}</span>
+                    <span className="ml-auto pl-3 text-[11px] text-ink-3 capitalize">
+                      {task.status.replace("_", " ")}
+                    </span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* Database Search Results (Projects) */}
+            {dbResults.projects.length > 0 && (
+              <Command.Group
+                heading="Projects"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+              >
+                {dbResults.projects.map((proj) => (
+                  <Command.Item
+                    key={proj.id}
+                    onSelect={() => navigateTo(`/app/projects/${proj.id}`)}
+                    className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full mr-2.5 shrink-0"
+                      style={{ backgroundColor: proj.color || "#3B63F0" }}
+                    />
+                    <span className="truncate">{proj.name}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* Database Search Results (People) */}
+            {dbResults.people.length > 0 && (
+              <Command.Group
+                heading="People"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+              >
+                {dbResults.people.map((person) => (
+                  <Command.Item
+                    key={person.id}
+                    onSelect={() => navigateTo("/app/people")}
+                    className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+                  >
+                    <User className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                    <span className="truncate">{person.fullName}</span>
+                    {person.jobTitle && (
+                      <span className="ml-auto pl-3 text-[11px] text-ink-3 truncate">
+                        {person.jobTitle}
+                      </span>
+                    )}
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* Database Search Results (Files) */}
+            {dbResults.files.length > 0 && (
+              <Command.Group
+                heading="Files"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+              >
+                {dbResults.files.map((file) => (
+                  <Command.Item
+                    key={file.id}
+                    onSelect={() => navigateTo("/app/files")}
+                    className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+                  >
+                    <FileText className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                    <span className="truncate">{file.name}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* Group 2: Go to (Every page) */}
+            <Command.Group
+              heading="Go to"
+              className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+            >
+              <Command.Item
+                onSelect={() => navigateTo("/app")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <LayoutDashboard className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Overview</span>
+                <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">
+                  G O
+                </span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/my-tasks")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <CheckSquare className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Tasks</span>
+                <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">
+                  G T
+                </span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/projects")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <FolderKanban className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Projects</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/calendar")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Calendar className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Calendar</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/meetings")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Video className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Meetings</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/hiring")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Briefcase className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Hiring</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/files")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Folder className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Files</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/people")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Users className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">People</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/departments")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Building2 className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Departments</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/attendance")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Clock3 className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Attendance</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/leave")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <CalendarDays className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Leave</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => navigateTo("/app/settings")}
+                className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <Settings className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate">Settings</span>
+              </Command.Item>
+            </Command.Group>
+
+            {/* Group 3: Recent (when no search query) */}
+            {!search && (
+              <Command.Group
+                heading="Recent"
+                className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+              >
+                {DEFAULT_RECENT.map((rec) => (
+                  <Command.Item
+                    key={rec.id}
+                    onSelect={() => navigateTo(rec.href)}
+                    className="relative flex h-[32px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+                  >
+                    <Clock className="h-4 w-4 stroke-[1.5] text-ink-3 mr-2.5 shrink-0" />
+                    <span className="truncate">{rec.title}</span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {/* Group 4: Ask AI (A single clean row at the bottom) */}
+            <Command.Group
+              heading="Ask AI"
+              className="pt-1 border-t border-hairline/60 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
+            >
+              <Command.Item
+                onSelect={handleAskAI}
+                className="relative flex h-[34px] cursor-pointer items-center rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 data-[selected=true]:bg-selected data-[selected=true]:text-ink hover:bg-hover"
+              >
+                <MessageSquare className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
+                <span className="truncate font-medium">
+                  {search.trim()
+                    ? `Ask Ropimo AI: "${search.trim()}"`
+                    : "Ask Ropimo AI"}
+                </span>
+                <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">
+                  ↵
+                </span>
+              </Command.Item>
+            </Command.Group>
+          </Command.List>
+
+          {/* Footer bar */}
+          <div className="h-9 px-3.5 border-t border-hairline flex items-center justify-between text-[11px] text-ink-3 select-none bg-surface">
+            <span>↑ ↓ to navigate · ↵ to select · Esc to close</span>
+            <span className="font-mono text-[10px]">⌘K</span>
           </div>
-          <div>
-            <span className="font-semibold text-[#10251F]">Ropimo</span> Command
-          </div>
-        </div>
+        </Command>
       </div>
-    </div>
+
+      {/* Creation modals */}
+      <CreateTaskModal
+        isOpen={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        workspaceId={workspaceId}
+        people={[]}
+        projects={[]}
+        departments={[]}
+        onSuccess={() => {
+          setCreateTaskOpen(false);
+          router.refresh();
+        }}
+      />
+
+      <CreateProjectModal
+        isOpen={createProjectOpen}
+        onClose={() => setCreateProjectOpen(false)}
+        workspaceId={workspaceId}
+        onSuccess={() => {
+          setCreateProjectOpen(false);
+          router.refresh();
+        }}
+      />
+
+      {/* AI Side Panel Drawer */}
+      <AICopilotDrawer
+        open={aiDrawerOpen}
+        onClose={() => setAiDrawerOpen(false)}
+        workspaceId={workspaceId}
+        workspaceName={workspaceName}
+        userName={userName}
+      />
+    </>
   );
 }

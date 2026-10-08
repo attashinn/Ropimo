@@ -25,6 +25,25 @@
   --primary-foreground: #FFFFFF;
   --muted: var(--ropimo-soft-green);
   --muted-foreground: var(--ropimo-muted-text);
+
+  /* App tokens fallback for portals and overlays */
+  --app-canvas: #F6F4EC;
+  --app-surface: #FFFFFF;
+  --app-hairline: #E9E6DA;
+  --app-hover: #F4F2EA;
+  --app-selected: #ECE9DD;
+  --app-ink: #111111;
+  --app-ink-2: #6B6B6B;
+  --app-ink-3: #9A9A9A;
+  --app-status-done: #1F9D55;
+  --app-status-progress: #D99A00;
+  --app-status-overdue: #D93025;
+  --app-status-none: #9A9A9A;
+  --app-accent-green: #7ED08A;
+  --app-accent-yellow: #FFE76A;
+  --app-accent-peach: #FFCFC2;
+  --app-accent-blue: #3B63F0;
+  --app-accent-orange: #FF6B3D;
 }
 
 @theme inline {
@@ -49,13 +68,89 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
 
-  --font-sans: var(--font-geist-sans);
+  --color-tasktide-black: #111111;
+  --color-tasktide-beige: #EFECE0;
+  --color-tasktide-offwhite: #FAF9F6;
+  --color-tasktide-peach: #FFCFC2;
+  --color-tasktide-orange: #FF6B3D;
+  --color-tasktide-blue: #3B63F0;
+  --color-tasktide-green: #7ED957;
+  --color-tasktide-yellow: #FFD93D;
+
+  --color-brand-black: #111111;
+  --color-brand-cream: #EFECE0;
+  --color-brand-offwhite: #FAF9F6;
+  --color-brand-peach: #FFCFC2;
+  --color-brand-orange: #FF6B3D;
+  --color-brand-blue: #3B63F0;
+  --color-brand-green: #7ED08A;
+  --color-brand-yellow: #FFE76A;
+  --color-brand-lightblue: #E3EDFB;
+
+  /* Ropimo App UI Tokens */
+  --color-canvas: var(--app-canvas);
+  --color-surface: var(--app-surface);
+  --color-hairline: var(--app-hairline);
+  --color-hover: var(--app-hover);
+  --color-selected: var(--app-selected);
+  --color-ink: var(--app-ink);
+  --color-ink-2: var(--app-ink-2);
+  --color-ink-3: var(--app-ink-3);
+  --color-status-done: var(--app-status-done);
+  --color-status-progress: var(--app-status-progress);
+  --color-status-overdue: var(--app-status-overdue);
+  --color-status-none: var(--app-status-none);
+  --color-accent-green: var(--app-accent-green);
+  --color-accent-yellow: var(--app-accent-yellow);
+  --color-accent-peach: var(--app-accent-peach);
+  --color-accent-blue: var(--app-accent-blue);
+  --color-accent-orange: var(--app-accent-orange);
+
+  --font-sans: var(--font-plus-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-geist-mono);
+  --font-plus-jakarta: var(--font-plus-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Scoped class for the logged-in app UI foundation */
+.app-root {
+  --app-canvas: #F6F4EC;
+  --app-surface: #FFFFFF;
+  --app-hairline: #E9E6DA;
+  --app-hover: #F4F2EA;
+  --app-selected: #ECE9DD;
+  --app-ink: #111111;
+  --app-ink-2: #6B6B6B;
+  --app-ink-3: #9A9A9A;
+
+  --app-status-done: #1F9D55;
+  --app-status-progress: #D99A00;
+  --app-status-overdue: #D93025;
+  --app-status-none: #9A9A9A;
+
+  --app-accent-green: #7ED08A;
+  --app-accent-yellow: #FFE76A;
+  --app-accent-peach: #FFCFC2;
+  --app-accent-blue: #3B63F0;
+  --app-accent-orange: #FF6B3D;
+
+  background-color: var(--app-canvas);
+  color: var(--app-ink);
+  font-family: var(--font-plus-jakarta), sans-serif;
 }
 
 html {
   scroll-behavior: smooth;
-  scrollbar-gutter: stable;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 body {
@@ -85,4 +180,15 @@ input[type="radio"] {
 .page-content {
   min-width: 0;
   overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

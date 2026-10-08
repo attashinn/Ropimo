@@ -39,6 +39,8 @@ import { Department } from "@/types/department";
 import { JobOpening, Candidate, Interview, RecruitmentStats } from "@/types/recruitment";
 import { MemberActivitySummary, MemberProjectSummary } from "@/lib/people/queries";
 import { toggleMemberStatusAction, assignPersonToDepartmentAction } from "@/lib/people/actions";
+import { useDebounce } from "@/hooks/use-debounce";
+import { toast } from "sonner";
 import { RopimoUserAvatar } from "@/components/ropimo/ropimo-user-avatar";
 import { RopimoSelect } from "@/components/ropimo/ropimo-select";
 import { EditPersonModal } from "@/components/app/edit-person-modal";
@@ -87,6 +89,7 @@ export function PeopleDirectory({
 
   // Filter & Search State
   const [searchQuery, setSearchQuery] = React.useState("");
+  const debouncedSearch = useDebounce(searchQuery, 200);
   const [selectedDeptId, setSelectedDeptId] = React.useState<string>("all");
   const [selectedRoleFilter, setSelectedRoleFilter] = React.useState<string>("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = React.useState<string>("all");
@@ -135,7 +138,7 @@ export function PeopleDirectory({
   // Filtering & Sorting
   const filteredPeople = React.useMemo(() => {
     let result = people.filter((person) => {
-      const query = searchQuery.toLowerCase().trim();
+      const query = debouncedSearch.toLowerCase().trim();
       const matchesSearch =
         !query ||
         (person.full_name && person.full_name.toLowerCase().includes(query)) ||
@@ -172,7 +175,7 @@ export function PeopleDirectory({
     }
 
     return result;
-  }, [people, searchQuery, selectedDeptId, selectedRoleFilter, selectedStatusFilter, sortBy]);
+  }, [people, debouncedSearch, selectedDeptId, selectedRoleFilter, selectedStatusFilter, sortBy]);
 
   // Pagination
   const pageSize = 12;
@@ -184,13 +187,19 @@ export function PeopleDirectory({
   }, [filteredPeople, currentPage]);
 
   const handleToggleStatus = async (person: WorkspacePerson) => {
-    const newStatus = person.employment_status === "Inactive" ? "Active" : "Inactive";
-    await toggleMemberStatusAction(
-      workspaceId,
-      person.user_id || person.id,
-      newStatus
-    );
-    router.refresh();
+    const prevStatus = person.employment_status || "Active";
+    const newStatus = prevStatus === "Inactive" ? "Active" : "Inactive";
+    try {
+      await toggleMemberStatusAction(
+        workspaceId,
+        person.user_id || person.id,
+        newStatus
+      );
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update member status");
+    }
   };
 
   const getStatusBadge = (status?: string) => {

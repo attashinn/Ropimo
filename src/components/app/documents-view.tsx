@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   DocumentItem,
   DocumentCategory,
@@ -100,6 +101,7 @@ export function DocumentsView({
   // View & Filtering State
   const [viewMode, setViewMode] = React.useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = React.useState("");
+  const debouncedSearch = useDebounce(searchQuery, 200);
   const [selectedCategory, setSelectedCategory] = React.useState<"all" | DocumentCategory>("all");
   const [selectedStatus, setSelectedStatus] = React.useState<"all" | DocumentStatus>("all");
   const [selectedAuthorId, setSelectedAuthorId] = React.useState<string>("all");
@@ -132,9 +134,9 @@ export function DocumentsView({
       list = list.filter((d) => !d.is_trash);
     }
 
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    // Search query — debounced 200ms
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter(
         (d) =>
           d.title.toLowerCase().includes(q) ||
@@ -174,7 +176,7 @@ export function DocumentsView({
   }, [
     documents,
     activeQuickFilter,
-    searchQuery,
+    debouncedSearch,
     selectedCategory,
     selectedStatus,
     selectedAuthorId,

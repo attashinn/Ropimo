@@ -16,7 +16,7 @@ export interface WorkspaceContextData {
   projects?: Array<{ id: string; name: string; status?: string; progress?: number }>;
   tasks?: Array<{ id: string; title: string; status?: string; priority?: string; dueDate?: string }>;
   departments?: Array<{ id: string; name: string }>;
-  teamMembers?: Array<{ id: string; name: string; email?: string }>;
+  teamMembers?: Array<{ id: string; name: string; email?: string; role?: string }>;
 }
 
 export interface GatewayResponse {
@@ -34,6 +34,8 @@ export interface AgentAction {
   title: string;
   description: string;
   payload: Record<string, any>;
+  executed?: boolean;
+  result?: any;
 }
 
 export const SUPPORTED_MODELS = [
@@ -78,23 +80,43 @@ Your job is to assist team leads, project managers, and team members with projec
 
 Tone & Persona:
 - Ultra-professional, concise, helpful, and action-oriented.
-- Format responses clearly using markdown (bullet points, bold key points, clean headers).
-- When a user asks you to create or plan something (e.g. "Create 3 tasks for the design sprint", "Set up a new marketing campaign"), provide the breakdown AND suggest structured actions.
+- When the user asks you to create, plan, or set up projects or tasks (e.g. "CREATE A PROJECT FOR...", "U CREATE THE PROJECT", "Assign tasks to Tashin"), DO NOT write long essays or endless lists of text.
+- Provide a brief 1-2 sentence response, followed immediately by the structured \`\`\`ropimo-actions block.
 
-Structured Action Capability:
-When you recommend creating tasks, projects, or job postings, you can embed an actionable block at the very end of your response inside a fenced JSON block with the language identifier "ropimo-actions":
+CRITICAL INSTRUCTION - STRUCTURED WORKSPACE ACTIONS:
+Whenever you recommend or are commanded to create projects, tasks, or jobs, you MUST include a fenced JSON block with the language identifier "ropimo-actions" at the end of your response:
 \`\`\`ropimo-actions
 [
   {
+    "type": "create_project",
+    "title": "Photogpafar Website Development",
+    "description": "Develop a website for Photogpafar with backend and frontend infrastructure",
+    "status": "in_progress",
+    "priority": "high"
+  },
+  {
     "type": "create_task",
-    "title": "Task title",
-    "description": "Short details",
+    "title": "Design & implement database schema",
+    "description": "Set up database models for user data and content",
     "priority": "high",
-    "estimatedDays": 3
+    "assigneeName": "tashinkan360"
+  },
+  {
+    "type": "create_task",
+    "title": "Build responsive frontend interface",
+    "description": "Develop interactive UI components and layout",
+    "priority": "high",
+    "assigneeName": "me"
   }
 ]
 \`\`\`
-The Ropimo UI will automatically convert these blocks into interactive one-click execution buttons for the user.
+
+Action Rules:
+1. "type" can be "create_project" or "create_task".
+2. For "create_project": "title" is the project name, "description" is the overview, "status" is "in_progress" or "active".
+3. For "create_task": "title" is the task name, "description" is the details, "priority" is "low" | "medium" | "high" | "urgent", and "assigneeName" is the name or username of the person to assign.
+4. Keep action descriptions concise so the JSON is compact and never gets cut off. Always close the array and code fence with \`\`\`.
+5. If the user asks you to create a project AND tasks, include the "create_project" first in the array, followed by the "create_task" items.
 `;
 
   if (ctx) {
@@ -115,7 +137,7 @@ The Ropimo UI will automatically convert these blocks into interactive one-click
     }
 
     if (ctx.teamMembers && ctx.teamMembers.length > 0) {
-      prompt += `\n- Team Members: ${ctx.teamMembers.map((m) => m.name).slice(0, 10).join(", ")}`;
+      prompt += `\n- Workspace Team Members: ${ctx.teamMembers.map((m) => `${m.name} (${m.role || "Member"}${m.email ? `, ${m.email}` : ""})`).slice(0, 15).join("; ")}`;
     }
   }
 
@@ -123,35 +145,106 @@ The Ropimo UI will automatically convert these blocks into interactive one-click
 }
 
 /**
- * Extracts action JSON blocks from agent response
+ * Extracts action JSON blocks from agent response with robust fallback for truncated output
  */
 export function extractAgentActions(text: string): { cleanedText: string; actions: AgentAction[] } {
   const actions: AgentAction[] = [];
   let cleanedText = text;
 
-  const actionRegex = /```ropimo-actions\s*([\s\S]*?)\s*```/g;
+  // 1. Try standard closed block: ```ropimo-actions ... ```
+  const closedRegex = /```ropimo-actions\s*([\s\S]*?)\s*```/g;
   let match;
+  let foundClosed = false;
 
-  while ((match = actionRegex.exec(text)) !== null) {
+  while ((match = closedRegex.exec(text)) !== null) {
+    foundClosed = true;
     try {
       const parsed = JSON.parse(match[1]);
       if (Array.isArray(parsed)) {
         parsed.forEach((item, index) => {
-          actions.push({
-            id: `action-${Date.now()}-${index}`,
-            type: item.type || "create_task",
-            title: item.title || "Untitled Action",
-            description: item.description || "",
-            payload: item,
-          });
+          if (item && typeof item === "object") {
+            actions.push({
+              id: `action-${Date.now()}-${index}`,
+              type: item.type || "create_task",
+              title: item.title || item.name || "Untitled Action",
+              description: item.description || "",
+              payload: item,
+            });
+          }
         });
       }
     } catch {
-      // JSON parse error in action block - ignore
+      // JSON parse error in action block - try object extraction fallback below
     }
   }
 
-  cleanedText = cleanedText.replace(/```ropimo-actions\s*[\s\S]*?\s*```/g, "").trim();
+  // 2. If no closed block or actions empty, check for unclosed / truncated block: ```ropimo-actions ...
+  if (!foundClosed || actions.length === 0) {
+    const unclosedMatch = text.match(/```ropimo-actions\s*([\s\S]*)$/);
+    if (unclosedMatch) {
+      let rawJson = unclosedMatch[1].trim();
+      // Remove trailing ``` if any
+      rawJson = rawJson.replace(/```\s*$/, "").trim();
+
+      // Attempt repair by closing open structures
+      const repairAttempts = [
+        rawJson,
+        rawJson + "\n}]",
+        rawJson + "\n]",
+        rawJson + '"\n}]',
+        rawJson + '"}\n]',
+      ];
+
+      for (const attempt of repairAttempts) {
+        try {
+          const parsed = JSON.parse(attempt);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item, index) => {
+              if (item && typeof item === "object" && (item.type || item.title || item.name)) {
+                actions.push({
+                  id: `action-${Date.now()}-${index}`,
+                  type: item.type || "create_task",
+                  title: item.title || item.name || "Untitled Action",
+                  description: item.description || "",
+                  payload: item,
+                });
+              }
+            });
+            if (actions.length > 0) break;
+          }
+        } catch {
+          // Keep trying
+        }
+      }
+
+      // If repair failed, regex-extract individual complete JSON objects
+      if (actions.length === 0) {
+        const objectRegex = /\{[^{}]*"type"\s*:\s*"(?:create_task|create_project)"[^{}]*\}/g;
+        let objMatch;
+        let count = 0;
+        while ((objMatch = objectRegex.exec(rawJson)) !== null) {
+          try {
+            const item = JSON.parse(objMatch[0]);
+            actions.push({
+              id: `action-${Date.now()}-${count++}`,
+              type: item.type || "create_task",
+              title: item.title || item.name || "Untitled Action",
+              description: item.description || "",
+              payload: item,
+            });
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    }
+  }
+
+  // Completely remove any ropimo-actions fence (closed or unclosed) so raw JSON never pollutes the chat bubble
+  cleanedText = cleanedText
+    .replace(/```ropimo-actions[\s\S]*?```/g, "")
+    .replace(/```ropimo-actions[\s\S]*$/g, "")
+    .trim();
 
   return { cleanedText, actions };
 }
@@ -197,7 +290,8 @@ export async function queryAIGateway(params: {
       body: JSON.stringify({
         model,
         messages: fullMessages,
-        temperature: params.temperature ?? 0.7,
+        temperature: params.temperature ?? 0.6,
+        max_tokens: 3000,
       }),
     });
 
@@ -238,3 +332,5 @@ export async function queryAIGateway(params: {
     };
   }
 }
+
+

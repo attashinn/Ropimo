@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   FileItem,
   FileType,
@@ -96,6 +97,7 @@ export function FilesView({
   // View & Filter States
   const [viewMode, setViewMode] = React.useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = React.useState("");
+  const debouncedSearch = useDebounce(searchQuery, 200);
   const [selectedFileType, setSelectedFileType] = React.useState<"all" | FileType>("all");
   const [sortBy, setSortBy] = React.useState<"last_modified" | "name" | "size">("last_modified");
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc");
@@ -138,9 +140,9 @@ export function FilesView({
       list = list.filter((item) => (item.folder_id || null) === currentFolderId && !item.is_trash);
     }
 
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    // Search query — debounced 200ms
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter(
         (item) =>
           item.name.toLowerCase().includes(q) ||
@@ -198,6 +200,7 @@ export function FilesView({
     currentFolderId,
     activeQuickFilter,
     searchQuery,
+    debouncedSearch,
     selectedFileType,
     selectedDeptId,
     selectedProjId,

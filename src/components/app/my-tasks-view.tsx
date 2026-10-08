@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CategorizedTasks, Task, TaskPriority, TaskStatus, TaskAttachment, TaskComment } from "@/types/task";
 import { WorkspacePerson } from "@/types/people";
 import { Project } from "@/types/project";
@@ -10,6 +11,7 @@ import { Department } from "@/types/department";
 import { CreateTaskModal } from "@/components/app/create-task-modal";
 import { updateTaskAction, deleteTaskAction, addTaskAttachmentAction, addTaskCommentAction } from "@/lib/task/actions";
 import { AppIcon } from "@/components/ui/app-icon";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export interface MyTasksViewProps {
   workspaceId: string;
@@ -135,6 +137,7 @@ export function MyTasksView({
   const [selectedPriority, setSelectedPriority] = React.useState<string>("all");
   const [selectedDueDate, setSelectedDueDate] = React.useState<string>("this_week");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const debouncedSearch = useDebounce(searchQuery, 200);
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [groupBy, setGroupBy] = React.useState<GroupByOption>("due_date");
 
@@ -192,9 +195,12 @@ export function MyTasksView({
   // Toggle single task completion
   const handleToggleTask = async (task: DisplayTaskItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const prevCompleted = task.completed;
+    const prevStatus = task.status;
     const nextCompleted = !task.completed;
     const nextStatus: TaskStatus = nextCompleted ? "completed" : "in_progress";
 
+    // Optimistic update
     setLocalTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted, status: nextStatus } : t))
     );
@@ -208,6 +214,11 @@ export function MyTasksView({
       router.refresh();
     } catch (err) {
       console.error(err);
+      // Rollback
+      setLocalTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, completed: prevCompleted, status: prevStatus } : t))
+      );
+      toast.error("Failed to update task");
     }
   };
 
@@ -315,6 +326,7 @@ export function MyTasksView({
     if (!selectedTaskDetails) return;
     if (!confirm(`Are you sure you want to delete "${selectedTaskDetails.title}"?`)) return;
     const taskId = selectedTaskDetails.id;
+    const snapshot = selectedTaskDetails;
     setSelectedTaskDetails(null);
     setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
     try {
@@ -322,6 +334,10 @@ export function MyTasksView({
       router.refresh();
     } catch (err) {
       console.error("Failed to delete task:", err);
+      // Rollback
+      setLocalTasks((prev) => [...prev, snapshot]);
+      setSelectedTaskDetails(snapshot);
+      toast.error("Failed to delete task");
     }
   };
 
@@ -355,10 +371,10 @@ export function MyTasksView({
     setSelectedTaskIds([]);
   };
 
-  // Filtering
+  // Filtering — use debouncedSearch (200ms) so table only re-renders after user stops typing
   const filteredTasks = React.useMemo(() => {
     return localTasks.filter((task) => {
-      const q = searchQuery.toLowerCase();
+      const q = debouncedSearch.toLowerCase();
       const matchesSearch =
         !q ||
         task.title.toLowerCase().includes(q) ||
@@ -380,7 +396,7 @@ export function MyTasksView({
 
       return matchesSearch && matchesProject && matchesStatus && matchesPriority;
     });
-  }, [localTasks, searchQuery, selectedProject, selectedStatus, selectedPriority]);
+  }, [localTasks, debouncedSearch, selectedProject, selectedStatus, selectedPriority]);
 
   const todayScheduleTasks = React.useMemo(() => {
     return localTasks.filter((t) => t.dueCategory === "today" && !t.completed);

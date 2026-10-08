@@ -115,12 +115,14 @@ export async function createProjectAction(
   }
 
   // 4. Insert project
+  const dbStatus = (status === "in_progress" || !status) ? "active" : status;
+
   const insertPayload: Record<string, unknown> = {
     workspace_id: workspaceId,
     name: trimmedName,
     slug,
     description: description?.trim() || null,
-    status: status || "active",
+    status: dbStatus,
     color: color || "#10251F",
     icon: projectIcon,
     created_by: user.id,
@@ -146,7 +148,7 @@ export async function createProjectAction(
       name: trimmedName,
       slug,
       description: description?.trim() || null,
-      status: status || "active",
+      status: dbStatus,
       color: color || "#10251F",
       icon: projectIcon,
       created_by: user.id,

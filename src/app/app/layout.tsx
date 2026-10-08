@@ -1,4 +1,4 @@
-import * as React from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDefaultWorkspace, getUserWorkspaces } from "@/lib/workspace/queries";
@@ -26,6 +26,12 @@ export default async function ProtectedAppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const headerList = await headers();
+  const currentPath = headerList.get("x-pathname") || "";
+  if (currentPath.includes("_kit") || currentPath.includes("/kit")) {
+    return <div className="app-root min-h-screen bg-canvas text-ink">{children}</div>;
+  }
+
   const supabase = await createClient();
 
   const {

@@ -1,0 +1,8 @@
+export { LogoStrip, default as LogoStripSection } from "./logo-strip";
+export { ProductShowcase, default as ProductShowcaseSection } from "./product-showcase";
+export { StatsRow, default as StatsCounterRow } from "./stats-row";
+export { Testimonials, default as TestimonialsSection } from "./testimonials";
+export { PricingSection, default as PricingBlock } from "./pricing-section";
+export { FAQSection, default as FAQBlock } from "./faq-section";
+export { FinalCTASection, default as FinalCTA } from "./final-cta-section";
+export { FooterSection, default as BrandFooter } from "./footer-section";

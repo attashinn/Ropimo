@@ -11,6 +11,14 @@ const nextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/app/_kit",
+        destination: "/app/kit",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,15 +1,19 @@
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/landing/navbar";
-import { Hero } from "@/components/landing/hero";
-import { UseCaseBento } from "@/components/landing/use-case-bento";
-import { ProductPreview } from "@/components/landing/product-preview";
-import { Features } from "@/components/landing/features";
-import { Workflow } from "@/components/landing/workflow";
-import { Collaboration } from "@/components/landing/collaboration";
-import { Pricing } from "@/components/landing/pricing";
-import { FAQ } from "@/components/landing/faq";
-import { DesignSystemShowcase } from "@/components/landing/design-system-showcase";
-import { Footer } from "@/components/landing/footer";
+import {
+  TaskTideHero,
+  FeaturesSection,
+  FeatureRows,
+} from "@/components/tasktide";
+import {
+  LogoStrip,
+  ProductShowcase,
+  StatsRow,
+  Testimonials,
+  PricingSection,
+  FAQSection,
+  FinalCTASection,
+  FooterSection,
+} from "@/components/sections";
 
 interface HomePageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -28,21 +32,41 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F4F3EE] text-[#18221E] antialiased">
-      <Navbar />
+    <div className="flex min-h-screen flex-col bg-[#FAF9F6] text-[#111111] antialiased selection:bg-[#111111] selection:text-white">
       <main className="flex-1">
-        <Hero />
-        <UseCaseBento />
-        <ProductPreview />
-        <Features />
-        <Workflow />
-        <Collaboration />
-        <Pricing />
-        <FAQ />
-        <DesignSystemShowcase />
+        {/* Hero Section & Floating Navbar (Untouched) */}
+        <TaskTideHero />
+
+        {/* Logo Strip */}
+        <LogoStrip />
+
+        {/* Core Workflow 3-Card Section (Untouched) */}
+        <FeaturesSection />
+
+        {/* Full Workspace Product Showcase */}
+        <ProductShowcase />
+
+        {/* Alternating Feature Rows (Untouched) */}
+        <FeatureRows />
+
+        {/* Stats Counter Row */}
+        <StatsRow />
+
+        {/* Testimonials */}
+        <Testimonials />
+
+        {/* Simple Pricing */}
+        <PricingSection />
+
+        {/* Frequently Asked Questions */}
+        <FAQSection />
+
+        {/* Final CTA */}
+        <FinalCTASection />
       </main>
-      <Footer />
+
+      {/* 12. Signature Cream Footer with Giant Faded Wordmark */}
+      <FooterSection />
     </div>
   );
 }
-

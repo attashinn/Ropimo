@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -76,6 +77,7 @@ export function AgentChatView({
   userName = "there",
   isDrawer = false,
 }: AgentChatViewProps) {
+  const router = useRouter();
   const [messages, setMessages] = React.useState<ChatMessageUI[]>([
     {
       id: "welcome",
@@ -195,6 +197,24 @@ export function AgentChatView({
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           model: data.modelUsed || selectedModel,
         };
+
+        // If actions were executed on the server, reflect immediately in state
+        if (data.actions && Array.isArray(data.actions)) {
+          const newlyExecuted: Record<string, boolean> = {};
+          data.actions.forEach((a: AgentAction) => {
+            if (a.executed) {
+              newlyExecuted[a.id] = true;
+            }
+          });
+          if (Object.keys(newlyExecuted).length > 0) {
+            setExecutedActions((prev) => ({ ...prev, ...newlyExecuted }));
+            router.refresh();
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("ropimo:refresh-data"));
+            }
+          }
+        }
+
         setMessages((prev) => [...prev, assistantMessage]);
       }
     } catch (err: any) {
@@ -226,22 +246,72 @@ export function AgentChatView({
         });
         if (res.success) {
           setExecutedActions((prev) => ({ ...prev, [action.id]: true }));
+          router.refresh();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("ropimo:refresh-data"));
+          }
         }
       } else if (action.type === "create_project") {
         const res = await createProjectAction({
           workspaceId,
-          name: action.payload.name || action.title,
+          name: action.payload.name || action.payload.title || action.title,
           description: action.payload.description || action.description,
-          status: "in_progress",
+          status: "active",
         });
         if (res.success) {
           setExecutedActions((prev) => ({ ...prev, [action.id]: true }));
+          router.refresh();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("ropimo:refresh-data"));
+          }
         }
       }
     } catch (e) {
       console.error("Action execution failed:", e);
     } finally {
       setActionLoading((prev) => ({ ...prev, [action.id]: false }));
+    }
+  };
+
+  const handleExecuteAllActions = async (actionsToRun: AgentAction[]) => {
+    let createdProjectId: string | undefined;
+    for (const act of actionsToRun) {
+      if (executedActions[act.id]) continue;
+      setActionLoading((prev) => ({ ...prev, [act.id]: true }));
+      try {
+        if (act.type === "create_project") {
+          const res = await createProjectAction({
+            workspaceId,
+            name: act.payload.name || act.payload.title || act.title,
+            description: act.payload.description || act.description,
+            status: "active",
+          });
+          if (res.success && res.project) {
+            createdProjectId = res.project.id;
+            setExecutedActions((prev) => ({ ...prev, [act.id]: true }));
+          }
+        } else if (act.type === "create_task") {
+          const res = await createTaskAction({
+            workspaceId,
+            projectId: createdProjectId || act.payload.projectId,
+            title: act.payload.title || act.title,
+            description: act.payload.description || act.description,
+            priority: (act.payload.priority as any) || "medium",
+            status: "todo",
+          });
+          if (res.success) {
+            setExecutedActions((prev) => ({ ...prev, [act.id]: true }));
+          }
+        }
+      } catch (e) {
+        console.error("Batch execute error:", e);
+      } finally {
+        setActionLoading((prev) => ({ ...prev, [act.id]: false }));
+      }
+    }
+    router.refresh();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ropimo:refresh-data"));
     }
   };
 
@@ -417,57 +487,99 @@ export function AgentChatView({
                 />
 
                 {/* Structured Workspace Actions */}
-                {msg.actions && msg.actions.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-[#E7E5E0] space-y-2.5">
-                    <p className="text-xs font-semibold text-[#10251F] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#10251F]" />
-                      Suggested Workspace Actions:
-                    </p>
-                    <div className="space-y-2">
-                      {msg.actions.map((act) => {
-                        const isExecuted = executedActions[act.id];
-                        const isExecuting = actionLoading[act.id];
-                        return (
-                          <div
-                            key={act.id}
-                            className="p-3 bg-[#FAF9F5] border border-[#E7E5E0] rounded-xl flex items-center justify-between gap-3 text-xs"
+                {msg.actions && msg.actions.length > 0 && (() => {
+                  const unexecutedCount = msg.actions.filter((a) => !executedActions[a.id]).length;
+                  const allDone = unexecutedCount === 0;
+
+                  return (
+                    <div className="mt-4 pt-3 border-t border-[#E7E5E0] space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-xs font-semibold text-[#10251F] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#10251F]" />
+                          {allDone ? "Executed Workspace Items:" : "Structured Workspace Actions:"}
+                        </p>
+                        {!allDone && msg.actions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleExecuteAllActions(msg.actions!)}
+                            className="px-2.5 py-1 text-[11px] font-semibold bg-[#10251F] text-[#C7F34A] hover:bg-[#1a3830] rounded-lg shadow-2xs transition-all flex items-center gap-1 cursor-pointer shrink-0"
                           >
-                            <div className="space-y-0.5">
-                              <span className="font-semibold text-[#10251F]">{act.title}</span>
-                              {act.description && (
-                                <p className="text-[11px] text-[#525B58] line-clamp-1">{act.description}</p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleExecuteAction(act)}
-                              disabled={isExecuted || isExecuting}
+                            <Sparkles className="w-3 h-3" />
+                            Execute All ({unexecutedCount})
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {msg.actions.map((act) => {
+                          const isExecuted = executedActions[act.id];
+                          const isExecuting = actionLoading[act.id];
+                          const isProject = act.type === "create_project";
+
+                          return (
+                            <div
+                              key={act.id}
                               className={cn(
-                                "px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all",
+                                "p-3 rounded-xl flex items-center justify-between gap-3 text-xs transition-colors",
                                 isExecuted
-                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default"
-                                  : "bg-[#10251F] text-[#C7F34A] hover:bg-[#1a3830]"
+                                  ? "bg-emerald-50/70 border border-emerald-200"
+                                  : "bg-[#FAF9F5] border border-[#E7E5E0]"
                               )}
                             >
-                              {isExecuting ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : isExecuted ? (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                  Created
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="w-3.5 h-3.5" />
-                                  Execute
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-[#10251F] truncate">{act.title}</span>
+                                  <span className={cn(
+                                    "px-1.5 py-0.2 text-[9px] uppercase font-bold tracking-wider rounded-md",
+                                    isProject ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                                  )}>
+                                    {isProject ? "Project" : "Task"}
+                                  </span>
+                                </div>
+                                {act.description && (
+                                  <p className="text-[11px] text-[#525B58] line-clamp-1">{act.description}</p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isExecuted ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      Created
+                                    </span>
+                                    <a
+                                      href={isProject ? "/app/projects" : "/app/tasks"}
+                                      className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-[#E7E5E0] text-[#10251F] hover:bg-neutral-50 rounded-lg flex items-center gap-1 shadow-2xs transition-colors"
+                                    >
+                                      View {isProject ? "Projects" : "Tasks"}
+                                      <ExternalLink className="w-3 h-3 text-[#525B58]" />
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleExecuteAction(act)}
+                                    disabled={isExecuting}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 bg-[#10251F] text-[#C7F34A] hover:bg-[#1a3830] transition-all cursor-pointer"
+                                  >
+                                    {isExecuting ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Create {isProject ? "Project" : "Task"}
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {isUser && (
