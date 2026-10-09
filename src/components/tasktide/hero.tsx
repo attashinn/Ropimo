@@ -258,9 +258,7 @@ export function Hero() {
           <p
             className="mt-5 sm:mt-8 max-w-lg text-[13.5px] sm:text-[15.5px] leading-relaxed text-[#6B6B6B] font-medium px-2"
           >
-            Track, Analyze, and Improve Your Performance with Our
-            <br className="hidden sm:inline" /> Comprehensive Fitness Records
-            Platform.
+            Tasks, meetings, hiring, and documents — your entire office in one calm workspace. No app-switching. No chaos.
           </p>
 
           {/* Email Input Bar CTA */}

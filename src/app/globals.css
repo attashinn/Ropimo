@@ -176,6 +176,18 @@ input[type="radio"] {
   accent-color: var(--ropimo-ink);
 }
 
+/* Infinite marquee for logo strip */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 /* Prevent horizontal overflow on all page containers */
 .page-content {
   min-width: 0;

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Check, X, Minus, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
@@ -359,18 +359,17 @@ export function ComparisonSection() {
 
                   {/* Ropimo Column (Featured, subtle warm cream tint, 1px hairlines) */}
                   <th className="py-4 px-4 sm:px-6 bg-[#FAF9F6] border-x border-[#E9E6DA] w-[26%] sm:w-[24%]">
-                    <div className="flex items-center gap-2.5">
-                      <RopimoLogo />
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-[#111111] text-sm sm:text-[15px]">
-                            Ropimo
-                          </span>
-                          <span className="px-1.5 py-0.5 rounded bg-[#111111] text-white text-[9px] font-bold tracking-wide">
-                            All-in-One
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#6B6B6B] font-medium mt-0.5">
+                    <div className="flex flex-col items-start gap-1">
+                      <img
+                        src="/logo/ropimo-logo.png"
+                        alt="Ropimo"
+                        className="h-6 sm:h-7 w-auto object-contain"
+                      />
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="px-1.5 py-0.5 rounded bg-[#111111] text-white text-[9px] font-bold tracking-wide">
+                          All-in-One
+                        </span>
+                        <span className="text-[11px] text-[#6B6B6B] font-semibold">
                           $10 flat / mo
                         </span>
                       </div>
@@ -380,11 +379,12 @@ export function ComparisonSection() {
                   {/* ClickUp Column */}
                   {(activeCompetitor === "all" || activeCompetitor === "clickup") && (
                     <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <ClickUpLogo />
-                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
-                          ClickUp
-                        </span>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <img
+                          src="/logo/comp/clickup-seeklogo.png"
+                          alt="ClickUp"
+                          className="h-5 sm:h-6 w-auto object-contain max-w-[110px]"
+                        />
                         <span className="text-[10px] text-neutral-400 font-medium">
                           $19–$28 / mo
                         </span>
@@ -395,11 +395,12 @@ export function ComparisonSection() {
                   {/* Asana Column */}
                   {(activeCompetitor === "all" || activeCompetitor === "asana") && (
                     <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <AsanaLogo />
-                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
-                          Asana
-                        </span>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <img
+                          src="/logo/comp/asana-seeklogo.png"
+                          alt="Asana"
+                          className="h-5 sm:h-6 w-auto object-contain max-w-[105px]"
+                        />
                         <span className="text-[10px] text-neutral-400 font-medium">
                           $25–$30 / mo
                         </span>
@@ -410,11 +411,12 @@ export function ComparisonSection() {
                   {/* Monday.com Column */}
                   {(activeCompetitor === "all" || activeCompetitor === "monday") && (
                     <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <MondayLogo />
-                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
-                          Monday.com
-                        </span>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <img
+                          src="/logo/comp/monday.png"
+                          alt="Monday.com"
+                          className="h-4 sm:h-5 w-auto object-contain max-w-[115px]"
+                        />
                         <span className="text-[10px] text-neutral-400 font-medium">
                           $24–$32 / mo
                         </span>
@@ -543,31 +545,6 @@ export function ComparisonSection() {
                 ))}
               </tbody>
             </table>
-          </div>
-
-          {/* Footer Callout (Flat, Hairline divider, No shadow) */}
-          <div className="p-5 sm:p-7 bg-[#FAF9F6] border-t border-[#E9E6DA] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-9 h-9 rounded-full bg-[#111111] text-white flex items-center justify-center shrink-0">
-                <Sparkles className="w-4 h-4 text-[#D6F786]" />
-              </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#111111]">
-                  Already have tasks in ClickUp, Asana, or Trello?
-                </h4>
-                <p className="text-[11px] sm:text-xs text-[#6B6B6B] font-medium mt-0.5">
-                  Import your workspaces with one click and start working immediately.
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/signup"
-              className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#111111] hover:bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 border border-[#111111]"
-            >
-              <span>Migrate to Ropimo</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
       </div>

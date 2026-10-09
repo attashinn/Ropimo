@@ -2,7 +2,6 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { ImageSlot } from "@/components/ui/image-slot";
 
 interface Testimonial {
   quote: string;
@@ -10,8 +9,8 @@ interface Testimonial {
   role: string;
   company: string;
   avatarBg: string;
-  avatarLabel: string;
-  avatarPath: string;
+  initials: string;
+  imageSrc: string;
 }
 
 const testimonials: Testimonial[] = [
@@ -21,9 +20,10 @@ const testimonials: Testimonial[] = [
     name: "Farhana Ahmed",
     role: "Operations Director",
     company: "Studio Vertex",
-    avatarBg: "bg-[#FFE76A]",
-    avatarLabel: "Farhana Ahmed - 56x56 - /images/farhana.png",
-    avatarPath: "/images/farhana.png",
+    avatarBg: "#FFE76A",
+    initials: "FA",
+    imageSrc:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=112&auto=format&fit=crop&q=80",
   },
   {
     quote:
@@ -31,9 +31,10 @@ const testimonials: Testimonial[] = [
     name: "Tanvir Hasan",
     role: "Head of People",
     company: "Apex Media",
-    avatarBg: "bg-[#3B63F0]",
-    avatarLabel: "Tanvir Hasan - 56x56 - /images/tanvir.png",
-    avatarPath: "/images/tanvir.png",
+    avatarBg: "#3B63F0",
+    initials: "TH",
+    imageSrc:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=112&auto=format&fit=crop&q=80",
   },
   {
     quote:
@@ -41,11 +42,28 @@ const testimonials: Testimonial[] = [
     name: "Nabila Tabassum",
     role: "Chief of Staff",
     company: "Pathline Logistics",
-    avatarBg: "bg-[#7ED08A]",
-    avatarLabel: "Nabila Tabassum - 56x56 - /images/nabila.png",
-    avatarPath: "/images/nabila.png",
+    avatarBg: "#7ED08A",
+    initials: "NT",
+    imageSrc:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=112&auto=format&fit=crop&q=80",
   },
 ];
+
+const containerVariants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.12 },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+  },
+};
 
 export function Testimonials() {
   return (
@@ -64,43 +82,61 @@ export function Testimonials() {
           </motion.h2>
         </div>
 
-        {/* 3 Equal White Cards Grid (Static, no entrance animation or hover scale) */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-stretch">
+        {/* 3-card stagger grid */}
+        <motion.div
+          className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-stretch"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-60px" }}
+        >
           {testimonials.map((t) => (
-            <div
+            <motion.div
               key={t.name}
-              className="bg-white rounded-[28px] p-7 sm:p-8 flex flex-col justify-between shadow-[0_16px_40px_rgba(0,0,0,0.05)] border border-neutral-200/60"
+              variants={cardVariants}
+              className="bg-white rounded-[28px] p-7 sm:p-8 flex flex-col justify-between border border-neutral-200/60"
             >
+              {/* Stars */}
+              <div className="flex items-center gap-0.5 mb-5">
+                {[...Array(5)].map((_, i) => (
+                  <svg key={i} width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path
+                      d="M7 1L8.5 5H13L9.5 7.5L11 11.5L7 9L3 11.5L4.5 7.5L1 5H5.5L7 1Z"
+                      fill="#111111"
+                    />
+                  </svg>
+                ))}
+              </div>
+
               {/* Quote */}
               <p className="text-[15px] sm:text-[16px] text-[#2D2D2C] leading-[1.65] font-medium mb-8">
-                “{t.quote}”
+                "{t.quote}"
               </p>
 
-              {/* Author Row with 56px Avatar ImageSlot */}
+              {/* Author Row */}
               <div className="flex items-center gap-3.5 pt-6 border-t border-neutral-100">
-                <div
-                  className={`w-14 h-14 rounded-full ${t.avatarBg} p-0.5 overflow-hidden shrink-0 flex items-center justify-center shadow-xs`}
-                >
-                  <ImageSlot
-                    customLabel={t.avatarLabel}
-                    path={t.avatarPath}
-                    rounded="rounded-full"
-                    className="w-full h-full text-[9px] p-1"
+                {/* Real photo avatar */}
+                <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 ring-2 ring-white shadow-sm">
+                  <img
+                    src={t.imageSrc}
+                    alt={t.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
 
                 <div className="flex flex-col text-left">
-                  <span className="text-[15px] font-bold text-[#111111] leading-tight">
+                  <span className="text-[14.5px] font-bold text-[#111111] leading-tight">
                     {t.name}
                   </span>
-                  <span className="text-[12.5px] font-medium text-[#6B6B6B] mt-0.5">
+                  <span className="text-[12px] font-medium text-[#6B6B6B] mt-0.5">
                     {t.role}, {t.company}
                   </span>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
