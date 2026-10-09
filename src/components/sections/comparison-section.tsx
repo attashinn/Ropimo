@@ -1,114 +1,301 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, Minus, Zap, Shield, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Check, X, Minus, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
-interface FeatureRow {
-  category: string;
-  name: string;
-  description: string;
-  ropimo: { value: boolean | string; note?: string };
-  clickup: { value: boolean | string; note?: string };
-  asana: { value: boolean | string; note?: string };
-  monday: { value: boolean | string; note?: string };
+// ─── Authentic Brand Logos ────────────────────────────────────────────────────
+
+function RopimoLogo() {
+  return (
+    <div className="w-6 h-6 rounded-md bg-[#111111] flex items-center justify-center shrink-0">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <rect x="3" y="3" width="14" height="14" rx="3.5" stroke="white" strokeWidth="1.8" />
+        <path d="M6.5 7.5H13.5M6.5 10H13.5M6.5 12.5H10.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
 }
 
-const COMPARISON_DATA: FeatureRow[] = [
+function ClickUpLogo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M4 14.5L12 7L20 14.5"
+        stroke="url(#clickup-gradient)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 17.5C8.6 19.2 10.2 20 12 20C13.8 20 15.4 19.2 17 17.5"
+        stroke="#FF02B0"
+        strokeWidth="2.8"
+        strokeLinecap="round"
+      />
+      <defs>
+        <linearGradient id="clickup-gradient" x1="4" y1="14.5" x2="20" y2="7" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#7B68EE" />
+          <stop offset="1" stopColor="#FF02B0" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function AsanaLogo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <circle cx="12" cy="6.8" r="3.6" fill="#F06A6D" />
+      <circle cx="6.2" cy="16.5" r="3.6" fill="#F06A6D" />
+      <circle cx="17.8" cy="16.5" r="3.6" fill="#F06A6D" />
+    </svg>
+  );
+}
+
+function MondayLogo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <rect x="3.5" y="10.5" width="3.5" height="8.5" rx="1.75" fill="#FF3D57" />
+      <rect x="10.25" y="5.5" width="3.5" height="13.5" rx="1.75" fill="#FFCB00" />
+      <rect x="17" y="9.5" width="3.5" height="9.5" rx="1.75" fill="#00C875" />
+    </svg>
+  );
+}
+
+// ─── Real-World Comparison Data ───────────────────────────────────────────────
+
+interface ComparisonRow {
+  name: string;
+  category?: string;
+  ropimo: {
+    status: "yes" | "no" | "partial";
+    headline: string;
+    detail: string;
+  };
+  clickup: {
+    status: "yes" | "no" | "partial";
+    headline: string;
+    detail: string;
+  };
+  asana: {
+    status: "yes" | "no" | "partial";
+    headline: string;
+    detail: string;
+  };
+  monday: {
+    status: "yes" | "no" | "partial";
+    headline: string;
+    detail: string;
+  };
+}
+
+const COMPARISON_ROWS: ComparisonRow[] = [
   {
-    category: "Core Workflows",
     name: "Task & Sprint Management",
-    description: "Assignees, priorities, subtasks, due dates, and real-time sprint boards.",
-    ropimo: { value: true, note: "Instant <100ms" },
-    clickup: { value: true, note: "Often laggy" },
-    asana: { value: true },
-    monday: { value: true },
+    category: "Daily Operations",
+    ropimo: {
+      status: "yes",
+      headline: "Built-in",
+      detail: "Live sprint boards, subtasks, & owners",
+    },
+    clickup: {
+      status: "yes",
+      headline: "Included",
+      detail: "Heavy interface with 40+ view options",
+    },
+    asana: {
+      status: "yes",
+      headline: "Included",
+      detail: "Basic list & board views",
+    },
+    monday: {
+      status: "yes",
+      headline: "Included",
+      detail: "Colored spreadsheet-style grid",
+    },
   },
   {
-    category: "Core Workflows",
-    name: "Native Meetings & Agendas",
-    description: "Built-in agendas, auto action items, and live meeting schedules without external plugins.",
-    ropimo: { value: true, note: "Built-in" },
-    clickup: { value: false, note: "Requires Zoom" },
-    asana: { value: false, note: "Requires Zoom" },
-    monday: { value: false, note: "Requires Zoom" },
+    name: "Video Meetings & Auto-Notes",
+    category: "Daily Operations",
+    ropimo: {
+      status: "yes",
+      headline: "Built-in native",
+      detail: "Agendas & action items convert to tasks",
+    },
+    clickup: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires Zoom / Google Meet subscription",
+    },
+    asana: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires external meeting link integration",
+    },
+    monday: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires external meeting app",
+    },
   },
   {
-    category: "Core Workflows",
-    name: "Hiring & Candidate Pipeline",
-    description: "Job posts, applicant Kanban, interview schedules, and digital offer letters.",
-    ropimo: { value: true, note: "Included free" },
-    clickup: { value: false, note: "Needs Lever/ATS" },
-    asana: { value: false, note: "Needs Lever/ATS" },
-    monday: { value: "partial", note: "Add-on $24/mo" },
+    name: "Hiring Pipeline & ATS",
+    category: "Daily Operations",
+    ropimo: {
+      status: "yes",
+      headline: "Included free",
+      detail: "Job listings, candidate Kanban, & offers",
+    },
+    clickup: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires Lever or Greenhouse ($6,000/yr)",
+    },
+    asana: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires external recruiting software",
+    },
+    monday: {
+      status: "partial",
+      headline: "Paid add-on",
+      detail: "Requires Monday HR module ($24/seat/mo)",
+    },
   },
   {
-    category: "Core Workflows",
-    name: "Official Document Storage & Approvals",
-    description: "Versioned company files, formal review sign-offs, and department permission vaults.",
-    ropimo: { value: true, note: "Included" },
-    clickup: { value: "partial", note: "Basic docs only" },
-    asana: { value: false, note: "Needs Google Drive" },
-    monday: { value: "partial", note: "Basic files only" },
+    name: "Company Vault & Document Approvals",
+    category: "Daily Operations",
+    ropimo: {
+      status: "yes",
+      headline: "Included free",
+      detail: "Digital sign-offs, versioning, & permissions",
+    },
+    clickup: {
+      status: "partial",
+      headline: "Basic docs only",
+      detail: "No formal approval routing or legal vault",
+    },
+    asana: {
+      status: "no",
+      headline: "Not included",
+      detail: "Must connect Google Drive or Box",
+    },
+    monday: {
+      status: "partial",
+      headline: "Basic files",
+      detail: "No built-in signature workflows",
+    },
   },
   {
-    category: "Core Workflows",
-    name: "Staff Attendance & Leave Tracking",
-    description: "Time-off requests, approval routing, and department calendar visibility.",
-    ropimo: { value: true, note: "Built-in" },
-    clickup: { value: false, note: "Needs BambooHR" },
-    asana: { value: false, note: "Needs BambooHR" },
-    monday: { value: false, note: "Needs BambooHR" },
+    name: "Attendance & Time-Off Approvals",
+    category: "Daily Operations",
+    ropimo: {
+      status: "yes",
+      headline: "Built-in",
+      detail: "Leave requests, balances, & office calendar",
+    },
+    clickup: {
+      status: "no",
+      headline: "Not included",
+      detail: "Requires separate HRIS (e.g. BambooHR)",
+    },
+    asana: {
+      status: "no",
+      headline: "Not included",
+      detail: "No staff attendance or leave features",
+    },
+    monday: {
+      status: "no",
+      headline: "Not included",
+      detail: "No leave tracking out of the box",
+    },
   },
   {
-    category: "Performance & Experience",
-    name: "Lightning Fast Speed",
-    description: "Sub-100ms page transitions, optimistic updates, and zero layout freezing.",
-    ropimo: { value: true, note: "<100ms instant" },
-    clickup: { value: false, note: "Heavy 3-5s load" },
-    asana: { value: "partial", note: "Moderate lag" },
-    monday: { value: false, note: "Heavy client script" },
+    name: "Speed & Performance",
+    category: "Experience",
+    ropimo: {
+      status: "yes",
+      headline: "Instant <100ms",
+      detail: "Optimistic updates with zero UI freeze",
+    },
+    clickup: {
+      status: "no",
+      headline: "Frequent lag",
+      detail: "Complex boards take 3–5 seconds to load",
+    },
+    asana: {
+      status: "partial",
+      headline: "Moderate",
+      detail: "Can feel slow on large multi-project teams",
+    },
+    monday: {
+      status: "no",
+      headline: "Script heavy",
+      detail: "Heavy DOM trees cause browser slowdowns",
+    },
   },
   {
-    category: "Performance & Experience",
-    name: "Keyboard-First Command Palette",
-    description: "Global Cmd+K search, fuzzy finder across tasks, files, and members with instant shortcuts.",
-    ropimo: { value: true, note: "Cmd+K / C / G+T" },
-    clickup: { value: "partial", note: "Basic search" },
-    asana: { value: "partial", note: "Basic search" },
-    monday: { value: false, note: "Limited shortcuts" },
+    name: "Keyboard Navigation & Cmd+K",
+    category: "Experience",
+    ropimo: {
+      status: "yes",
+      headline: "Global command bar",
+      detail: "Cmd+K fuzzy search, C to create, G+T jumps",
+    },
+    clickup: {
+      status: "partial",
+      headline: "Basic modal",
+      detail: "Limited shortcut actions across items",
+    },
+    asana: {
+      status: "partial",
+      headline: "Basic search",
+      detail: "Search only, no quick command actions",
+    },
+    monday: {
+      status: "no",
+      headline: "Limited",
+      detail: "Mouse-heavy dropdown navigation",
+    },
   },
   {
-    category: "Performance & Experience",
-    name: "Zero Cognitive Overload",
-    description: "A calm, dense, distraction-free sheet. No 800 configuration toggles or cockpit clutter.",
-    ropimo: { value: true, note: "Calm & clean" },
-    clickup: { value: false, note: "Severe clutter" },
-    asana: { value: "partial", note: "Multiple nested tabs" },
-    monday: { value: false, note: "Flashy colors" },
-  },
-  {
-    category: "Pricing & Value",
-    name: "All-in-One Flat Pricing",
-    description: "Everything your company needs in one transparent monthly subscription.",
-    ropimo: { value: true, note: "$10–$19 / seat" },
-    clickup: { value: false, note: "$19–$28 + plugins" },
-    asana: { value: false, note: "$25–$30 / seat" },
-    monday: { value: false, note: "$24–$32 / seat" },
+    name: "Total Stack Monthly Cost",
+    category: "Pricing",
+    ropimo: {
+      status: "yes",
+      headline: "$10–$19 / seat",
+      detail: "1 tool covers tasks, meetings, HR, & files",
+    },
+    clickup: {
+      status: "no",
+      headline: "$19–$28 / seat",
+      detail: "Plus $100+/mo in stacked external tools",
+    },
+    asana: {
+      status: "no",
+      headline: "$25–$30 / seat",
+      detail: "Plus $100+/mo for Zoom, ATS, and storage",
+    },
+    monday: {
+      status: "no",
+      headline: "$24–$32 / seat",
+      detail: "Expensive tier gating on essential features",
+    },
   },
 ];
 
 export function ComparisonSection() {
-  const [selectedCompetitor, setSelectedCompetitor] = useState<"all" | "clickup" | "asana" | "monday">("all");
+  const [activeCompetitor, setActiveCompetitor] = useState<"all" | "clickup" | "asana" | "monday">("all");
 
   return (
-    <section className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 lg:py-32 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-neutral-200/50">
+    <section className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-[#E9E6DA]">
       <div className="max-w-6xl mx-auto flex flex-col items-center">
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto flex flex-col items-center mb-10 sm:mb-14">
-          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#EFECE0] text-[12px] sm:text-[13px] font-bold text-neutral-800 tracking-wider uppercase mb-5 shadow-xs select-none">
-            Tool Comparison
+        {/* Section Header (Authentic, No marketing fluff) */}
+        <div className="text-center max-w-2xl mx-auto flex flex-col items-center mb-10 sm:mb-14">
+          <span className="inline-flex items-center px-3.5 py-1 rounded-full bg-[#EFECE0] text-[11.5px] font-bold text-neutral-800 tracking-wider uppercase mb-4 select-none border border-[#E0DCCF]">
+            The Honest Comparison
           </span>
 
           <motion.h2
@@ -116,44 +303,43 @@ export function ComparisonSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-3xl sm:text-5xl lg:text-[54px] font-[800] tracking-[-0.035em] text-[#111111] leading-[1.08]"
+            className="text-3xl sm:text-5xl lg:text-[52px] font-[800] tracking-[-0.035em] text-[#111111] leading-[1.08]"
           >
-            Why teams replace ClickUp & Asana with Ropimo.
+            Why teams switch from ClickUp and Asana.
           </motion.h2>
 
-          <p className="mt-5 text-[15.5px] sm:text-[17.5px] text-[#6B6B6B] leading-relaxed max-w-2xl font-medium">
-            Stop juggling five separate subscriptions, 40 confusing views, and bloated feature lists nobody on your team actually uses.
+          <p className="mt-4 text-[15px] sm:text-[17px] text-[#6B6B6B] leading-relaxed font-medium">
+            Most teams pay for a project management tool, then still end up buying separate software for meetings, hiring, and company files. Ropimo puts your whole office in one calm sheet.
           </p>
         </div>
 
-        {/* Comparison Matrix Table Card */}
-        <div className="w-full bg-white rounded-[32px] sm:rounded-[36px] border border-neutral-200/80 shadow-[0_16px_48px_rgba(0,0,0,0.05)] overflow-hidden">
-          {/* Table Header Controls */}
-          <div className="p-6 sm:p-8 bg-[#FAF9F6]/80 border-b border-neutral-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-extrabold text-[#111111] tracking-tight">
-                Detailed Feature Matrix
-              </h3>
-              <p className="text-xs sm:text-sm text-[#6B6B6B] font-medium mt-1">
-                See how Ropimo stacks up feature-for-feature against legacy work tools.
-              </p>
+        {/* Clean Flat Comparison Matrix Card (ZERO shadows, crisp hairlines) */}
+        <div className="w-full bg-white rounded-[24px] sm:rounded-[28px] border border-[#E9E6DA] overflow-hidden">
+          {/* Header Bar with Competitor Tabs for Mobile */}
+          <div className="px-6 py-5 bg-[#FAF9F6] border-b border-[#E9E6DA] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#1F9D55]" />
+              <span className="text-xs sm:text-sm font-bold text-[#111111]">
+                Real Capabilities Breakdown
+              </span>
             </div>
 
-            {/* Filter Toggle Pills on Mobile */}
+            {/* Mobile Column Switcher */}
             <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1">
               {[
-                { key: "all", label: "All" },
+                { key: "all", label: "Show All" },
                 { key: "clickup", label: "vs ClickUp" },
                 { key: "asana", label: "vs Asana" },
                 { key: "monday", label: "vs Monday" },
               ].map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setSelectedCompetitor(tab.key as any)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                    selectedCompetitor === tab.key
-                      ? "bg-[#111111] text-white"
-                      : "bg-[#EFECE0] text-neutral-700 hover:bg-neutral-200"
+                  type="button"
+                  onClick={() => setActiveCompetitor(tab.key as any)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${
+                    activeCompetitor === tab.key
+                      ? "bg-[#111111] text-white border-[#111111]"
+                      : "bg-[#EFECE0] text-neutral-700 border-[#E0DCCF] hover:bg-[#E7E3D5]"
                   }`}
                 >
                   {tab.label}
@@ -164,146 +350,192 @@ export function ComparisonSection() {
 
           {/* Matrix Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
+            <table className="w-full text-left border-collapse text-xs sm:text-[13px]">
               <thead>
-                <tr className="border-b border-neutral-200/80 bg-white">
-                  <th className="py-4 sm:py-5 px-5 sm:px-8 font-bold text-neutral-500 uppercase text-[11px] tracking-wider w-[36%] sm:w-[32%]">
-                    Capabilities
+                <tr className="border-b border-[#E9E6DA] bg-white">
+                  <th className="py-4 px-5 sm:px-7 font-bold text-neutral-400 uppercase text-[10px] sm:text-[11px] tracking-wider w-[30%] sm:w-[28%]">
+                    Capability
                   </th>
-                  {/* Ropimo Column (Highlighted) */}
-                  <th className="py-4 sm:py-5 px-4 sm:px-6 bg-[#FAF9F6] border-x border-neutral-200/80 w-[24%] sm:w-[22%] text-center sm:text-left">
-                    <div className="flex flex-col sm:flex-row items-center gap-2">
-                      <span className="font-extrabold text-[#111111] text-sm sm:text-base">Ropimo</span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#111111] text-white text-[9px] sm:text-[10px] font-bold tracking-wide">
-                        All-in-One
-                      </span>
+
+                  {/* Ropimo Column (Featured, subtle warm cream tint, 1px hairlines) */}
+                  <th className="py-4 px-4 sm:px-6 bg-[#FAF9F6] border-x border-[#E9E6DA] w-[26%] sm:w-[24%]">
+                    <div className="flex items-center gap-2.5">
+                      <RopimoLogo />
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-[#111111] text-sm sm:text-[15px]">
+                            Ropimo
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-[#111111] text-white text-[9px] font-bold tracking-wide">
+                            All-in-One
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#6B6B6B] font-medium mt-0.5">
+                          $10 flat / mo
+                        </span>
+                      </div>
                     </div>
                   </th>
-                  {/* Competitor 1: ClickUp */}
-                  {(selectedCompetitor === "all" || selectedCompetitor === "clickup") && (
-                    <th className="py-4 sm:py-5 px-3 sm:px-5 font-bold text-neutral-600 w-[14%] sm:w-[15%] text-center">
-                      ClickUp
+
+                  {/* ClickUp Column */}
+                  {(activeCompetitor === "all" || activeCompetitor === "clickup") && (
+                    <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <ClickUpLogo />
+                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
+                          ClickUp
+                        </span>
+                        <span className="text-[10px] text-neutral-400 font-medium">
+                          $19–$28 / mo
+                        </span>
+                      </div>
                     </th>
                   )}
-                  {/* Competitor 2: Asana */}
-                  {(selectedCompetitor === "all" || selectedCompetitor === "asana") && (
-                    <th className="py-4 sm:py-5 px-3 sm:px-5 font-bold text-neutral-600 w-[14%] sm:w-[15%] text-center">
-                      Asana
+
+                  {/* Asana Column */}
+                  {(activeCompetitor === "all" || activeCompetitor === "asana") && (
+                    <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <AsanaLogo />
+                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
+                          Asana
+                        </span>
+                        <span className="text-[10px] text-neutral-400 font-medium">
+                          $25–$30 / mo
+                        </span>
+                      </div>
                     </th>
                   )}
-                  {/* Competitor 3: Monday */}
-                  {(selectedCompetitor === "all" || selectedCompetitor === "monday") && (
-                    <th className="py-4 sm:py-5 px-3 sm:px-5 font-bold text-neutral-600 w-[14%] sm:w-[15%] text-center">
-                      Monday.com
+
+                  {/* Monday.com Column */}
+                  {(activeCompetitor === "all" || activeCompetitor === "monday") && (
+                    <th className="py-4 px-4 sm:px-5 w-[16%] text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <MondayLogo />
+                        <span className="font-extrabold text-[#111111] text-xs sm:text-[13px]">
+                          Monday.com
+                        </span>
+                        <span className="text-[10px] text-neutral-400 font-medium">
+                          $24–$32 / mo
+                        </span>
+                      </div>
                     </th>
                   )}
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-neutral-200/60 font-medium">
-                {COMPARISON_DATA.map((row, idx) => (
+              <tbody className="divide-y divide-[#E9E6DA]">
+                {COMPARISON_ROWS.map((row, idx) => (
                   <tr
                     key={row.name}
-                    className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF9F6]/30"}
+                    className={idx % 2 === 0 ? "bg-white" : "bg-[#FAF9F6]/40"}
                   >
-                    {/* Capability Name & Description */}
-                    <td className="py-4 px-5 sm:px-8">
-                      <div className="font-bold text-[#111111] text-xs sm:text-[13.5px]">
+                    {/* Feature Name */}
+                    <td className="py-4 px-5 sm:px-7 align-middle">
+                      <div className="font-bold text-[#111111] leading-snug">
                         {row.name}
                       </div>
-                      <div className="text-[11px] sm:text-xs text-[#6B6B6B] mt-0.5 leading-relaxed hidden sm:block">
-                        {row.description}
-                      </div>
-                    </td>
-
-                    {/* Ropimo Column */}
-                    <td className="py-4 px-4 sm:px-6 bg-[#FAF9F6] border-x border-neutral-200/80">
-                      <div className="flex items-center justify-center sm:justify-start gap-2">
-                        <span className="h-5 w-5 rounded-full bg-[#EAF4E2] text-[#1F9D55] flex items-center justify-center shrink-0 shadow-xs">
-                          <Check className="w-3 h-3 stroke-[3]" />
+                      {row.category && (
+                        <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wide block mt-0.5">
+                          {row.category}
                         </span>
-                        {row.ropimo.note && (
-                          <span className="text-[11px] sm:text-xs font-bold text-[#111111] hidden sm:inline">
-                            {row.ropimo.note}
+                      )}
+                    </td>
+
+                    {/* Ropimo Winner Cell */}
+                    <td className="py-4 px-4 sm:px-6 bg-[#FAF9F6] border-x border-[#E9E6DA] align-middle">
+                      <div className="flex items-start gap-2">
+                        <span className="h-4 w-4 rounded-full bg-[#EAF4E2] text-[#1F9D55] flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#111111] text-xs">
+                            {row.ropimo.headline}
                           </span>
-                        )}
+                          <span className="text-[11px] text-[#6B6B6B] mt-0.5 leading-snug">
+                            {row.ropimo.detail}
+                          </span>
+                        </div>
                       </div>
                     </td>
 
-                    {/* ClickUp Column */}
-                    {(selectedCompetitor === "all" || selectedCompetitor === "clickup") && (
-                      <td className="py-4 px-3 sm:px-5 text-center">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          {row.clickup.value === true ? (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center">
-                              <Check className="w-3 h-3 stroke-[2.5]" />
+                    {/* ClickUp Cell */}
+                    {(activeCompetitor === "all" || activeCompetitor === "clickup") && (
+                      <td className="py-4 px-4 sm:px-5 align-middle text-center">
+                        <div className="flex flex-col items-center">
+                          {row.clickup.status === "yes" ? (
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0 mb-1">
+                              <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
-                          ) : row.clickup.value === "partial" ? (
-                            <span className="h-5 w-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                              <Minus className="w-3 h-3 stroke-[3]" />
+                          ) : row.clickup.status === "partial" ? (
+                            <span className="h-4 w-4 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 mb-1">
+                              <Minus className="w-2.5 h-2.5 stroke-[3]" />
                             </span>
                           ) : (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center">
-                              <X className="w-3 h-3 stroke-[2.5]" />
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center shrink-0 mb-1">
+                              <X className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
                           )}
-                          {row.clickup.note && (
-                            <span className="text-[10px] text-[#6B6B6B] hidden sm:inline">
-                              {row.clickup.note}
-                            </span>
-                          )}
+                          <span className="font-semibold text-neutral-800 text-[11px]">
+                            {row.clickup.headline}
+                          </span>
+                          <span className="text-[10px] text-neutral-400 leading-tight mt-0.5 max-w-[130px] hidden sm:block">
+                            {row.clickup.detail}
+                          </span>
                         </div>
                       </td>
                     )}
 
-                    {/* Asana Column */}
-                    {(selectedCompetitor === "all" || selectedCompetitor === "asana") && (
-                      <td className="py-4 px-3 sm:px-5 text-center">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          {row.asana.value === true ? (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center">
-                              <Check className="w-3 h-3 stroke-[2.5]" />
+                    {/* Asana Cell */}
+                    {(activeCompetitor === "all" || activeCompetitor === "asana") && (
+                      <td className="py-4 px-4 sm:px-5 align-middle text-center">
+                        <div className="flex flex-col items-center">
+                          {row.asana.status === "yes" ? (
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0 mb-1">
+                              <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
-                          ) : row.asana.value === "partial" ? (
-                            <span className="h-5 w-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                              <Minus className="w-3 h-3 stroke-[3]" />
+                          ) : row.asana.status === "partial" ? (
+                            <span className="h-4 w-4 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 mb-1">
+                              <Minus className="w-2.5 h-2.5 stroke-[3]" />
                             </span>
                           ) : (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center">
-                              <X className="w-3 h-3 stroke-[2.5]" />
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center shrink-0 mb-1">
+                              <X className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
                           )}
-                          {row.asana.note && (
-                            <span className="text-[10px] text-[#6B6B6B] hidden sm:inline">
-                              {row.asana.note}
-                            </span>
-                          )}
+                          <span className="font-semibold text-neutral-800 text-[11px]">
+                            {row.asana.headline}
+                          </span>
+                          <span className="text-[10px] text-neutral-400 leading-tight mt-0.5 max-w-[130px] hidden sm:block">
+                            {row.asana.detail}
+                          </span>
                         </div>
                       </td>
                     )}
 
-                    {/* Monday Column */}
-                    {(selectedCompetitor === "all" || selectedCompetitor === "monday") && (
-                      <td className="py-4 px-3 sm:px-5 text-center">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          {row.monday.value === true ? (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center">
-                              <Check className="w-3 h-3 stroke-[2.5]" />
+                    {/* Monday Cell */}
+                    {(activeCompetitor === "all" || activeCompetitor === "monday") && (
+                      <td className="py-4 px-4 sm:px-5 align-middle text-center">
+                        <div className="flex flex-col items-center">
+                          {row.monday.status === "yes" ? (
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0 mb-1">
+                              <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
-                          ) : row.monday.value === "partial" ? (
-                            <span className="h-5 w-5 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                              <Minus className="w-3 h-3 stroke-[3]" />
+                          ) : row.monday.status === "partial" ? (
+                            <span className="h-4 w-4 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 mb-1">
+                              <Minus className="w-2.5 h-2.5 stroke-[3]" />
                             </span>
                           ) : (
-                            <span className="h-5 w-5 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center">
-                              <X className="w-3 h-3 stroke-[2.5]" />
+                            <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center shrink-0 mb-1">
+                              <X className="w-2.5 h-2.5 stroke-[2.5]" />
                             </span>
                           )}
-                          {row.monday.note && (
-                            <span className="text-[10px] text-[#6B6B6B] hidden sm:inline">
-                              {row.monday.note}
-                            </span>
-                          )}
+                          <span className="font-semibold text-neutral-800 text-[11px]">
+                            {row.monday.headline}
+                          </span>
+                          <span className="text-[10px] text-neutral-400 leading-tight mt-0.5 max-w-[130px] hidden sm:block">
+                            {row.monday.detail}
+                          </span>
                         </div>
                       </td>
                     )}
@@ -313,28 +545,28 @@ export function ComparisonSection() {
             </table>
           </div>
 
-          {/* Table Bottom Callout Footer */}
-          <div className="p-6 sm:p-8 bg-[#FAF9F6] border-t border-neutral-200/80 flex flex-col sm:flex-row items-center justify-between gap-5">
-            <div className="flex items-center gap-3.5 text-left">
-              <div className="w-10 h-10 rounded-full bg-[#111111] text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Zap className="w-5 h-5 text-[#D6F786]" />
+          {/* Footer Callout (Flat, Hairline divider, No shadow) */}
+          <div className="p-5 sm:p-7 bg-[#FAF9F6] border-t border-[#E9E6DA] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-left">
+              <div className="w-9 h-9 rounded-full bg-[#111111] text-white flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-[#D6F786]" />
               </div>
               <div>
-                <h4 className="text-sm sm:text-base font-extrabold text-[#111111]">
-                  Ready to switch from ClickUp or Asana?
+                <h4 className="text-xs sm:text-sm font-bold text-[#111111]">
+                  Already have tasks in ClickUp, Asana, or Trello?
                 </h4>
-                <p className="text-xs sm:text-sm text-[#6B6B6B] font-medium">
-                  Import your projects and tasks in under 60 seconds with our instant migrator.
+                <p className="text-[11px] sm:text-xs text-[#6B6B6B] font-medium mt-0.5">
+                  Import your workspaces with one click and start working immediately.
                 </p>
               </div>
             </div>
 
             <Link
               href="/signup"
-              className="w-full sm:w-auto px-6 py-3 rounded-full bg-[#111111] hover:bg-black text-white text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xs cursor-pointer shrink-0"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#111111] hover:bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 border border-[#111111]"
             >
-              <span>Start Free Migration</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>Migrate to Ropimo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
