@@ -410,14 +410,31 @@ export async function getProjectById(
       try {
         const { data: profile } = await adminClient
           .from("profiles")
-          .select("full_name, email")
+          .select("full_name")
           .eq("id", leadUserId)
           .maybeSingle();
-        if (profile) {
-          managerName = profile.full_name || profile.email;
+        if (profile?.full_name) {
+          managerName = profile.full_name;
         }
       } catch {
-        // ignore
+        // Safe ignore if profiles table or row does not exist
+      }
+
+      // Safe fallback to workspace_members if profile row is missing
+      if (!managerName) {
+        try {
+          const { data: member } = await adminClient
+            .from("workspace_members")
+            .select("full_name")
+            .eq("workspace_id", r.workspace_id)
+            .eq("user_id", leadUserId)
+            .maybeSingle();
+          if (member?.full_name) {
+            managerName = member.full_name;
+          }
+        } catch {
+          // Safe ignore
+        }
       }
     }
 

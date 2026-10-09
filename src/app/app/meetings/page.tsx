@@ -1,10 +1,11 @@
 import * as React from "react";
-import { MeetingsView } from "@/components/app/meetings-view";
+import { getDefaultWorkspace } from "@/lib/workspace/queries";
 import {
-  DEFAULT_MEETINGS_DATA,
-  DEFAULT_MEETING_STATS,
-  DEFAULT_MEETING_INSIGHTS,
+  getWorkspaceMeetings,
+  getMeetingStats,
+  getMeetingInsights,
 } from "@/lib/meetings/queries";
+import { MeetingsView } from "@/components/app/meetings-view";
 
 export const metadata = {
   title: "Meetings — Ropimo",
@@ -12,13 +13,22 @@ export const metadata = {
 };
 
 export default async function MeetingsPage() {
+  const workspace = await getDefaultWorkspace();
+  const workspaceId = workspace?.id || "";
+
+  const [initialMeetings, meetingStats, meetingInsights] = await Promise.all([
+    getWorkspaceMeetings(workspaceId),
+    getMeetingStats(workspaceId),
+    getMeetingInsights(workspaceId),
+  ]);
+
   return (
     <MeetingsView
-      workspaceId="ws-default"
-      workspaceName="brnnd"
-      initialMeetings={DEFAULT_MEETINGS_DATA}
-      meetingStats={DEFAULT_MEETING_STATS}
-      meetingInsights={DEFAULT_MEETING_INSIGHTS}
+      workspaceId={workspaceId}
+      workspaceName={workspace?.name || "Workspace"}
+      initialMeetings={initialMeetings}
+      meetingStats={meetingStats}
+      meetingInsights={meetingInsights}
     />
   );
 }

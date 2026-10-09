@@ -1,5 +1,4 @@
 import { createAdminClient } from "../src/lib/supabase/admin";
-import { attendanceStore } from "../src/lib/attendance/store";
 import {
   checkInAction,
   checkOutAction,
@@ -78,7 +77,7 @@ async function runQA() {
 
   // 4. Employee Check In (Fresh daily punch)
   const todayDateStr = new Date().toISOString().split("T")[0];
-  attendanceStore.deleteAttendanceRecord(employeeUserId, todayDateStr, workspaceId);
+  await adminClient.from("attendance_records").delete().eq("workspace_id", workspaceId).eq("user_id", employeeUserId).eq("date", todayDateStr);
 
   const checkInRes = await checkInAction({
     workspaceId,
@@ -164,7 +163,7 @@ async function runQA() {
   }
 
   // 13. Leave Balances
-  attendanceStore.clearTestLeaveData(employeeUserId, workspaceId);
+  await adminClient.from("leave_requests").delete().eq("workspace_id", workspaceId).eq("user_id", employeeUserId);
   const balances = await getEmployeeLeaveBalances(employeeUserId, workspaceId);
   assert(balances.length >= 4, "4 standard leave types initialized (Annual, Sick, Personal, Unpaid)");
   const annualBal = balances.find((b) => b.leave_type === "Annual Leave");
@@ -227,13 +226,15 @@ async function runQA() {
   assert(leaveCalEvent?.event_type === "leave", "Calendar event type is 'leave'");
 
   // 20. Approved Leave Reflected in Attendance on target date
-  const futureDateState = await getTodayAttendanceState(employeeUserId, workspaceId);
-  // Test dynamically with store query for date
-  const isOnLeaveFuture = attendanceStore.isEmployeeOnApprovedLeave(
-    employeeUserId,
-    "2026-09-21",
-    workspaceId
-  );
+  const { data: futureLeaves } = await adminClient
+    .from("leave_requests")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", employeeUserId)
+    .eq("status", "Approved")
+    .lte("start_date", "2026-09-21")
+    .gte("end_date", "2026-09-21");
+  const isOnLeaveFuture = Boolean(futureLeaves && futureLeaves.length > 0);
   assert(isOnLeaveFuture === true, "Approved leave correctly resolves employee as On Leave on date");
 
   // 21. Rejection with Reason Flow

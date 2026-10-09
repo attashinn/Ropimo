@@ -39,7 +39,7 @@ export interface UploadOptions {
 }
 
 /**
- * Upload a file buffer directly to Cloudflare R2 (or fallback to local public storage)
+ * Upload a file buffer directly to Cloudflare R2 (or fallback to local storage ONLY in development)
  */
 export async function uploadToR2({
   key,
@@ -61,19 +61,29 @@ export async function uploadToR2({
 
       await r2Client.send(command);
 
-      const publicUrl = getR2FileUrl(sanitizedKey);
+      const fileUrl = getR2FileUrl(sanitizedKey);
 
       return {
         key: sanitizedKey,
-        url: publicUrl,
-        publicUrl,
+        url: fileUrl,
+        publicUrl: fileUrl,
       };
     } catch (r2Error) {
-      console.warn("R2 upload error, falling back to local storage:", r2Error);
+      console.warn("R2 upload error:", r2Error);
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Cloudflare R2 upload failed in production. Local uploads are disabled.");
+      }
     }
   }
 
-  // Fallback: Save file to local public/uploads directory
+  // In production, fallback to public/uploads is strictly forbidden (read-only filesystem & security risk)
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Cloudflare R2 storage credentials are required in production. Local filesystem upload fallback is prohibited on Vercel/serverless."
+    );
+  }
+
+  // Development-only fallback: Save file to local public/uploads directory for testing
   try {
     const localPath = path.join(process.cwd(), "public", "uploads", sanitizedKey);
     const dir = path.dirname(localPath);
@@ -82,25 +92,20 @@ export async function uploadToR2({
     }
     fs.writeFileSync(localPath, buffer);
 
-    const publicUrl = `/uploads/${sanitizedKey}`;
+    const fileUrl = `/api/storage/${sanitizedKey}`;
     return {
       key: sanitizedKey,
-      url: publicUrl,
-      publicUrl,
+      url: fileUrl,
+      publicUrl: fileUrl,
     };
   } catch (fsErr) {
     console.error("Local storage fallback failed:", fsErr);
-    // Return proxy URL as last resort
-    return {
-      key: sanitizedKey,
-      url: `/api/storage/${sanitizedKey}`,
-      publicUrl: `/api/storage/${sanitizedKey}`,
-    };
+    throw new Error("Failed to store file in storage.");
   }
 }
 
 /**
- * Delete a file object from Cloudflare R2 or local storage
+ * Delete a file object from Cloudflare R2 or local development storage
  */
 export async function deleteFromR2(key: string): Promise<boolean> {
   const sanitizedKey = key.replace(/^\/+/, "");
@@ -118,44 +123,48 @@ export async function deleteFromR2(key: string): Promise<boolean> {
     }
   }
 
-  try {
-    const localPath = path.join(process.cwd(), "public", "uploads", sanitizedKey);
-    if (fs.existsSync(localPath)) {
-      fs.unlinkSync(localPath);
-      return true;
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const localPath = path.join(process.cwd(), "public", "uploads", sanitizedKey);
+      if (fs.existsSync(localPath)) {
+        fs.unlinkSync(localPath);
+        return true;
+      }
+    } catch (e) {
+      console.error("Error deleting local file:", e);
     }
-  } catch (e) {
-    console.error("Error deleting local file:", e);
   }
 
   return false;
 }
 
 /**
- * Get file stream / object from Cloudflare R2 or local storage
+ * Get file stream / object from Cloudflare R2 or local development storage
  */
 export async function getFromR2(key: string) {
   const sanitizedKey = key.replace(/^\/+/, "");
 
-  // Check local file first if available
-  const localPath = path.join(process.cwd(), "public", "uploads", sanitizedKey);
-  if (fs.existsSync(localPath)) {
-    const fileBuffer = fs.readFileSync(localPath);
-    return {
-      Body: {
-        transformToWebStream: () => {
-          return new ReadableStream({
-            start(controller) {
-              controller.enqueue(new Uint8Array(fileBuffer));
-              controller.close();
-            },
-          });
+  // Check local file in development only
+  if (process.env.NODE_ENV !== "production") {
+    const localPath = path.join(process.cwd(), "public", "uploads", sanitizedKey);
+    if (fs.existsSync(localPath)) {
+      const fileBuffer = fs.readFileSync(localPath);
+      return {
+        Body: {
+          transformToWebStream: () => {
+            return new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(fileBuffer));
+                controller.close();
+              },
+            });
+          },
         },
-      },
-      ContentType: undefined,
-      ContentLength: fileBuffer.length,
-      ETag: undefined,
-    };
+        ContentType: undefined,
+        ContentLength: fileBuffer.length,
+        ETag: undefined,
+      };
+    }
   }
 
   if (hasValidR2Credentials) {
@@ -166,7 +175,9 @@ export async function getFromR2(key: string) {
     return await r2Client.send(command);
   }
 
-  throw new Error("File not found");
+  const notFoundErr = new Error("File not found in storage");
+  notFoundErr.name = "NoSuchKey";
+  throw notFoundErr;
 }
 
 /**
@@ -197,6 +208,10 @@ export async function getR2PresignedUploadUrl(
     };
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Cloudflare R2 storage credentials are required for presigned uploads in production.");
+  }
+
   return {
     uploadUrl: `/api/upload`,
     key: sanitizedKey,
@@ -205,7 +220,7 @@ export async function getR2PresignedUploadUrl(
 }
 
 /**
- * Resolve public or proxy access URL for a stored R2 key
+ * Resolve proxy access URL for a stored R2 key
  */
 export function getR2FileUrl(key: string): string {
   const sanitizedKey = key.replace(/^\/+/, "");

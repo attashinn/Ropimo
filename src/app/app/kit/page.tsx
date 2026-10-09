@@ -34,8 +34,13 @@ import {
   Row,
   EmptyLine,
 } from "@/components/app/ui";
+import { notFound } from "next/navigation";
 
 export default function DesignKitPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   const [activeTab, setActiveTab] = React.useState("all");
   const [selectedRow, setSelectedRow] = React.useState<string | null>("row-2");
   const [inputValue, setInputValue] = React.useState("");

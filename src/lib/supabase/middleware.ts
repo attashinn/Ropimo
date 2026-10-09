@@ -46,6 +46,17 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   supabaseResponse.headers.set("x-pathname", pathname);
 
+  // Block design kit completely in production
+  if (
+    process.env.NODE_ENV === "production" &&
+    (pathname === "/app/kit" ||
+      pathname === "/app/_kit" ||
+      pathname.startsWith("/app/kit/") ||
+      pathname.startsWith("/app/_kit/"))
+  ) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   const isProtectedPath =
     (pathname.startsWith("/dashboard") ||
       pathname.startsWith("/onboarding") ||

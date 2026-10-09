@@ -23,12 +23,18 @@ export default async function DashboardPage() {
     redirect("/login?next=/dashboard");
   }
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Fetch user profile safely
+  let profile: { full_name?: string | null; avatar_url?: string | null } | null = null;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    profile = data;
+  } catch {
+    // Gracefully handle if profiles table or row does not exist
+  }
 
   // Fetch workspace memberships
   const { data: memberships } = await supabase

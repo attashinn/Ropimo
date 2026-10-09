@@ -14,11 +14,22 @@ import {
   LeaveStatus,
 } from "@/types/leave";
 import { getWorkspacePeople } from "@/lib/people/queries";
-import { attendanceStore } from "./store";
 
 function getTodayDateStr(): string {
   return new Date().toISOString().split("T")[0];
 }
+
+const DEFAULT_SETTINGS: AttendanceSettings = {
+  id: "default-settings",
+  workspace_id: "",
+  work_start_time: "09:00",
+  work_end_time: "17:00",
+  grace_period_minutes: 15,
+  half_day_threshold_minutes: 240,
+  work_days: [1, 2, 3, 4, 5],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 
 /**
  * Fetch Today's Attendance State for a single employee
@@ -43,10 +54,20 @@ export const getTodayAttendanceState = cache(
     }
 
     const today = getTodayDateStr();
+    const admin = createAdminClient();
 
     // 1. Check if employee is on approved leave today
-    const approvedLeaves = attendanceStore.getApprovedLeavesForDate(today, workspaceId);
-    const userLeave = approvedLeaves.find((l) => l.user_id === userId) || null;
+    const { data: approvedLeaves } = await admin
+      .from("leave_requests")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .eq("status", "Approved")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .limit(1);
+
+    const userLeave = approvedLeaves && approvedLeaves.length > 0 ? (approvedLeaves[0] as unknown as LeaveRequest) : null;
 
     if (userLeave) {
       return {
@@ -58,7 +79,15 @@ export const getTodayAttendanceState = cache(
     }
 
     // 2. Fetch today's record
-    const record = attendanceStore.getAttendanceRecord(userId, today, workspaceId);
+    const { data: records } = await admin
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .eq("date", today)
+      .limit(1);
+
+    const record = records && records.length > 0 ? (records[0] as unknown as AttendanceRecord) : null;
 
     if (!record || !record.check_in_at) {
       return {
@@ -73,7 +102,7 @@ export const getTodayAttendanceState = cache(
       return {
         record,
         state: "Checked Out",
-        workedMinutes: record.total_minutes,
+        workedMinutes: record.total_minutes || 0,
         approvedLeave: null,
       };
     }
@@ -111,33 +140,43 @@ export const getWorkspaceAttendanceRecords = cache(
 
     const people = await getWorkspacePeople(workspaceId);
     const peopleMap = new Map(people.map((p) => [p.user_id, p]));
-
     const targetDate = options?.date || getTodayDateStr();
+    const admin = createAdminClient();
 
-    // Store records
-    const rawRecords = attendanceStore.getWorkspaceAttendance(workspaceId, {
-      date: options?.date,
-      startDate: options?.startDate,
-      endDate: options?.endDate,
-      status: options?.status as any,
-    });
+    // Query DB attendance records
+    let query = admin
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", workspaceId);
 
+    if (options?.date) {
+      query = query.eq("date", options.date);
+    } else if (options?.startDate && options?.endDate) {
+      query = query.gte("date", options.startDate).lte("date", options.endDate);
+    } else {
+      query = query.eq("date", targetDate);
+    }
+
+    const { data: dbRecords } = await query;
+    const rawRecords = (dbRecords || []) as unknown as AttendanceRecord[];
     const recordsMap = new Map(rawRecords.map((r) => [`${r.user_id}_${r.date}`, r]));
 
-    // Approved leaves for resolving "On Leave" records dynamically
-    const approvedLeaves = attendanceStore.getLeaveRequests(workspaceId, {
-      status: "Approved",
-    });
+    // Query approved leaves
+    const { data: dbLeaves } = await admin
+      .from("leave_requests")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "Approved");
+    const approvedLeaves = (dbLeaves || []) as unknown as LeaveRequest[];
 
     const combined: AttendanceRecord[] = [];
 
-    // If filtering by specific date (e.g. Today), synthesize rows for all active workspace members
+    // If filtering by specific date, synthesize rows for all active workspace members
     if (options?.date || (!options?.startDate && !options?.endDate)) {
       for (const person of people) {
         const key = `${person.user_id}_${targetDate}`;
         const existing = recordsMap.get(key);
 
-        // Check if person was on approved leave for this date
         const isOnLeave = approvedLeaves.some(
           (l) =>
             l.user_id === person.user_id &&
@@ -186,7 +225,6 @@ export const getWorkspaceAttendanceRecords = cache(
         }
       }
     } else {
-      // Date range query
       for (const r of rawRecords) {
         const person = peopleMap.get(r.user_id);
         combined.push({
@@ -277,10 +315,18 @@ export const getMonthlyAttendanceSummary = cache(
     const now = new Date();
     const targetYear = year || now.getFullYear();
     const targetMonth = month !== undefined ? month : now.getMonth() + 1;
+    const admin = createAdminClient();
 
     const monthPrefix = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
-    const allRecords = attendanceStore.getEmployeeAttendanceHistory(userId, workspaceId);
-    const monthRecords = allRecords.filter((r) => r.date.startsWith(monthPrefix));
+    const { data: dbRecords } = await admin
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .gte("date", `${monthPrefix}-01`)
+      .lte("date", `${monthPrefix}-31`);
+
+    const monthRecords = (dbRecords || []) as unknown as AttendanceRecord[];
 
     let present = 0;
     let late = 0;
@@ -289,9 +335,8 @@ export const getMonthlyAttendanceSummary = cache(
     let totalMinutes = 0;
 
     for (const r of monthRecords) {
-      if (r.status === "Present") present++;
+      if (r.status === "Present" || r.status === "Half Day") present++;
       else if (r.status === "Late") late++;
-      else if (r.status === "Half Day") present++;
       else if (r.status === "On Leave") leave++;
       else if (r.status === "Absent") absent++;
 
@@ -299,10 +344,14 @@ export const getMonthlyAttendanceSummary = cache(
     }
 
     // Approved leaves count for the month
-    const approvedLeaves = attendanceStore.getLeaveRequests(workspaceId, {
-      userId,
-      status: "Approved",
-    });
+    const { data: dbLeaves } = await admin
+      .from("leave_requests")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .eq("status", "Approved");
+
+    const approvedLeaves = (dbLeaves || []) as unknown as LeaveRequest[];
 
     for (const l of approvedLeaves) {
       if (l.start_date.startsWith(monthPrefix) || l.end_date.startsWith(monthPrefix)) {
@@ -327,7 +376,15 @@ export const getMonthlyAttendanceSummary = cache(
 export const getEmployeeAttendanceHistory = cache(
   async (userId: string, workspaceId: string): Promise<AttendanceRecord[]> => {
     if (!userId || !workspaceId) return [];
-    return attendanceStore.getEmployeeAttendanceHistory(userId, workspaceId);
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .order("date", { ascending: false });
+
+    return (data || []) as unknown as AttendanceRecord[];
   }
 );
 
@@ -337,7 +394,32 @@ export const getEmployeeAttendanceHistory = cache(
 export const getEmployeeLeaveBalances = cache(
   async (userId: string, workspaceId: string): Promise<LeaveBalance[]> => {
     if (!userId || !workspaceId) return [];
-    return attendanceStore.getLeaveBalances(userId, workspaceId);
+    const admin = createAdminClient();
+    const currentYear = new Date().getFullYear();
+
+    const { data } = await admin
+      .from("leave_balances")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId)
+      .eq("year", currentYear);
+
+    if (data && data.length > 0) {
+      return data.map((d: any) => ({
+        leave_type: d.leave_type,
+        allocated: d.total_allocated || 0,
+        used: d.used_days || 0,
+        remaining: Math.max(0, (d.total_allocated || 0) - (d.used_days || 0)),
+      }));
+    }
+
+    // Return default balances if not yet initialized
+    return [
+      { leave_type: "Annual Leave", allocated: 20, used: 0, remaining: 20 },
+      { leave_type: "Sick Leave", allocated: 10, used: 0, remaining: 10 },
+      { leave_type: "Personal Leave", allocated: 5, used: 0, remaining: 5 },
+      { leave_type: "Unpaid Leave", allocated: 0, used: 0, remaining: 0 },
+    ];
   }
 );
 
@@ -357,8 +439,26 @@ export const getWorkspaceLeaveRequests = cache(
 
     const people = await getWorkspacePeople(workspaceId);
     const peopleMap = new Map(people.map((p) => [p.user_id, p]));
+    const admin = createAdminClient();
 
-    const requests = attendanceStore.getLeaveRequests(workspaceId, options);
+    let query = admin
+      .from("leave_requests")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false });
+
+    if (options?.userId) {
+      query = query.eq("user_id", options.userId);
+    }
+    if (options?.status && options.status !== "all") {
+      query = query.eq("status", options.status);
+    }
+    if (options?.leaveType && options.leaveType !== "all") {
+      query = query.eq("leave_type", options.leaveType);
+    }
+
+    const { data } = await query;
+    const requests = (data || []) as unknown as LeaveRequest[];
 
     return requests.map((r) => {
       const person = peopleMap.get(r.user_id);
@@ -432,6 +532,20 @@ export const getDepartmentAttendanceSummary = cache(
  */
 export const getAttendanceSettings = cache(
   async (workspaceId: string): Promise<AttendanceSettings> => {
-    return attendanceStore.getSettings(workspaceId);
+    if (!workspaceId) return DEFAULT_SETTINGS;
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("attendance_settings")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    if (data) {
+      return data as unknown as AttendanceSettings;
+    }
+    return {
+      ...DEFAULT_SETTINGS,
+      workspace_id: workspaceId,
+    };
   }
 );

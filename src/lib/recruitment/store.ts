@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import {
   JobOpening,
   Candidate,
@@ -12,6 +10,7 @@ import {
 } from "@/types/recruitment";
 
 import { EmployeeOnboarding, OnboardingChecklistItem, WorkspaceInvitation } from "@/types/people";
+import crypto from "crypto";
 
 interface RecruitmentDataStore {
   job_openings: JobOpening[];
@@ -26,60 +25,25 @@ interface RecruitmentDataStore {
   invitations: WorkspaceInvitation[];
 }
 
-const DATA_DIR = path.join(process.cwd(), ".data");
-const DATA_FILE = path.join(DATA_DIR, "recruitment-store.json");
+let _memoryStore: RecruitmentDataStore = {
+  job_openings: [],
+  candidates: [],
+  candidate_applications: [],
+  application_stage_history: [],
+  interviews: [],
+  interview_feedback: [],
+  offers: [],
+  candidate_activities: [],
+  onboardings: [],
+  invitations: [],
+};
 
 function ensureStore(): RecruitmentDataStore {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(DATA_FILE)) {
-      const initial: RecruitmentDataStore = {
-        job_openings: [],
-        candidates: [],
-        candidate_applications: [],
-        application_stage_history: [],
-        interviews: [],
-        interview_feedback: [],
-        offers: [],
-        candidate_activities: [],
-        onboardings: [],
-        invitations: [],
-      };
-      fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2), "utf8");
-      return initial;
-    }
-    const raw = fs.readFileSync(DATA_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!parsed.onboardings) parsed.onboardings = [];
-    if (!parsed.invitations) parsed.invitations = [];
-    return parsed;
-  } catch {
-    return {
-      job_openings: [],
-      candidates: [],
-      candidate_applications: [],
-      application_stage_history: [],
-      interviews: [],
-      interview_feedback: [],
-      offers: [],
-      candidate_activities: [],
-      onboardings: [],
-      invitations: [],
-    };
-  }
+  return _memoryStore;
 }
 
 function saveStore(data: RecruitmentDataStore) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-  } catch (err) {
-    console.error("Failed to save recruitment store:", err);
-  }
+  _memoryStore = data;
 }
 
 export const recruitmentStore = {
@@ -539,7 +503,10 @@ Object.assign(recruitmentStore, {
   getInvitationByToken(token: string): WorkspaceInvitation | null {
     if (!token) return null;
     const store = ensureStore();
-    return (store.invitations || []).find((i) => i.token === token) || null;
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    return (
+      (store.invitations || []).find((i) => i.token === token || i.token === tokenHash) || null
+    );
   },
 
   getInvitationByEmail(email: string, workspaceId: string): WorkspaceInvitation | null {

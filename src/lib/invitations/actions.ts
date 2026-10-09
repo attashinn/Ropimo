@@ -16,43 +16,15 @@ export interface InvitationActionResult {
   data?: any;
 }
 
-// ─── AUTH HELPER ─────────────────────────────────────────────────────────────
+import { requireUser, requireWorkspaceRole } from "@/lib/auth/require-user";
 
 async function verifyCallerRole(workspaceId: string, allowedRoles: WorkspaceRole[] = ["owner", "admin", "manager"]) {
   if (!workspaceId) {
     throw new Error("Workspace ID is required.");
   }
 
+  const { user, role } = await requireWorkspaceRole(workspaceId, allowedRoles as any);
   const adminClient = createAdminClient();
-  let user: { id: string; email?: string } | null = null;
-
-  try {
-    const authClient = await createClient();
-    const { data: authData } = await authClient.auth.getUser();
-    if (authData?.user) {
-      user = { id: authData.user.id, email: authData.user.email };
-    }
-  } catch {
-    // CLI / Background script context
-  }
-
-  if (!user) {
-    const { data: fallbackMember } = await adminClient
-      .from("workspace_members")
-      .select("user_id, role, full_name")
-      .eq("workspace_id", workspaceId)
-      .in("role", ["owner", "admin"])
-      .limit(1)
-      .maybeSingle();
-
-    if (fallbackMember) {
-      user = { id: fallbackMember.user_id, email: "admin@ropimo.com" };
-    }
-  }
-
-  if (!user) {
-    throw new Error("Unauthorized. You must be authenticated to manage invitations.");
-  }
 
   const { data: callerMember } = await adminClient
     .from("workspace_members")
@@ -61,14 +33,9 @@ async function verifyCallerRole(workspaceId: string, allowedRoles: WorkspaceRole
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const role = (callerMember?.role as WorkspaceRole) || "owner";
-  if (!allowedRoles.includes(role)) {
-    throw new Error("Unauthorized. Insufficient workspace permissions.");
-  }
-
   return {
     user,
-    member: callerMember || { role: "owner", full_name: "Admin" },
+    member: callerMember || { role, full_name: user.email?.split("@")[0] || "Admin" },
     adminClient,
   };
 }
@@ -112,8 +79,9 @@ export async function inviteEmployeeAction(params: {
       };
     }
 
-    // 3. Generate secure cryptographic token & 7-day expiration
-    const token = `inv_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+    // 3. Generate secure cryptographic token (32+ bytes) & store ONLY a hash
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const role: WorkspaceRole = params.role || "member";
     const fullName = params.fullName?.trim() || email.split("@")[0];
@@ -124,7 +92,7 @@ export async function inviteEmployeeAction(params: {
       email,
       role,
       status: "Pending",
-      token,
+      token: tokenHash, // Store ONLY the SHA-256 hash
       employee_id: params.employeeId || null,
       full_name: fullName,
       job_title: params.jobTitle || null,
@@ -148,7 +116,7 @@ export async function inviteEmployeeAction(params: {
           email,
           role,
           status: "pending",
-          token,
+          token: tokenHash, // Store ONLY the SHA-256 hash
           employee_id: params.employeeId || null,
           full_name: fullName,
           job_title: params.jobTitle || null,
@@ -165,7 +133,7 @@ export async function inviteEmployeeAction(params: {
       console.warn("DB invitation upsert notice:", dbErr);
     }
 
-    const inviteUrl = `${getAppUrl()}/invite/${token}`;
+    const inviteUrl = `${getAppUrl()}/invite/${rawToken}`;
 
     // 5. Send Invitation Email (non-blocking — failure does not cancel the invitation)
     try {
@@ -206,7 +174,7 @@ export async function inviteEmployeeAction(params: {
     return {
       success: true,
       data: {
-        token,
+        token: rawToken,
         inviteUrl,
         expiresAt,
         status: "Pending",
@@ -256,11 +224,12 @@ export async function resendEmployeeInvitationAction(params: {
       return { success: false, error: "Invitation has already been accepted." };
     }
 
-    // Refresh token and extend expiration by 7 days
-    const newToken = `inv_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+    // Refresh token with 32+ bytes random crypto and store ONLY the SHA-256 hash
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
     const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    inv.token = newToken;
+    inv.token = tokenHash;
     inv.status = "Pending";
     inv.expires_at = newExpiresAt;
     inv.updated_at = new Date().toISOString();
@@ -270,7 +239,7 @@ export async function resendEmployeeInvitationAction(params: {
       await adminClient
         .from("workspace_invitations")
         .update({
-          token: newToken,
+          token: tokenHash,
           status: "pending",
           expires_at: newExpiresAt,
           updated_at: new Date().toISOString(),
@@ -284,7 +253,7 @@ export async function resendEmployeeInvitationAction(params: {
       .eq("id", params.workspaceId)
       .maybeSingle();
 
-    const inviteUrl = `${getAppUrl()}/invite/${newToken}`;
+    const inviteUrl = `${getAppUrl()}/invite/${rawToken}`;
 
     // Resend invitation email (non-blocking)
     try {
@@ -318,7 +287,7 @@ export async function resendEmployeeInvitationAction(params: {
 
     return {
       success: true,
-      data: { token: newToken, inviteUrl, expiresAt: newExpiresAt },
+      data: { token: rawToken, inviteUrl, expiresAt: newExpiresAt },
     };
   } catch (err: any) {
     return { success: false, error: err?.message || "Failed to resend invitation." };
@@ -333,7 +302,7 @@ export async function revokeEmployeeInvitationAction(params: {
   email?: string;
 }): Promise<InvitationActionResult> {
   try {
-    const { user, member, adminClient } = await verifyCallerRole(params.workspaceId);
+    const { user, member, adminClient } = await verifyCallerRole(params.workspaceId, ["owner", "admin"]);
 
     const email = params.email?.toLowerCase().trim();
     let inv = email ? (recruitmentStore as any).getInvitationByEmail?.(email, params.workspaceId) : null;
@@ -411,16 +380,19 @@ export async function acceptInvitationAction(params: {
     }
 
     const trimmedToken = params.token.trim();
+    const tokenHash = crypto.createHash("sha256").update(trimmedToken).digest("hex");
     const adminClient = createAdminClient();
 
-    // 1. Fetch invitation by token (Store + DB)
-    let inv = (recruitmentStore as any).getInvitationByToken?.(trimmedToken);
+    // 1. Fetch invitation by token (matching hashed token or raw token)
+    let inv =
+      (recruitmentStore as any).getInvitationByToken?.(tokenHash) ||
+      (recruitmentStore as any).getInvitationByToken?.(trimmedToken);
 
     if (!inv) {
       const { data: dbInv } = await adminClient
         .from("workspace_invitations")
         .select(`*`)
-        .eq("token", trimmedToken)
+        .or(`token.eq.${tokenHash},token.eq.${trimmedToken}`)
         .maybeSingle();
 
       if (dbInv) {
@@ -432,10 +404,10 @@ export async function acceptInvitationAction(params: {
       return { success: false, error: "Invalid invitation token. Please check your invitation link." };
     }
 
-    // 2. Validate status and expiration
+    // 2. Validate status and single use
     const statusLower = (inv.status || "pending").toLowerCase();
     if (statusLower === "accepted") {
-      return { success: false, error: "This invitation has already been accepted. Please sign in to access your workspace." };
+      return { success: false, error: "This invitation has already been accepted and cannot be reused." };
     }
     if (statusLower === "revoked") {
       return { success: false, error: "This invitation has been revoked by the workspace administrator." };
@@ -454,6 +426,18 @@ export async function acceptInvitationAction(params: {
     const workspaceId = inv.workspace_id;
     const email = inv.email.toLowerCase().trim();
     const fullName = params.fullName?.trim() || inv.full_name || email.split("@")[0];
+
+    // Check signed-in user matches invited email
+    try {
+      const authClient = await createClient();
+      const { data: authData } = await authClient.auth.getUser();
+      if (authData?.user?.email && authData.user.email.toLowerCase() !== email) {
+        return {
+          success: false,
+          error: `Signed-in account (${authData.user.email}) does not match the invited email (${email}). Please sign in with the invited email address.`,
+        };
+      }
+    } catch {}
 
     // 3. Resolve or Create Supabase Auth User
     let targetUserId = inv.user_id || null;

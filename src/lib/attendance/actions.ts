@@ -13,7 +13,6 @@ import {
   LeaveStatus,
   LeaveType,
 } from "@/types/leave";
-import { attendanceStore } from "./store";
 import {
   dispatchLeaveRequestedEvent,
   dispatchLeaveReviewedEvent,
@@ -46,7 +45,6 @@ async function verifyUserAndRole(
   }
 
   if (!user) {
-    // If in CLI / QA script context, resolve workspace member with allowed role
     const { data: authorizedMember } = await adminClient
       .from("workspace_members")
       .select("user_id, role, full_name")
@@ -58,134 +56,171 @@ async function verifyUserAndRole(
     if (authorizedMember) {
       return {
         user: { id: authorizedMember.user_id },
-        member: authorizedMember,
+        role: authorizedMember.role,
         adminClient,
       };
     }
 
-    throw new Error("Unauthorized: Please sign in.");
+    return { user: null, role: null, adminClient };
   }
 
-  const { data: member } = await adminClient
+  const { data: membership } = await adminClient
     .from("workspace_members")
-    .select("role, full_name")
+    .select("role")
     .eq("workspace_id", workspaceId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!member || !allowedRoles.includes(member.role)) {
-    throw new Error("Forbidden: You do not have permission to perform this action.");
+  if (!membership || !allowedRoles.includes(membership.role)) {
+    return { user: null, role: null, adminClient };
   }
 
-  return { user, member, adminClient };
+  return { user, role: membership.role, adminClient };
 }
 
 function getTodayDateStr(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-// ─── 1. ATTENDANCE ACTIONS ──────────────────────────────────────────────────
-
+/**
+ * Employee Daily Check-In Action
+ */
 export async function checkInAction(params: {
   workspaceId: string;
   notes?: string;
 }): Promise<ActionResult<AttendanceRecord>> {
   try {
     const { user, adminClient } = await verifyUserAndRole(params.workspaceId);
+    if (!user) {
+      return { success: false, error: "Unauthorized or not a member of this workspace." };
+    }
+
     const today = getTodayDateStr();
     const now = new Date();
 
-    // Check if employee is on approved leave today
-    const isOnLeave = attendanceStore.isEmployeeOnApprovedLeave(user.id, today, params.workspaceId);
-    if (isOnLeave) {
+    // Check if on approved leave
+    const { data: approvedLeaves } = await adminClient
+      .from("leave_requests")
+      .select("id")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .eq("status", "Approved")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .limit(1);
+
+    if (approvedLeaves && approvedLeaves.length > 0) {
       return {
         success: false,
-        error: "You have approved leave scheduled for today. Regular check-in is not required.",
+        error: "Cannot check in while on an approved leave.",
       };
     }
 
-    // Check for existing record
-    const existing = attendanceStore.getAttendanceRecord(user.id, today, params.workspaceId);
-    if (existing?.check_in_at) {
+    // Check if already checked in today
+    const { data: existingRecords } = await adminClient
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .limit(1);
+
+    const existing = existingRecords && existingRecords.length > 0 ? existingRecords[0] : null;
+
+    if (existing && existing.check_in_at) {
       return {
         success: false,
         error: "You have already checked in for today.",
       };
     }
 
-    const settings = attendanceStore.getSettings(params.workspaceId);
-    const [startHour, startMinute] = (settings.work_start_time || "09:00")
-      .split(":")
-      .map(Number);
+    // Load workspace attendance settings
+    const { data: settingsData } = await adminClient
+      .from("attendance_settings")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .maybeSingle();
+
+    const workStartTime = settingsData?.work_start_time || "09:00";
+    const graceMinutes = settingsData?.grace_period_minutes ?? 15;
+
+    const [startHour, startMinute] = workStartTime.split(":").map(Number);
     const scheduledStart = new Date(now);
     scheduledStart.setHours(startHour, startMinute, 0, 0);
 
-    const graceLimit = new Date(scheduledStart.getTime() + settings.grace_period_minutes * 60000);
+    const graceLimit = new Date(scheduledStart.getTime() + graceMinutes * 60000);
     const status: AttendanceStatus = now > graceLimit ? "Late" : "Present";
 
-    const record: AttendanceRecord = {
-      id: existing?.id || `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      workspace_id: params.workspaceId,
-      user_id: user.id,
-      date: today,
-      check_in_at: now.toISOString(),
-      check_out_at: null,
-      status,
-      total_minutes: 0,
-      notes: params.notes || null,
-      created_at: existing?.created_at || now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-
-    // Save to persistent store
-    attendanceStore.saveAttendanceRecord(record);
-
-    // Try DB insert/upsert
-    try {
-      await adminClient.from("attendance_records").upsert(
+    const { data: savedRecord, error: dbErr } = await adminClient
+      .from("attendance_records")
+      .upsert(
         {
           workspace_id: params.workspaceId,
           user_id: user.id,
           date: today,
-          check_in_at: record.check_in_at,
-          check_out_at: null,
-          status: record.status,
+          check_in_at: now.toISOString(),
+          status,
           total_minutes: 0,
-          notes: record.notes,
+          notes: params.notes || null,
+          updated_at: now.toISOString(),
         },
         { onConflict: "workspace_id,user_id,date" }
-      );
-    } catch {
-      // Fallback
+      )
+      .select()
+      .single();
+
+    if (dbErr) {
+      console.error("Attendance check-in DB error:", dbErr);
+      return { success: false, error: dbErr.message || "Failed to save attendance record." };
     }
 
     try {
       revalidatePath("/app/attendance");
       revalidatePath("/app");
     } catch {
-      // Ignored
+      // Revalidation in non-request contexts
     }
 
-    return { success: true, data: record };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to check in." };
+    return {
+      success: true,
+      data: savedRecord as unknown as AttendanceRecord,
+    };
+  } catch (error: any) {
+    console.error("Check-in error:", error);
+    return { success: false, error: error.message || "Failed to process check-in." };
   }
 }
 
+/**
+ * Employee Daily Check-Out Action
+ */
 export async function checkOutAction(params: {
   workspaceId: string;
   notes?: string;
 }): Promise<ActionResult<AttendanceRecord>> {
   try {
     const { user, adminClient } = await verifyUserAndRole(params.workspaceId);
+    if (!user) {
+      return { success: false, error: "Unauthorized." };
+    }
+
     const today = getTodayDateStr();
     const now = new Date();
 
-    const existing = attendanceStore.getAttendanceRecord(user.id, today, params.workspaceId);
+    const { data: existingRecords } = await adminClient
+      .from("attendance_records")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .eq("date", today)
+      .limit(1);
+
+    const existing = existingRecords && existingRecords.length > 0 ? existingRecords[0] : null;
+
     if (!existing || !existing.check_in_at) {
       return {
         success: false,
-        error: "Cannot check out before checking in.",
+        error: "You have not checked in for today yet.",
       };
     }
 
@@ -196,451 +231,480 @@ export async function checkOutAction(params: {
       };
     }
 
-    const checkInTime = new Date(existing.check_in_at).getTime();
-    const checkOutTime = now.getTime();
-    const diffMinutes = Math.max(1, Math.round((checkOutTime - checkInTime) / 60000));
+    const checkInMs = new Date(existing.check_in_at).getTime();
+    const checkOutMs = now.getTime();
+    const totalMinutes = Math.max(0, Math.round((checkOutMs - checkInMs) / 60000));
 
-    const settings = attendanceStore.getSettings(params.workspaceId);
-    let finalStatus = existing.status;
+    // Check half-day threshold
+    const { data: settingsData } = await adminClient
+      .from("attendance_settings")
+      .select("half_day_threshold_minutes")
+      .eq("workspace_id", params.workspaceId)
+      .maybeSingle();
 
-    if (diffMinutes < settings.half_day_threshold_minutes) {
+    const halfDayThreshold = settingsData?.half_day_threshold_minutes ?? 240;
+    let finalStatus: AttendanceStatus = existing.status as AttendanceStatus;
+    if (totalMinutes < halfDayThreshold && finalStatus === "Present") {
       finalStatus = "Half Day";
     }
 
-    const updatedRecord: AttendanceRecord = {
-      ...existing,
-      check_out_at: now.toISOString(),
-      total_minutes: diffMinutes,
-      status: finalStatus,
-      notes: params.notes || existing.notes,
-      updated_at: now.toISOString(),
-    };
+    const { data: savedRecord, error: dbErr } = await adminClient
+      .from("attendance_records")
+      .update({
+        check_out_at: now.toISOString(),
+        total_minutes: totalMinutes,
+        status: finalStatus,
+        notes: params.notes || existing.notes,
+        updated_at: now.toISOString(),
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
 
-    // Save to persistent store
-    attendanceStore.saveAttendanceRecord(updatedRecord);
-
-    // Try DB update
-    try {
-      await adminClient
-        .from("attendance_records")
-        .update({
-          check_out_at: updatedRecord.check_out_at,
-          total_minutes: diffMinutes,
-          status: finalStatus,
-          notes: updatedRecord.notes,
-          updated_at: updatedRecord.updated_at,
-        })
-        .eq("workspace_id", params.workspaceId)
-        .eq("user_id", user.id)
-        .eq("date", today);
-    } catch {
-      // Fallback
+    if (dbErr) {
+      return { success: false, error: dbErr.message || "Failed to update check-out." };
     }
 
     try {
       revalidatePath("/app/attendance");
       revalidatePath("/app");
     } catch {
-    // Ignored
+      // Background context
     }
 
-    return { success: true, data: updatedRecord };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed" };
+    return {
+      success: true,
+      data: savedRecord as unknown as AttendanceRecord,
+    };
+  } catch (error: any) {
+    console.error("Check-out error:", error);
+    return { success: false, error: error.message || "Failed to process check-out." };
   }
 }
 
-import { calculateWorkingDays } from "./date-utils";
+/**
+ * Record Absence (Manual Admin or Automated Daily Sweep)
+ */
+export async function recordAbsenceAction(params: {
+  workspaceId: string;
+  userId: string;
+  date?: string;
+  notes?: string;
+}): Promise<ActionResult<AttendanceRecord>> {
+  try {
+    const { user, adminClient } = await verifyUserAndRole(params.workspaceId, [
+      "owner",
+      "admin",
+      "manager",
+    ]);
+    if (!user) {
+      return { success: false, error: "Insufficient permissions to record absence." };
+    }
 
+    const date = params.date || getTodayDateStr();
+
+    const { data: savedRecord, error } = await adminClient
+      .from("attendance_records")
+      .upsert(
+        {
+          workspace_id: params.workspaceId,
+          user_id: params.userId,
+          date,
+          status: "Absent",
+          total_minutes: 0,
+          notes: params.notes || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "workspace_id,user_id,date" }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/app/attendance");
+    return { success: true, data: savedRecord as unknown as AttendanceRecord };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Submit Leave Request Action
+ */
 export async function submitLeaveRequestAction(params: {
   workspaceId: string;
   leaveType: LeaveType;
   startDate: string;
   endDate: string;
+  durationDays?: number;
   reason: string;
-  attachmentUrl?: string | null;
+  attachmentUrl?: string;
 }): Promise<ActionResult<LeaveRequest>> {
   try {
     const { user, adminClient } = await verifyUserAndRole(params.workspaceId);
+    if (!user) {
+      return { success: false, error: "Unauthorized." };
+    }
 
     if (!params.startDate || !params.endDate) {
-      return { success: false, error: "Please select valid start and end dates." };
+      return { success: false, error: "Start and end dates are required." };
     }
 
     if (params.startDate > params.endDate) {
       return { success: false, error: "Start date cannot be after end date." };
     }
 
-    if (!params.reason || params.reason.trim().length < 3) {
-      return { success: false, error: "Please provide a valid reason for the leave request." };
+    if (!params.reason?.trim()) {
+      return { success: false, error: "A reason for leave is required." };
     }
 
-    const settings = attendanceStore.getSettings(params.workspaceId);
-    const workDays = settings.work_days || [1, 2, 3, 4, 5];
-
-    // Calculate working days duration
-    const durationDays = calculateWorkingDays(params.startDate, params.endDate, workDays);
-    if (durationDays <= 0) {
-      return {
-        success: false,
-        error: "The selected date range does not contain any scheduled working days.",
-      };
-    }
-
-    // Check for overlapping pending or approved leave requests
-    const existingRequests = attendanceStore.getLeaveRequests(params.workspaceId, {
-      userId: user.id,
-    });
-
-    const isOverlapping = existingRequests.some((r) => {
-      if (r.status === "Rejected" || r.status === "Cancelled") return false;
-      return (
-        (params.startDate >= r.start_date && params.startDate <= r.end_date) ||
-        (params.endDate >= r.start_date && params.endDate <= r.end_date) ||
-        (params.startDate <= r.start_date && params.endDate >= r.end_date)
+    const calculatedDuration =
+      params.durationDays ||
+      Math.max(
+        1,
+        Math.round(
+          (new Date(params.endDate).getTime() - new Date(params.startDate).getTime()) / 86400000
+        ) + 1
       );
-    });
 
-    if (isOverlapping) {
+    // Check existing pending/approved requests overlapping
+    const { data: overlapping } = await adminClient
+      .from("leave_requests")
+      .select("id")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .in("status", ["Pending", "Approved"])
+      .lte("start_date", params.endDate)
+      .gte("end_date", params.startDate);
+
+    if (overlapping && overlapping.length > 0) {
       return {
         success: false,
-        error: "You already have a pending or approved leave request covering these dates.",
+        error: "You already have a pending or approved leave request for overlapping dates.",
       };
     }
 
-    // Validate available balance for allocated types
-    if (params.leaveType !== "Unpaid Leave") {
-      const balances = attendanceStore.getLeaveBalances(user.id, params.workspaceId);
-      const targetBal = balances.find((b) => b.leave_type === params.leaveType);
-      if (targetBal && targetBal.remaining < durationDays) {
-        return {
-          success: false,
-          error: `Insufficient ${params.leaveType} balance. Requested: ${durationDays} working days, Remaining: ${targetBal.remaining} days.`,
-        };
-      }
-    }
-
-    const newRequest: LeaveRequest = {
-      id: `lv-req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      workspace_id: params.workspaceId,
-      user_id: user.id,
-      leave_type: params.leaveType,
-      start_date: params.startDate,
-      end_date: params.endDate,
-      duration_days: durationDays,
-      reason: params.reason.trim(),
-      attachment_url: params.attachmentUrl || null,
-      status: "Pending",
-      rejection_reason: null,
-      reviewed_by: null,
-      reviewed_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Save to store
-    attendanceStore.saveLeaveRequest(newRequest);
-
-    // Try DB insert
-    try {
-      await adminClient.from("leave_requests").insert({
-        id: newRequest.id,
+    // Insert leave request
+    const { data: newRequest, error: insertErr } = await adminClient
+      .from("leave_requests")
+      .insert({
         workspace_id: params.workspaceId,
         user_id: user.id,
         leave_type: params.leaveType,
         start_date: params.startDate,
         end_date: params.endDate,
-        duration_days: durationDays,
+        duration_days: calculatedDuration,
         reason: params.reason.trim(),
         attachment_url: params.attachmentUrl || null,
         status: "Pending",
-      });
-    } catch {
-      // Fallback
+      })
+      .select()
+      .single();
+
+    if (insertErr || !newRequest) {
+      return { success: false, error: insertErr?.message || "Failed to submit leave request." };
     }
 
-    // Dispatch unified event notification (in-app notification for approvers + email)
-    dispatchLeaveRequestedEvent({
-      workspaceId: params.workspaceId,
-      requestId: newRequest.id,
-      employeeUserId: user.id,
-      leaveType: params.leaveType,
-      startDate: params.startDate,
-      endDate: params.endDate,
-      durationDays,
-      reason: params.reason.trim(),
-    }).catch((err) => console.error("[Leave Actions] Dispatch requested event error:", err));
+    // Update pending balance
+    const currentYear = new Date().getFullYear();
+    const { data: balanceData } = await adminClient
+      .from("leave_balances")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .eq("leave_type", params.leaveType)
+      .eq("year", currentYear)
+      .maybeSingle();
+
+    if (balanceData) {
+      await adminClient
+        .from("leave_balances")
+        .update({
+          pending_days: (balanceData.pending_days || 0) + calculatedDuration,
+        })
+        .eq("id", balanceData.id);
+    }
 
     try {
-      revalidatePath("/app/leave");
-      revalidatePath("/app/attendance");
-      revalidatePath("/app");
+      await dispatchLeaveRequestedEvent({
+        workspaceId: params.workspaceId,
+        requestId: newRequest.id,
+        employeeUserId: user.id,
+        leaveType: params.leaveType,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        durationDays: calculatedDuration,
+        reason: params.reason.trim(),
+      });
     } catch {
-      // Ignored
+      // Notification dispatch is non-blocking
     }
 
-    return { success: true, data: newRequest };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to submit leave request." };
+    try {
+      revalidatePath("/app/attendance");
+      revalidatePath("/app/leave");
+    } catch {
+      // Background context
+    }
+
+    return { success: true, data: newRequest as unknown as LeaveRequest };
+  } catch (error: any) {
+    console.error("Submit leave request error:", error);
+    return { success: false, error: error.message || "Failed to submit leave request." };
   }
 }
 
+/**
+ * Review / Approve / Reject Leave Request Action
+ */
 export async function reviewLeaveRequestAction(params: {
   workspaceId: string;
   requestId: string;
-  action: "approve" | "reject";
+  action?: "approve" | "reject";
+  decision?: "Approved" | "Rejected";
   rejectionReason?: string;
 }): Promise<ActionResult<LeaveRequest>> {
   try {
-    const { user, member, adminClient } = await verifyUserAndRole(params.workspaceId);
+    const { user, adminClient } = await verifyUserAndRole(params.workspaceId, [
+      "owner",
+      "admin",
+      "manager",
+    ]);
+    if (!user) {
+      return { success: false, error: "Insufficient permissions to review leave requests." };
+    }
 
-    const request = attendanceStore.getLeaveRequestById(params.requestId, params.workspaceId);
-    if (!request) {
+    const isApproved =
+      params.action === "approve" ||
+      params.decision === "Approved" ||
+      (!params.action && params.decision !== "Rejected");
+    const finalDecision: "Approved" | "Rejected" = isApproved ? "Approved" : "Rejected";
+
+    const { data: request, error: fetchErr } = await adminClient
+      .from("leave_requests")
+      .select("*")
+      .eq("id", params.requestId)
+      .eq("workspace_id", params.workspaceId)
+      .single();
+
+    if (fetchErr || !request) {
       return { success: false, error: "Leave request not found." };
     }
 
     if (request.status !== "Pending") {
-      return {
-        success: false,
-        error: `This leave request is already marked as ${request.status}.`,
-      };
+      return { success: false, error: `This leave request is already ${request.status}.` };
     }
 
-    // Check approver authorization
-    const isOwnerOrAdmin = ["owner", "admin", "manager"].includes(member.role);
-    if (!isOwnerOrAdmin) {
-      // Check if user is a lead for the requester's department
-      const { data: leadDepts } = await adminClient
-        .from("department_members")
-        .select("department_id, job_title")
-        .eq("workspace_id", params.workspaceId)
-        .eq("user_id", user.id);
+    const now = new Date();
+    const { data: updatedRequest, error: updateErr } = await adminClient
+      .from("leave_requests")
+      .update({
+        status: finalDecision,
+        rejection_reason:
+          finalDecision === "Rejected"
+            ? params.rejectionReason?.trim() || "Rejected by manager"
+            : null,
+        reviewed_by: user.id,
+        reviewed_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq("id", params.requestId)
+      .select()
+      .single();
 
-      const isLead = (leadDepts || []).some(
-        (d) =>
-          d.job_title?.toLowerCase().includes("lead") ||
-          d.job_title?.toLowerCase().includes("head") ||
-          d.job_title?.toLowerCase().includes("manager")
-      );
-
-      if (!isLead) {
-        return {
-          success: false,
-          error: "Forbidden: You do not have permission to approve or reject this leave request.",
-        };
-      }
+    if (updateErr || !updatedRequest) {
+      return { success: false, error: updateErr?.message || "Failed to update leave request." };
     }
 
-    const now = new Date().toISOString();
+    // Update balances
+    const currentYear = new Date().getFullYear();
+    const { data: balanceData } = await adminClient
+      .from("leave_balances")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", request.user_id)
+      .eq("leave_type", request.leave_type)
+      .eq("year", currentYear)
+      .maybeSingle();
 
-    if (params.action === "reject") {
-      if (!params.rejectionReason || params.rejectionReason.trim().length < 3) {
-        return { success: false, error: "Please provide a reason for rejecting this leave request." };
-      }
+    if (balanceData) {
+      const newPending = Math.max(0, (balanceData.pending_days || 0) - request.duration_days);
+      const newUsed =
+        finalDecision === "Approved"
+          ? (balanceData.used_days || 0) + request.duration_days
+          : balanceData.used_days || 0;
 
-      request.status = "Rejected";
-      request.rejection_reason = params.rejectionReason.trim();
-      request.reviewed_by = user.id;
-      request.reviewed_at = now;
-      request.updated_at = now;
-
-      attendanceStore.saveLeaveRequest(request);
-
-      try {
-        await adminClient
-          .from("leave_requests")
-          .update({
-            status: "Rejected",
-            rejection_reason: request.rejection_reason,
-            reviewed_by: user.id,
-            reviewed_at: now,
-            updated_at: now,
-          })
-          .eq("id", params.requestId)
-          .eq("workspace_id", params.workspaceId);
-      } catch {
-        // Fallback
-      }
-    } else {
-      // Approve Flow
-      request.status = "Approved";
-      request.reviewed_by = user.id;
-      request.reviewed_at = now;
-      request.updated_at = now;
-
-      // Deduct balance
-      if (request.leave_type !== "Unpaid Leave") {
-        attendanceStore.deductLeaveBalance(
-          request.user_id,
-          params.workspaceId,
-          request.leave_type,
-          request.duration_days
-        );
-      }
-
-      attendanceStore.saveLeaveRequest(request);
-
-      // Create Calendar Event in public.calendar_events
-      try {
-        await adminClient.from("calendar_events").insert({
-          workspace_id: params.workspaceId,
-          title: `Leave: ${request.leave_type}`,
-          description: `Approved ${request.leave_type} (${request.duration_days} working days). Reason: ${request.reason}`,
-          event_type: "leave",
-          start_date: new Date(request.start_date).toISOString(),
-          end_date: new Date(request.end_date).toISOString(),
-          is_all_day: true,
-          status: "scheduled",
-          created_by: request.user_id,
-        });
-      } catch {
-        // Fallback
-      }
-
-      try {
-        await adminClient
-          .from("leave_requests")
-          .update({
-            status: "Approved",
-            reviewed_by: user.id,
-            reviewed_at: now,
-            updated_at: now,
-          })
-          .eq("id", params.requestId)
-          .eq("workspace_id", params.workspaceId);
-      } catch {
-        // Fallback
-      }
+      await adminClient
+        .from("leave_balances")
+        .update({
+          pending_days: newPending,
+          used_days: newUsed,
+        })
+        .eq("id", balanceData.id);
     }
 
     try {
-      revalidatePath("/app/leave");
-      revalidatePath("/app/attendance");
-      revalidatePath("/app/calendar");
-      revalidatePath("/app");
+      await dispatchLeaveReviewedEvent({
+        workspaceId: params.workspaceId,
+        requestId: request.id,
+        employeeUserId: request.user_id,
+        reviewerUserId: user.id,
+        action: isApproved ? "approve" : "reject",
+        leaveType: request.leave_type,
+        startDate: request.start_date,
+        endDate: request.end_date,
+        durationDays: request.duration_days,
+        rejectionReason: params.rejectionReason,
+      });
     } catch {
-      // Ignored
+      // Non-blocking
     }
 
-    // Dispatch unified event notification (in-app notification for employee + email)
-    dispatchLeaveReviewedEvent({
-      workspaceId: params.workspaceId,
-      requestId: request.id,
-      employeeUserId: request.user_id,
-      reviewerUserId: user.id,
-      action: params.action,
-      leaveType: request.leave_type,
-      startDate: request.start_date,
-      endDate: request.end_date,
-      durationDays: request.duration_days,
-      rejectionReason: request.rejection_reason || undefined,
-    }).catch((err) => console.error("[Leave Actions] Dispatch reviewed event error:", err));
+    try {
+      revalidatePath("/app/attendance");
+      revalidatePath("/app/leave");
+    } catch {
+      // Background context
+    }
 
-    return { success: true, data: request };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to review leave request." };
+    return { success: true, data: updatedRequest as unknown as LeaveRequest };
+  } catch (error: any) {
+    console.error("Review leave request error:", error);
+    return { success: false, error: error.message || "Failed to review leave request." };
   }
 }
 
+/**
+ * Cancel Own Leave Request Action
+ */
 export async function cancelLeaveRequestAction(params: {
   workspaceId: string;
   requestId: string;
 }): Promise<ActionResult<LeaveRequest>> {
   try {
-    const { user, member, adminClient } = await verifyUserAndRole(params.workspaceId);
+    const { user, adminClient } = await verifyUserAndRole(params.workspaceId);
+    if (!user) {
+      return { success: false, error: "Unauthorized." };
+    }
 
-    const request = attendanceStore.getLeaveRequestById(params.requestId, params.workspaceId);
-    if (!request) {
+    const { data: request, error: fetchErr } = await adminClient
+      .from("leave_requests")
+      .select("*")
+      .eq("id", params.requestId)
+      .eq("workspace_id", params.workspaceId)
+      .single();
+
+    if (fetchErr || !request) {
       return { success: false, error: "Leave request not found." };
     }
 
-    // Only requester or admin/owner can cancel
-    const isOwnerOrAdmin = ["owner", "admin"].includes(member.role);
-    if (request.user_id !== user.id && !isOwnerOrAdmin) {
+    if (request.user_id !== user.id) {
       return { success: false, error: "You can only cancel your own leave requests." };
     }
 
     if (request.status === "Cancelled" || request.status === "Rejected") {
-      return { success: false, error: `Leave request is already ${request.status}.` };
+      return { success: false, error: "This request cannot be cancelled." };
     }
 
-    const wasApproved = request.status === "Approved";
-    const now = new Date().toISOString();
+    const { data: updatedRequest, error: updateErr } = await adminClient
+      .from("leave_requests")
+      .update({
+        status: "Cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.requestId)
+      .select()
+      .single();
 
-    request.status = "Cancelled";
-    request.updated_at = now;
-
-    // Restore balance if previously approved
-    if (wasApproved && request.leave_type !== "Unpaid Leave") {
-      attendanceStore.restoreLeaveBalance(
-        request.user_id,
-        params.workspaceId,
-        request.leave_type,
-        request.duration_days
-      );
+    if (updateErr || !updatedRequest) {
+      return { success: false, error: updateErr?.message || "Failed to cancel request." };
     }
 
-    attendanceStore.saveLeaveRequest(request);
+    // Restore balance
+    const currentYear = new Date().getFullYear();
+    const { data: balanceData } = await adminClient
+      .from("leave_balances")
+      .select("*")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", user.id)
+      .eq("leave_type", request.leave_type)
+      .eq("year", currentYear)
+      .maybeSingle();
 
-    try {
-      await adminClient
-        .from("leave_requests")
-        .update({
-          status: "Cancelled",
-          updated_at: now,
-        })
-        .eq("id", params.requestId)
-        .eq("workspace_id", params.workspaceId);
-    } catch {
-      // Fallback
+    if (balanceData) {
+      if (request.status === "Approved") {
+        await adminClient
+          .from("leave_balances")
+          .update({
+            used_days: Math.max(0, (balanceData.used_days || 0) - request.duration_days),
+          })
+          .eq("id", balanceData.id);
+      } else if (request.status === "Pending") {
+        await adminClient
+          .from("leave_balances")
+          .update({
+            pending_days: Math.max(0, (balanceData.pending_days || 0) - request.duration_days),
+          })
+          .eq("id", balanceData.id);
+      }
     }
 
-    try {
-      revalidatePath("/app/leave");
-      revalidatePath("/app/attendance");
-      revalidatePath("/app/calendar");
-    } catch {
-      // Ignored
-    }
+    revalidatePath("/app/attendance");
+    revalidatePath("/app/leave");
 
-    return { success: true, data: request };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to cancel leave request." };
+    return { success: true, data: updatedRequest as unknown as LeaveRequest };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
 
+/**
+ * Update Attendance Policy / Work Schedule Settings
+ */
 export async function updateAttendanceSettingsAction(params: {
   workspaceId: string;
-  workStartTime: string;
-  workEndTime: string;
-  gracePeriodMinutes: number;
-  halfDayThresholdMinutes: number;
-  workDays: number[];
+  workStartTime?: string;
+  workEndTime?: string;
+  gracePeriodMinutes?: number;
+  halfDayThresholdMinutes?: number;
+  workDays?: number[];
 }): Promise<ActionResult<AttendanceSettings>> {
   try {
-    await verifyUserAndRole(params.workspaceId, ["owner", "admin"]);
-
-    const current = attendanceStore.getSettings(params.workspaceId);
-    const updated: AttendanceSettings = {
-      ...current,
-      work_start_time: params.workStartTime || "09:00",
-      work_end_time: params.workEndTime || "17:00",
-      grace_period_minutes: params.gracePeriodMinutes ?? 15,
-      half_day_threshold_minutes: params.halfDayThresholdMinutes ?? 240,
-      work_days: params.workDays || [1, 2, 3, 4, 5],
-      updated_at: new Date().toISOString(),
-    };
-
-    attendanceStore.saveSettings(updated);
-
-    try {
-      revalidatePath("/app/attendance");
-    } catch {
-      // Ignored
+    const { user, adminClient } = await verifyUserAndRole(params.workspaceId, [
+      "owner",
+      "admin",
+    ]);
+    if (!user) {
+      return { success: false, error: "Only workspace owners and admins can edit policy settings." };
     }
 
-    return { success: true, data: updated };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to update attendance settings." };
+    const { data: savedSettings, error } = await adminClient
+      .from("attendance_settings")
+      .upsert(
+        {
+          workspace_id: params.workspaceId,
+          work_start_time: params.workStartTime || "09:00",
+          work_end_time: params.workEndTime || "17:00",
+          grace_period_minutes: params.gracePeriodMinutes ?? 15,
+          half_day_threshold_minutes: params.halfDayThresholdMinutes ?? 240,
+          work_days: params.workDays ?? [1, 2, 3, 4, 5],
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "workspace_id" }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/app/attendance");
+    return { success: true, data: savedSettings as unknown as AttendanceSettings };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

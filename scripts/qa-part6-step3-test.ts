@@ -1,6 +1,5 @@
 import { createAdminClient } from "../src/lib/supabase/admin";
 import { recruitmentStore } from "../src/lib/recruitment/store";
-import { attendanceStore } from "../src/lib/attendance/store";
 import {
   inviteEmployeeAction,
   acceptInvitationAction,
@@ -237,7 +236,7 @@ async function runQA() {
     updated_at: new Date().toISOString(),
   };
 
-  (attendanceStore as any).saveAttendanceRecord(checkInRecord);
+  await adminClient.from("attendance_records").upsert(checkInRecord);
   assert(true, "Employee attendance check-in and check-out verified");
 
   const attendanceHistory = await getEmployeeAttendanceHistory(userId, workspaceId);
@@ -263,7 +262,7 @@ async function runQA() {
     updated_at: new Date().toISOString(),
   };
 
-  (attendanceStore as any).saveLeaveRequest(leaveRecord);
+  await adminClient.from("leave_requests").upsert(leaveRecord);
   assert(true, "Employee leave request submitted and approved in leave store");
 
   // 16. Calendar Integration (Approved Leave Appears as Event)

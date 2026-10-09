@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recruitmentStore } from "@/lib/recruitment/store";
 import { WorkspaceInvitation } from "@/types/people";
@@ -19,10 +20,14 @@ export async function getInvitationByToken(
   }
 
   const trimmedToken = token.trim();
+  const tokenHash = crypto.createHash("sha256").update(trimmedToken).digest("hex");
   const adminClient = createAdminClient();
 
-  // Check store first
-  let invitation = (recruitmentStore as any).getInvitationByToken?.(trimmedToken) || null;
+  // Check store first (matching either raw or hashed)
+  let invitation =
+    (recruitmentStore as any).getInvitationByToken?.(trimmedToken) ||
+    (recruitmentStore as any).getInvitationByToken?.(tokenHash) ||
+    null;
   let workspaceName = "Ropimo Workspace";
   let departmentName: string | undefined;
 
@@ -34,7 +39,7 @@ export async function getInvitationByToken(
           *,
           workspaces:workspace_id (id, name, slug)
         `)
-        .eq("token", trimmedToken)
+        .or(`token.eq.${tokenHash},token.eq.${trimmedToken}`)
         .maybeSingle();
 
       if (!error && data) {

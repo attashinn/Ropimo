@@ -724,10 +724,10 @@ export const getWorkspaceCalendarEvents = cache(
     // Add db events
     parsedDbEvents.forEach((e) => combinedMap.set(e.id, e));
 
-    // Add approved leaves from attendance store
+    // Add approved leaves from attendance database
     try {
-      const { attendanceStore } = await import("@/lib/attendance/store");
-      const approvedLeaves = attendanceStore.getLeaveRequests(workspaceId, {
+      const { getWorkspaceLeaveRequests } = await import("@/lib/attendance/queries");
+      const approvedLeaves = await getWorkspaceLeaveRequests(workspaceId, {
         status: "Approved",
       });
 

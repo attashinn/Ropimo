@@ -9,7 +9,7 @@ export async function generateMetadata({
   params: Promise<{ meetingId: string }>;
 }) {
   const { meetingId } = await params;
-  const meeting = getMeetingById(meetingId);
+  const meeting = await getMeetingById(meetingId);
   return {
     title: meeting ? `${meeting.title} — Ropimo Meetings` : "Meeting — Ropimo",
     description: meeting?.description ?? "Meeting details",
@@ -22,7 +22,7 @@ export default async function MeetingDetailPage({
   params: Promise<{ meetingId: string }>;
 }) {
   const { meetingId } = await params;
-  const meeting = getMeetingById(meetingId);
+  const meeting = await getMeetingById(meetingId);
 
   if (!meeting) {
     notFound();

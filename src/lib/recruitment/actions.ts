@@ -1,8 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicCandidateApplicationSchema } from "./validation";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import {
   JobOpeningStatus,
   CandidateStage,
@@ -229,23 +233,54 @@ export async function submitCandidateApplicationAction(params: {
   cvFileName: string;
   cvFileSize?: number;
   cvFileType?: string;
+  turnstileToken?: string | null;
 }): Promise<ActionResult> {
   try {
-    if (!params.fullName || params.fullName.trim().length < 2) {
-      return { success: false, error: "Please provide a valid full name." };
+    // 1. Server-side Zod validation
+    const parsed = PublicCandidateApplicationSchema.safeParse(params);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message || "Invalid application data.",
+      };
     }
-    if (!params.email || !params.email.includes("@")) {
-      return { success: false, error: "Please provide a valid email address." };
-    }
-    if (!params.cvStorageKey) {
-      return { success: false, error: "CV / Resume is required." };
+    const validatedData = parsed.data;
+
+    // 2. IP-based rate limiting (max 5 application submissions per minute)
+    let clientIp = "127.0.0.1";
+    try {
+      const headerList = await headers();
+      clientIp = getClientIp(headerList);
+    } catch {
+      // Non-request context
     }
 
-    const normalizedEmail = params.email.trim().toLowerCase();
+    const rateLimit = await checkRateLimit(`job-apply:${clientIp}`, {
+      intervalSeconds: 60,
+      maxRequests: 5,
+    });
+
+    if (!rateLimit.success) {
+      return {
+        success: false,
+        error: "Too many application requests from this address. Please wait a minute and try again.",
+      };
+    }
+
+    // 3. Cloudflare Turnstile Verification
+    const turnstileCheck = await verifyTurnstileToken(validatedData.turnstileToken, clientIp);
+    if (!turnstileCheck.success) {
+      return {
+        success: false,
+        error: turnstileCheck.error || "Turnstile verification failed.",
+      };
+    }
+
+    const normalizedEmail = validatedData.email;
 
     // Check existing candidate
     let candidate = recruitmentStore
-      .getCandidates(params.workspaceId)
+      .getCandidates(validatedData.workspaceId)
       .find((c) => c.email.toLowerCase() === normalizedEmail);
 
     if (!candidate) {

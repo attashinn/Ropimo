@@ -1,3 +1,6 @@
+-- 002_create_workspaces.sql
+-- Workspaces and Workspace Members schema with RLS and helper functions
+
 -- 1. Create workspaces table
 CREATE TABLE IF NOT EXISTS public.workspaces (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -6,6 +9,9 @@ CREATE TABLE IF NOT EXISTS public.workspaces (
   logo_url TEXT,
   icon TEXT DEFAULT '🏢',
   created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  team_size TEXT DEFAULT '1-10',
+  industry TEXT DEFAULT 'Other',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -15,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member', 'guest')) DEFAULT 'member',
+  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'hr', 'manager', 'member', 'guest')) DEFAULT 'member',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (workspace_id, user_id)
 );
@@ -24,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON public.workspace_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace_id ON public.workspace_members(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON public.workspaces(slug);
+CREATE INDEX IF NOT EXISTS idx_workspaces_owner_id ON public.workspaces(owner_id);
 
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
@@ -54,14 +61,31 @@ AS $$
   LIMIT 1;
 $$;
 
--- 7. RLS Policies for Workspaces
--- SELECT: Users can view workspaces they are members of
+-- 7. Helper function: is_workspace_admin_or_owner
+CREATE OR REPLACE FUNCTION public.is_workspace_admin_or_owner(_workspace_id UUID, _user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id = _workspace_id
+      AND user_id = _user_id
+      AND role IN ('owner', 'admin')
+  );
+$$;
+
+-- 8. RLS Policies for Workspaces
+-- SELECT: Users can view workspaces they are members of or own
 DROP POLICY IF EXISTS "Members can view workspace" ON public.workspaces;
 CREATE POLICY "Members can view workspace"
 ON public.workspaces
 FOR SELECT
 USING (
   public.is_workspace_member(id, auth.uid())
+  OR (owner_id IS NOT NULL AND owner_id = auth.uid())
+  OR (created_by IS NOT NULL AND created_by = auth.uid())
 );
 
 -- INSERT: Authenticated users can create a workspace
@@ -70,7 +94,7 @@ CREATE POLICY "Authenticated users can create workspace"
 ON public.workspaces
 FOR INSERT
 WITH CHECK (
-  auth.uid() IS NOT NULL AND auth.uid() = created_by
+  auth.uid() IS NOT NULL AND (auth.uid() = created_by OR auth.uid() = owner_id)
 );
 
 -- UPDATE: Owners and Admins can update workspace details
@@ -80,6 +104,7 @@ ON public.workspaces
 FOR UPDATE
 USING (
   public.get_workspace_role(id, auth.uid()) IN ('owner', 'admin')
+  OR owner_id = auth.uid()
 );
 
 -- DELETE: Only owners can delete workspace
@@ -89,16 +114,17 @@ ON public.workspaces
 FOR DELETE
 USING (
   public.get_workspace_role(id, auth.uid()) = 'owner'
+  OR owner_id = auth.uid()
 );
 
--- 8. RLS Policies for Workspace Members
+-- 9. RLS Policies for Workspace Members
 -- SELECT: Members can view all members of their workspaces
 DROP POLICY IF EXISTS "Members can view workspace members" ON public.workspace_members;
 CREATE POLICY "Members can view workspace members"
 ON public.workspace_members
 FOR SELECT
 USING (
-  public.is_workspace_member(workspace_id, auth.uid())
+  public.is_workspace_member(workspace_id, auth.uid()) OR user_id = auth.uid()
 );
 
 -- INSERT: Owners and admins can add members, or self-join when creating workspace
@@ -110,6 +136,8 @@ WITH CHECK (
   (user_id = auth.uid() AND role = 'owner')
   OR
   public.get_workspace_role(workspace_id, auth.uid()) IN ('owner', 'admin')
+  OR
+  EXISTS (SELECT 1 FROM public.workspaces WHERE id = workspace_id AND (owner_id = auth.uid() OR created_by = auth.uid()))
 );
 
 -- UPDATE: Owners and admins can update member roles
@@ -130,7 +158,7 @@ USING (
   user_id = auth.uid() OR public.get_workspace_role(workspace_id, auth.uid()) IN ('owner', 'admin')
 );
 
--- 9. Transactional RPC function for creating a workspace
+-- 10. Transactional RPC function for creating a workspace
 CREATE OR REPLACE FUNCTION public.create_workspace_with_owner(
   name TEXT,
   slug TEXT,
@@ -150,8 +178,8 @@ BEGIN
   END IF;
 
   -- Insert Workspace
-  INSERT INTO public.workspaces (name, slug, icon, created_by)
-  VALUES (name, slug, icon, caller_id)
+  INSERT INTO public.workspaces (name, slug, icon, created_by, owner_id)
+  VALUES (name, slug, icon, caller_id, caller_id)
   RETURNING id, name, slug, icon, created_at INTO new_ws_record;
 
   new_ws_id := new_ws_record.id;
