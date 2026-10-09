@@ -9,6 +9,7 @@ import {
   WorkspaceRole,
 } from "@/types/people";
 import { revalidatePath } from "next/cache";
+import { getAppUrl } from "@/lib/utils";
 
 export interface PeopleActionResult {
   success: boolean;
@@ -702,7 +703,7 @@ export async function submitEmployeeOnboardingAction(input: {
       workspaceName: ws?.name || "Ropimo Workspace",
       recipientEmail: email,
       recipientName: fullName,
-      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/app`,
+      dashboardUrl: `${getAppUrl()}/app`,
     });
   } catch {}
 

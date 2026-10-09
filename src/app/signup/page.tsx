@@ -4,7 +4,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata: Metadata = {
-  title: "Create an account — Ropimo",
+  title: "Create an account | Ropimo",
   description: "Get started with Ropimo in under 30 seconds.",
 };
 

@@ -18,6 +18,7 @@ import {
   sendLeaveRejectedEmail,
   sendWelcomeEmail,
 } from "@/lib/email/resend";
+import { getAppUrl } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. IN-APP NOTIFICATION HELPER
@@ -80,7 +81,7 @@ export async function dispatchTaskAssignedEvent(params: {
   if (!assigneeUserIds || assigneeUserIds.length === 0) return;
 
   const adminClient = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
   const taskUrl = `${appUrl}/app/tasks/${taskId}`;
 
   // Fetch actor profile & workspace name
@@ -158,7 +159,7 @@ export async function dispatchProjectMemberAddedEvent(params: {
   if (memberUserId === addedByUserId) return;
 
   const adminClient = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
   const projectUrl = `${appUrl}/app/projects/${projectSlug || projectId}`;
 
   const [{ data: actorProfile }, { data: targetProfile }, { data: wsData }] = await Promise.all([
@@ -225,7 +226,7 @@ export async function dispatchLeaveRequestedEvent(params: {
   } = params;
 
   const adminClient = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
   const reviewUrl = `${appUrl}/app/leave`;
 
   const [{ data: employeeMember }, { data: wsData }, { data: approvers }] = await Promise.all([
@@ -301,7 +302,7 @@ export async function dispatchLeaveReviewedEvent(params: {
   } = params;
 
   const adminClient = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
   const dashboardUrl = `${appUrl}/app/leave`;
 
   const [{ data: reviewerMember }, { data: employeeMember }, { data: wsData }] = await Promise.all([
@@ -370,7 +371,7 @@ export async function dispatchInvitationAcceptedEvent(params: {
   const { workspaceId, userId, email, fullName } = params;
 
   const adminClient = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl();
 
   const [{ data: wsData }, { data: admins }] = await Promise.all([
     adminClient.from("workspaces").select("name").eq("id", workspaceId).maybeSingle(),

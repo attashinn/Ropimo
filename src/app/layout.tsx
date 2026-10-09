@@ -20,7 +20,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ropimo — Everything your team needs to get work done",
+  title: "Ropimo | Everything your team needs to get work done",
   description:
     "Ropimo brings projects, tasks, files, documents, planning, and teamwork into one simple, unified workspace.",
   icons: {

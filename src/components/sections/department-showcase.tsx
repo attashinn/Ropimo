@@ -92,7 +92,7 @@ const DEPARTMENTS: Department[] = [
     mobileSubtitle: "Uptime, access requests & deployments",
     items: [
       {
-        title: "Cloud Migration — Phase 2 Cutover",
+        title: "Cloud Migration: Phase 2 Cutover",
         owner: { name: "Conway D.", avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80" },
         status: { label: "In Progress", color: "#3B63F0", bg: "#EEF2FF" },
         date: "Oct 30",
@@ -106,7 +106,7 @@ const DEPARTMENTS: Department[] = [
         tag: "Security",
       },
       {
-        title: "Hardware Refresh — Design Team Laptops",
+        title: "Hardware Refresh: Design Team Laptops",
         owner: { name: "Ellyse P.", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" },
         status: { label: "In Review", color: "#D99A00", bg: "#FEF6E4" },
         date: "Nov 5",
@@ -121,7 +121,7 @@ const DEPARTMENTS: Department[] = [
       },
     ],
     assistantPrompt: "Check on-call alerts for Sprint 32 cutover",
-    assistantAction: "Zero critical alerts detected — SSO audit signed off",
+    assistantAction: "Zero critical alerts detected. SSO audit signed off",
   },
   {
     id: "product",
@@ -132,7 +132,7 @@ const DEPARTMENTS: Department[] = [
       "Connect user feedback to engineering tickets. Track live sprint velocity, PR reviews, and blocker items without heavy Jira setup.",
     ctaLabel: "Start for free",
     accentColor: "#7ED08A",
-    tableTitle: "Sprint 32 — Core Engine",
+    tableTitle: "Sprint 32: Core Engine",
     mobileBg: "#EAF6ED",
     mobileFeatureTitle: "Sprint Velocity",
     mobileSubtitle: "Sprints, specs & roadmaps aligned",
@@ -184,28 +184,28 @@ const DEPARTMENTS: Department[] = [
     mobileSubtitle: "Pipelines, client notes & contracts closed",
     items: [
       {
-        title: "Acme Corp — 250 Seat Enterprise Deal",
+        title: "Acme Corp: 250 Seat Enterprise Deal",
         owner: { name: "Alyssa C.", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&auto=format&fit=crop&q=80" },
         status: { label: "Proposal", color: "#3B63F0", bg: "#EEF2FF" },
         date: "Oct 29",
         tag: "Enterprise",
       },
       {
-        title: "VentureScale — Annual Plan Renewal",
+        title: "VentureScale: Annual Plan Renewal",
         owner: { name: "Stokes H.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" },
         status: { label: "Closed Won", color: "#1F9D55", bg: "#EAF4E2" },
         date: "Oct 15",
         tag: "Renewal",
       },
       {
-        title: "FintechStack — Security Review & MSA",
+        title: "FintechStack: Security Review & MSA",
         owner: { name: "Conway D.", avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80" },
         status: { label: "Legal", color: "#D99A00", bg: "#FEF6E4" },
         date: "Nov 4",
         tag: "Legal",
       },
       {
-        title: "Alpha Labs — Custom SLA Proposal",
+        title: "Alpha Labs: Custom SLA Proposal",
         owner: { name: "Starc B.", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80" },
         status: { label: "Negotiating", color: "#9A9A9A", bg: "#F4F4F4" },
         date: "Nov 12",
@@ -259,7 +259,7 @@ const DEPARTMENTS: Department[] = [
       },
     ],
     assistantPrompt: "Prepare standard offer packet for finalist",
-    assistantAction: "Offer letter signed in 18 minutes — onboarding initiated",
+    assistantAction: "Offer letter signed in 18 minutes. Onboarding initiated",
   },
   {
     id: "leadership",
@@ -297,7 +297,7 @@ const DEPARTMENTS: Department[] = [
         tag: "OKRs",
       },
       {
-        title: "Risk Register — Q4 Delivery Threats",
+        title: "Risk Register: Q4 Delivery Threats",
         owner: { name: "Stokes H.", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" },
         status: { label: "In Review", color: "#D99A00", bg: "#FEF6E4" },
         date: "Oct 31",

@@ -25,7 +25,7 @@ export function LogoStrip() {
       <div className="pointer-events-none absolute top-0 left-0 w-24 sm:w-40 h-full z-10 bg-gradient-to-r from-[#FAF9F6] to-transparent" />
       <div className="pointer-events-none absolute top-0 right-0 w-24 sm:w-40 h-full z-10 bg-gradient-to-l from-[#FAF9F6] to-transparent" />
 
-      {/* Marquee track — items duplicated for a seamless loop */}
+      {/* Marquee track: items duplicated for a seamless loop */}
       <div className="flex items-center overflow-hidden" aria-hidden="true">
         <div className="flex items-center gap-12 sm:gap-16 animate-marquee whitespace-nowrap">
           {[...brands, ...brands].map((brand, i) => (

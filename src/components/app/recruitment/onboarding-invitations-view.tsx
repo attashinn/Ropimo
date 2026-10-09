@@ -23,6 +23,7 @@ import { WorkspaceInvitation, WorkspacePerson } from "@/types/people";
 import { Department } from "@/types/department";
 import { resendEmployeeInvitationAction } from "@/lib/invitations/actions";
 import { RopimoUserAvatar } from "@/components/ropimo/ropimo-user-avatar";
+import { getAppUrl } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export interface OnboardingInvitationsViewProps {
@@ -57,8 +58,7 @@ export function OnboardingInvitationsView({
 
   const handleCopyLink = (inv: WorkspaceInvitation) => {
     const token = inv.token || inv.id;
-    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
-    const inviteUrl = `${origin}/invite/${token}`;
+    const inviteUrl = `${getAppUrl()}/invite/${token}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedId(inv.id);
     setActionNotice(`Invite link for ${inv.full_name || inv.email} copied to clipboard!`);

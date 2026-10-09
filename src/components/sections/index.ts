@@ -1,4 +1,5 @@
 export { LogoStrip, default as LogoStripSection } from "./logo-strip";
+export { DepartmentShowcase, default as DepartmentShowcaseSection } from "./department-showcase";
 export { ProductShowcase, default as ProductShowcaseSection } from "./product-showcase";
 export { StatsRow, default as StatsCounterRow } from "./stats-row";
 export { Testimonials, default as TestimonialsSection } from "./testimonials";

@@ -9,7 +9,7 @@ import { getNavVisibility } from "@/lib/auth/permissions";
 import { UserContext } from "@/types/permissions";
 
 export const metadata = {
-  title: "Workspace — Ropimo",
+  title: "Workspace | Ropimo",
   description: "Ropimo unified team workspace",
   icons: {
     icon: [

@@ -69,7 +69,7 @@ export function Hero() {
         {/* SVG Connector Lines connecting avatars (hidden on mobile & tablet) */}
         <ConnectorLines />
 
-        {/* 6 Collaborative Floating Avatars anchored relative to content frame — shown on desktop only (hidden lg:block) so they never overlap mobile text */}
+        {/* 6 Collaborative Floating Avatars anchored relative to content frame (hidden on mobile) */}
         {/* Top-Left: Ellyse */}
         <FloatingAvatar
           name="Ellyse"
@@ -279,7 +279,7 @@ export function Hero() {
           <p
             className="mt-5 sm:mt-8 max-w-lg text-[15px] sm:text-[16px] leading-relaxed text-[#6B6B6B] font-medium px-2"
           >
-            Tasks, meetings, hiring, and documents — your entire office in one calm workspace. No app-switching. No chaos.
+            Tasks, meetings, hiring, and documents in one calm workspace. No app-switching. No chaos.
           </p>
 
           {/* Email Input Bar CTA */}

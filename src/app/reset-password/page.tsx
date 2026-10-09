@@ -5,7 +5,7 @@ import { LogoIcon } from "@/components/landing/icons";
 import { ResetForm } from "@/components/auth/reset-form";
 
 export const metadata: Metadata = {
-  title: "Set new password — Ropimo",
+  title: "Set new password | Ropimo",
   description: "Create a new password for your account.",
 };
 

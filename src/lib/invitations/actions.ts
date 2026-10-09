@@ -8,6 +8,7 @@ import { sendInvitationEmail } from "@/lib/email/resend";
 import { dispatchInvitationAcceptedEvent } from "@/lib/notifications/service";
 import { WorkspaceInvitation, WorkspaceRole, EmploymentType } from "@/types/people";
 import { revalidatePath } from "next/cache";
+import { getAppUrl } from "@/lib/utils";
 
 export interface InvitationActionResult {
   success: boolean;
@@ -164,7 +165,7 @@ export async function inviteEmployeeAction(params: {
       console.warn("DB invitation upsert notice:", dbErr);
     }
 
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/${token}`;
+    const inviteUrl = `${getAppUrl()}/invite/${token}`;
 
     // 5. Send Invitation Email (non-blocking — failure does not cancel the invitation)
     try {
@@ -283,7 +284,7 @@ export async function resendEmployeeInvitationAction(params: {
       .eq("id", params.workspaceId)
       .maybeSingle();
 
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/${newToken}`;
+    const inviteUrl = `${getAppUrl()}/invite/${newToken}`;
 
     // Resend invitation email (non-blocking)
     try {

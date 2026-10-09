@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
+import { getAppUrl } from "@/lib/utils";
 
 export interface AuthActionResult {
   success: boolean;
@@ -26,7 +27,7 @@ export async function signUpAction({
   password: string;
 }): Promise<AuthActionResult> {
   const reqHeaders = await headers();
-  const origin = reqHeaders.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const origin = getAppUrl(reqHeaders);
   const supabase = await createClient();
 
   const cleanEmail = email.trim().toLowerCase();
@@ -120,7 +121,7 @@ export async function signInWithOtpAction({
   redirectPath?: string;
 }): Promise<AuthActionResult> {
   const reqHeaders = await headers();
-  const origin = reqHeaders.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const origin = getAppUrl(reqHeaders);
   const supabase = await createClient();
   const cleanEmail = email.trim().toLowerCase();
 

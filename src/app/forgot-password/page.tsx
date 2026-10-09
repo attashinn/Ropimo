@@ -5,7 +5,7 @@ import { LogoIcon } from "@/components/landing/icons";
 import { ForgotForm } from "@/components/auth/forgot-form";
 
 export const metadata: Metadata = {
-  title: "Forgot password — Ropimo",
+  title: "Forgot password | Ropimo",
   description: "Reset your Ropimo password.",
 };
 
