@@ -7,6 +7,7 @@ import {
 import {
   LogoStrip,
   ProductShowcase,
+  ComparisonSection,
   StatsRow,
   Testimonials,
   PricingSection,
@@ -45,6 +46,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         {/* Full Workspace Product Showcase */}
         <ProductShowcase />
+
+        {/* Competitor Comparison Section (ClickUp, Asana, Monday, Notion) */}
+        <ComparisonSection />
 
         {/* Alternating Feature Rows (Untouched) */}
         <FeatureRows />

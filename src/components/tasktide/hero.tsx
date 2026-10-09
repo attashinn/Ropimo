@@ -162,8 +162,21 @@ export function Hero() {
             <div className="flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3.5 gap-y-1.5 sm:gap-y-2">
               <span>Collaborate</span>
 
-              {/* Inline tilted green cursor arrow badge */}
-              <span className="inline-flex items-center justify-center bg-[#D6F786] rounded-xl sm:rounded-2xl px-1.5 sm:px-3 py-0.5 sm:py-1.5 -rotate-6 shadow-xs select-none">
+              {/* Inline animated floating green cursor arrow badge */}
+              <motion.span
+                animate={{
+                  y: [0, -5, 0],
+                  rotate: [-6, -2, -8, -6],
+                  scale: [1, 1.05, 1],
+                }}
+                transition={{
+                  duration: 3.2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                whileHover={{ scale: 1.15, rotate: 0 }}
+                className="inline-flex items-center justify-center bg-[#D6F786] rounded-xl sm:rounded-2xl px-1.5 sm:px-3 py-0.5 sm:py-1.5 shadow-xs select-none cursor-pointer"
+              >
                 <svg
                   width="26"
                   height="26"
@@ -180,7 +193,7 @@ export function Hero() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </span>
+              </motion.span>
 
               {/* Word Track with hand-drawn scribble underline */}
               <span className="relative inline-block">
