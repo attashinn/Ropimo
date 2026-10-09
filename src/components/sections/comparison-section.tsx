@@ -99,39 +99,6 @@ const COMPARISON_DATA: FeatureRow[] = [
   },
 ];
 
-const COMPARISON_HIGHLIGHTS = [
-  {
-    competitor: "ClickUp",
-    tag: "vs ClickUp",
-    title: "Say goodbye to cockpit syndrome.",
-    description:
-      "ClickUp tried to build every feature on Earth into one screen, resulting in hundreds of settings, sluggish load times, and confused teammates. Ropimo gives you pure speed, calm typography, and zero configuration bloat.",
-    ropimoWin: "Instant <100ms speed, 1-click workflows, calm cream design",
-    competitorFlaw: "Laggy boards, bloated settings, high learning curve",
-    color: "#FFCFC2",
-  },
-  {
-    competitor: "Asana & Monday",
-    tag: "vs Asana & Monday",
-    title: "Replace 5 disparate SaaS bills.",
-    description:
-      "Asana and Monday manage basic tasks, but you still need Calendly for meetings, Greenhouse for hiring, and DocuSign for approvals. Ropimo delivers tasks, meetings, hiring pipelines, and official documents in one cohesive app.",
-    ropimoWin: "Complete office suite: Tasks + Meetings + Hiring + Documents",
-    competitorFlaw: "$120+/mo per seat when factoring in stacked external tools",
-    color: "#D6F786",
-  },
-  {
-    competitor: "Notion & Spreadsheets",
-    tag: "vs Notion & Sheets",
-    title: "Real operations without endless DIY maintenance.",
-    description:
-      "Notion gives you a blank canvas that someone on your team has to constantly build, maintain, and fix. Ropimo comes out of the box with structured, production-ready workflows built for real companies.",
-    ropimoWin: "Ready in 2 minutes, strict data models, zero template breakage",
-    competitorFlaw: "Broken databases, fragile permissions, chaotic formatting",
-    color: "#FFE76A",
-  },
-];
-
 export function ComparisonSection() {
   const [selectedCompetitor, setSelectedCompetitor] = useState<"all" | "clickup" | "asana" | "monday">("all");
 
@@ -139,7 +106,7 @@ export function ComparisonSection() {
     <section className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 lg:py-32 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-neutral-200/50">
       <div className="max-w-6xl mx-auto flex flex-col items-center">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto flex flex-col items-center mb-14 sm:mb-20">
+        <div className="text-center max-w-3xl mx-auto flex flex-col items-center mb-10 sm:mb-14">
           <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-[#EFECE0] text-[12px] sm:text-[13px] font-bold text-neutral-800 tracking-wider uppercase mb-5 shadow-xs select-none">
             Tool Comparison
           </span>
@@ -157,51 +124,6 @@ export function ComparisonSection() {
           <p className="mt-5 text-[15.5px] sm:text-[17.5px] text-[#6B6B6B] leading-relaxed max-w-2xl font-medium">
             Stop juggling five separate subscriptions, 40 confusing views, and bloated feature lists nobody on your team actually uses.
           </p>
-        </div>
-
-        {/* 3 Quick Contrast Cards */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-24">
-          {COMPARISON_HIGHLIGHTS.map((item) => (
-            <div
-              key={item.competitor}
-              className="bg-white rounded-[28px] p-6 sm:p-7 border border-neutral-200/80 shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span
-                    style={{ backgroundColor: item.color }}
-                    className="px-3 py-1 rounded-full text-[11px] font-extrabold text-[#111111] tracking-wide shadow-xs"
-                  >
-                    {item.tag}
-                  </span>
-                  <span className="text-[12px] font-semibold text-neutral-400">Head to Head</span>
-                </div>
-
-                <h3 className="text-[19px] sm:text-[20px] font-extrabold text-[#111111] leading-snug tracking-tight">
-                  {item.title}
-                </h3>
-
-                <p className="mt-3 text-[13.5px] text-[#6B6B6B] leading-relaxed font-medium">
-                  {item.description}
-                </p>
-              </div>
-
-              <div className="mt-6 pt-5 border-t border-neutral-100 flex flex-col gap-2.5 text-xs">
-                <div className="flex items-start gap-2">
-                  <span className="h-4 w-4 rounded-full bg-[#EAF4E2] text-[#1F9D55] flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-2.5 h-2.5 stroke-[3]" />
-                  </span>
-                  <span className="font-semibold text-[#111111]">{item.ropimoWin}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="h-4 w-4 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center shrink-0 mt-0.5">
-                    <X className="w-2.5 h-2.5 stroke-[3]" />
-                  </span>
-                  <span className="text-[#6B6B6B]">{item.competitorFlaw}</span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Comparison Matrix Table Card */}
