@@ -1,15 +1,66 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Navbar } from "./navbar";
 import { FloatingAvatar } from "./floating-avatar";
 import { ConnectorLines } from "./connector-lines";
 import { ScallopedEdge } from "./scalloped-edge";
 
+const ROTATING_WORDS = [
+  { text: "TaskTide", tag: "Software" },
+  { text: "Your Team", tag: "Together" },
+  { text: "Zero Chaos", tag: "Clarity" },
+  { text: "Every Project", tag: "On Track" },
+  { text: "Real Focus", tag: "Speed" },
+];
+
 export function Hero() {
   const [email, setEmail] = useState("");
+
+  // Animated typewriter state
+  const [wordIndex, setWordIndex] = useState(0);
+  const [subIndex, setSubIndex] = useState(ROTATING_WORDS[0].text.length);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentWord = ROTATING_WORDS[wordIndex].text;
+
+    // Pause when fully typed
+    if (!isDeleting && subIndex === currentWord.length) {
+      const timer = setTimeout(() => {
+        setIsDeleting(true);
+      }, 2200);
+      return () => clearTimeout(timer);
+    }
+
+    // Switch to next word when completely deleted
+    if (isDeleting && subIndex === 0) {
+      setIsDeleting(false);
+      setWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
+      const timer = setTimeout(() => {}, 300);
+      return () => clearTimeout(timer);
+    }
+
+    // Typing and backspacing speed
+    const speed = isDeleting ? 45 : 95;
+    const timer = setTimeout(() => {
+      setSubIndex((prev) => prev + (isDeleting ? -1 : 1));
+    }, speed);
+
+    return () => clearTimeout(timer);
+  }, [subIndex, isDeleting, wordIndex]);
+
+  const handleNextWord = () => {
+    const nextIdx = (wordIndex + 1) % ROTATING_WORDS.length;
+    setWordIndex(nextIdx);
+    setSubIndex(ROTATING_WORDS[nextIdx].text.length);
+    setIsDeleting(false);
+  };
+
+  const currentWord = ROTATING_WORDS[wordIndex].text;
+  const displayText = currentWord.substring(0, subIndex) || "\u00A0";
 
   return (
     <section className="relative w-full bg-[#EFECE0] pt-2 sm:pt-4 overflow-hidden font-[family-name:var(--font-plus-jakarta)]">
@@ -161,18 +212,31 @@ export function Hero() {
               <span>and Succeed with</span>
             </div>
 
-            {/* Line 3: TaskTide highlight peach box with tag and caret */}
+            {/* Line 3: Dynamic Animated Typewriter peach box with tag and caret */}
             <div className="mt-2 sm:mt-3 flex items-center justify-center">
-              <span className="relative inline-flex items-center bg-[#FFCFC2] px-3.5 sm:px-7 py-0.5 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-xs">
-                <span>TaskTide</span>
+              <span
+                onClick={handleNextWord}
+                title="Click to cycle words"
+                className="relative inline-flex items-center bg-[#FFCFC2] px-3.5 sm:px-7 py-0.5 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-xs cursor-pointer select-none transition-all hover:bg-[#FFC6B8] active:scale-[0.98]"
+              >
+                <span className="min-w-[1ch]">{displayText}</span>
 
-                {/* Top-Right orange tag "Software" */}
-                <span className="absolute -top-2.5 sm:-top-3.5 -right-2 sm:-right-3.5 bg-[#FF6B3D] text-white text-[9.5px] sm:text-[11.5px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full shadow-xs tracking-wide">
-                  Software
-                </span>
+                {/* Top-Right animated orange tag */}
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={ROTATING_WORDS[wordIndex].tag}
+                    initial={{ opacity: 0, y: -4, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute -top-2.5 sm:-top-3.5 -right-2 sm:-right-3.5 bg-[#FF6B3D] text-white text-[9.5px] sm:text-[11.5px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full shadow-xs tracking-wide"
+                  >
+                    {ROTATING_WORDS[wordIndex].tag}
+                  </motion.span>
+                </AnimatePresence>
 
-                {/* Thin vertical orange text cursor bar */}
-                <span className="w-[2px] sm:w-[3.5px] h-[28px] sm:h-[48px] md:h-[62px] bg-[#FF6B3D] rounded-full ml-1.5 sm:ml-2.5" />
+                {/* Thin vertical orange text cursor bar with smooth blink */}
+                <span className="w-[2px] sm:w-[3.5px] h-[26px] sm:h-[46px] md:h-[58px] bg-[#FF6B3D] rounded-full ml-1.5 sm:ml-2.5 animate-pulse self-center shrink-0" />
               </span>
             </div>
           </motion.h1>
