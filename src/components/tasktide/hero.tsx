@@ -146,16 +146,16 @@ export function Hero() {
         />
 
         {/* Centered Hero Content */}
-        <div className="relative z-20 max-w-4xl mx-auto flex flex-col items-center text-center px-1 sm:px-4">
+        <div className="relative z-20 max-w-4xl mx-auto flex flex-col items-center text-center px-2 sm:px-4">
           {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-[32px] sm:text-5xl md:text-6xl lg:text-[76px] font-[800] tracking-[-0.035em] text-[#111111] leading-[1.12] sm:leading-[1.05]"
+            className="text-[38px] xs:text-[42px] sm:text-5xl md:text-6xl lg:text-[76px] font-[800] tracking-[-0.035em] text-[#111111] leading-[1.08] sm:leading-[1.05]"
           >
             {/* Line 1: Collaborate + green cursor badge + Track with scribble */}
-            <div className="flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3.5 gap-y-1.5 sm:gap-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-2.5 sm:gap-x-3.5 gap-y-1.5 sm:gap-y-2">
               <span>Collaborate</span>
 
               {/* Inline animated floating green cursor arrow badge */}
@@ -171,7 +171,7 @@ export function Hero() {
                   ease: "easeInOut",
                 }}
                 whileHover={{ scale: 1.15, rotate: 0 }}
-                className="inline-flex items-center justify-center bg-[#D6F786] rounded-xl sm:rounded-2xl px-1.5 sm:px-3 py-0.5 sm:py-1.5 shadow-xs select-none cursor-pointer"
+                className="inline-flex items-center justify-center bg-[#D6F786] rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1 sm:py-1.5 shadow-xs select-none cursor-pointer"
               >
                 <svg
                   width="26"
@@ -179,7 +179,7 @@ export function Hero() {
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
-                  className="w-4 h-4 sm:w-6 sm:h-6 text-[#52B21E]"
+                  className="w-5 h-5 sm:w-6 sm:h-6 text-[#52B21E]"
                 >
                   <path
                     d="M4 4L11.5 21L14.5 13.5L22 10.5L4 4Z"
@@ -198,7 +198,7 @@ export function Hero() {
                   viewBox="0 0 170 20"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
-                  className="absolute -bottom-2 sm:-bottom-3 left-0 w-full h-[10px] sm:h-[16px] pointer-events-none overflow-visible"
+                  className="absolute -bottom-2 sm:-bottom-3 left-0 w-full h-[12px] sm:h-[16px] pointer-events-none overflow-visible"
                 >
                   <path
                     d="M2 10 C 25 4, 52 14, 88 8 C 118 3, 146 11, 166 7"
@@ -222,11 +222,11 @@ export function Hero() {
             </div>
 
             {/* Line 3: Dynamic Animated Typewriter peach box with tag and caret */}
-            <div className="mt-2 sm:mt-3 flex items-center justify-center">
+            <div className="mt-2.5 sm:mt-3 flex items-center justify-center">
               <span
                 onClick={handleNextWord}
                 title="Click to cycle words"
-                className="relative inline-flex items-center bg-[#FFCFC2] px-3.5 sm:px-7 py-0.5 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-xs cursor-pointer select-none transition-all hover:bg-[#FFC6B8] active:scale-[0.98]"
+                className="relative inline-flex items-center bg-[#FFCFC2] px-5 sm:px-7 py-1 sm:py-1.5 rounded-2xl shadow-xs cursor-pointer select-none transition-all hover:bg-[#FFC6B8] active:scale-[0.98]"
               >
                 <span className="min-w-[1ch]">{displayText}</span>
 
@@ -238,21 +238,21 @@ export function Hero() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 4, scale: 0.9 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute -top-2.5 sm:-top-3.5 -right-2 sm:-right-3.5 bg-[#FF6B3D] text-white text-[9.5px] sm:text-[11.5px] font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full shadow-xs tracking-wide"
+                    className="absolute -top-3 sm:-top-3.5 -right-2.5 sm:-right-3.5 bg-[#FF6B3D] text-white text-[10.5px] sm:text-[11.5px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full shadow-xs tracking-wide"
                   >
                     {ROTATING_WORDS[wordIndex].tag}
                   </motion.span>
                 </AnimatePresence>
 
                 {/* Thin vertical orange text cursor bar with smooth blink */}
-                <span className="w-[2px] sm:w-[3.5px] h-[26px] sm:h-[46px] md:h-[58px] bg-[#FF6B3D] rounded-full ml-1.5 sm:ml-2.5 animate-pulse self-center shrink-0" />
+                <span className="w-[2.5px] sm:w-[3.5px] h-[34px] sm:h-[46px] md:h-[58px] bg-[#FF6B3D] rounded-full ml-1.5 sm:ml-2.5 animate-pulse self-center shrink-0" />
               </span>
             </div>
           </motion.h1>
 
           {/* Subtext */}
           <p
-            className="mt-5 sm:mt-8 max-w-lg text-[13.5px] sm:text-[15.5px] leading-relaxed text-[#6B6B6B] font-medium px-2"
+            className="mt-5 sm:mt-8 max-w-lg text-[15px] sm:text-[16px] leading-relaxed text-[#6B6B6B] font-medium px-2"
           >
             Tasks, meetings, hiring, and documents — your entire office in one calm workspace. No app-switching. No chaos.
           </p>
@@ -266,7 +266,7 @@ export function Hero() {
                 setEmail("");
               }
             }}
-            className="mt-6 sm:mt-10 relative w-full max-w-[480px] bg-white rounded-full p-1.5 sm:p-2 pl-4 sm:pl-6 shadow-[0_12px_36px_rgba(0,0,0,0.06)] border border-neutral-200/80 flex items-center justify-between focus-within:ring-2 focus-within:ring-black/10 focus-within:border-black/30"
+            className="mt-6 sm:mt-10 relative w-full max-w-[480px] bg-white rounded-full p-2 sm:p-2.5 pl-4 sm:pl-6 shadow-[0_12px_36px_rgba(0,0,0,0.06)] border border-neutral-200/80 flex items-center justify-between focus-within:ring-2 focus-within:ring-black/10 focus-within:border-black/30"
           >
             <input
               type="email"
@@ -274,11 +274,11 @@ export function Hero() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
-              className="bg-transparent border-0 outline-none text-[13px] sm:text-[15px] text-[#111111] placeholder:text-neutral-400 w-full pr-2 sm:pr-3 font-medium min-w-0"
+              className="bg-transparent border-0 outline-none text-[14px] sm:text-[15px] text-[#111111] placeholder:text-neutral-400 w-full pr-2 sm:pr-3 font-medium min-w-0"
             />
             <button
               type="submit"
-              className="bg-[#111111] hover:bg-black text-white rounded-full py-2 sm:py-3 px-3.5 sm:px-6 flex items-center gap-1.5 sm:gap-2.5 text-[12.5px] sm:text-[14px] font-semibold transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] shrink-0 shadow-sm cursor-pointer whitespace-nowrap"
+              className="bg-[#111111] hover:bg-black text-white rounded-full py-2.5 sm:py-3 px-4 sm:px-6 flex items-center gap-2 sm:gap-2.5 text-[13px] sm:text-[14px] font-semibold transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] shrink-0 shadow-sm cursor-pointer whitespace-nowrap"
             >
               <span>Get Started</span>
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white text-[#111111] flex items-center justify-center shrink-0">
