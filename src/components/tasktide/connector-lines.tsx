@@ -8,7 +8,7 @@ export function ConnectorLines() {
       viewBox="0 0 1200 620"
       preserveAspectRatio="none"
       fill="none"
-      className="absolute inset-0 w-full h-full pointer-events-none z-10 hidden md:block opacity-90"
+      className="absolute inset-0 w-full h-full pointer-events-none z-10 hidden lg:block opacity-90"
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Left path 1: Ellyse -> Stokes */}
