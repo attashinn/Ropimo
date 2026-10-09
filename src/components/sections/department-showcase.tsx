@@ -291,7 +291,7 @@ export function DepartmentShowcase() {
   const activeDept = DEPARTMENTS.find((d) => d.id === activeTab) || DEPARTMENTS[0];
 
   return (
-    <section className="relative w-full bg-[#FAF9F6] py-16 sm:py-24 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-[#E9E6DA]">
+    <section id="workflows" className="relative w-full bg-[#FAF9F6] py-16 sm:py-24 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-[#E9E6DA]">
       <div className="max-w-6xl mx-auto flex flex-col items-center">
 
         {/* ── Centered heading (matches ClickUp layout exactly) ─────────────── */}

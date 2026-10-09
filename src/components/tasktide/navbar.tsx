@@ -1,241 +1,380 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { motion, AnimatePresence, useScroll } from "framer-motion";
+import {
+  ChevronDown,
+  Menu,
+  X,
+  Layers,
+  FileText,
+  Users,
+  Kanban,
+} from "lucide-react";
+
+interface NavItem {
+  label: string;
+  href: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Workflows", href: "#workflows" },
+  { label: "Compare", href: "#compare" },
+  { label: "Reviews", href: "#testimonials" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
+];
+
+const PRODUCT_MODULES = [
+  {
+    title: "Tasks & Sprints",
+    desc: "Kanban boards, Gantt timelines, subtasks & real-time owners",
+    icon: Kanban,
+    color: "#3B63F0",
+    bg: "#EEF2FF",
+  },
+  {
+    title: "Department Workflows",
+    desc: "Pre-built pipelines for Marketing, IT, Sales, HR & PMO",
+    icon: Layers,
+    color: "#1F9D55",
+    bg: "#EAF4E2",
+  },
+  {
+    title: "Live Docs & Notes",
+    desc: "Meeting agendas that automatically turn into action items",
+    icon: FileText,
+    color: "#FF6B3D",
+    bg: "#FFF0EB",
+  },
+  {
+    title: "Hiring & ATS",
+    desc: "Candidate scorecards, interview stages and offer sign-offs",
+    icon: Users,
+    color: "#8B5CF6",
+    bg: "#F5F3FF",
+  },
+];
 
 export function Navbar() {
-  const [pagesOpen, setPagesOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const [productOpen, setProductOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navLinks = [
-    { label: "Home", href: "#" },
-    { label: "About Us", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Pages", href: "#", hasDropdown: true },
-    { label: "Pricing", href: "#" },
-  ];
+  const { scrollY } = useScroll();
 
-  const pagesDropdown = [
-    { label: "Features", desc: "Core capabilities & workflows", href: "#" },
-    { label: "Integrations", desc: "Sync with your favorite tools", href: "#" },
-    { label: "Changelog", desc: "Latest product updates", href: "#" },
-    { label: "Documentation", desc: "Setup guides & API reference", href: "#" },
-  ];
+  useEffect(() => {
+    return scrollY.on("change", (latest) => {
+      setScrolled(latest > 20);
+    });
+  }, [scrollY]);
 
   return (
-    <header
-      className="relative z-50 w-full pt-4 px-4 sm:px-6"
-    >
-      <nav
-        aria-label="Main Navigation"
-        className="mx-auto max-w-6xl h-[62px] bg-white rounded-2xl sm:rounded-full px-4 sm:px-6 flex items-center justify-between shadow-[0_4px_25px_rgba(0,0,0,0.05)] border border-neutral-200/50 font-[family-name:var(--font-plus-jakarta)]"
-      >
-        {/* Left: Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 shrink-0">
-          <div className="w-10 h-10 rounded-full bg-[#111111] flex items-center justify-center shadow-sm">
-            {/* White rounded-square list glyph */}
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="text-white"
-            >
-              <rect
-                x="3"
-                y="3"
-                width="14"
-                height="14"
-                rx="3.5"
-                stroke="white"
-                strokeWidth="1.8"
+    <>
+      {/* ── Fixed Floating Navbar Wrapper (Always pinned & visible on scroll) ── */}
+      <header className="fixed top-0 left-0 right-0 z-[100] px-4 sm:px-6 pt-3 sm:pt-4 pointer-events-none flex justify-center font-[family-name:var(--font-plus-jakarta)]">
+        {/* ── Floating Pill Bar ── */}
+        <nav
+          aria-label="Main Navigation"
+          className={`pointer-events-auto relative w-full max-w-6xl transition-all duration-200 ease-out rounded-full px-4 sm:px-6 flex items-center justify-between select-none ${
+            scrolled
+              ? "h-[58px] bg-white/90 backdrop-blur-xl border border-neutral-200/80 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.07)]"
+              : "h-[62px] bg-white/80 backdrop-blur-md border border-neutral-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+          }`}
+        >
+          {/* ── LEFT: Official Ropimo Logo + Wordmark (Clean, no extra badges) ── */}
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 sm:gap-3 group shrink-0"
+            aria-label="Ropimo Home"
+          >
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
+              <Image
+                src="/logo/favicon.png"
+                alt="Ropimo"
+                width={36}
+                height={36}
+                className="w-full h-full object-contain rounded-xl"
+                priority
               />
-              <path
-                d="M6.5 7.5H13.5M6.5 10H13.5M6.5 12.5H10.5"
-                stroke="white"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <span className="text-[20px] font-extrabold tracking-[-0.03em] text-[#111111]">
-            TaskTide
-          </span>
-        </Link>
+            </div>
 
-        {/* Center: Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 text-[14px] font-medium text-[#333333]">
-          {navLinks.map((item) => {
-            if (item.hasDropdown) {
+            <span className="font-[800] tracking-[-0.04em] text-[#111111] text-[19px] sm:text-[20px] leading-none">
+              Ropimo
+            </span>
+          </Link>
+
+          {/* ── CENTER: Clean Desktop Navigation ── */}
+          <div
+            className="hidden md:flex items-center gap-1 relative"
+            onMouseLeave={() => setHoveredNav(null)}
+          >
+            {/* Product Dropdown Trigger */}
+            <div
+              className="relative"
+              onMouseEnter={() => {
+                setHoveredNav("Product");
+                setProductOpen(true);
+              }}
+              onMouseLeave={() => setProductOpen(false)}
+            >
+              <button
+                type="button"
+                className={`relative z-10 flex items-center gap-1 px-3.5 py-1.5 rounded-full text-[13.5px] font-semibold transition-colors cursor-pointer ${
+                  productOpen || hoveredNav === "Product"
+                    ? "text-[#111111]"
+                    : "text-[#555555] hover:text-[#111111]"
+                }`}
+              >
+                Product
+                <motion.span
+                  animate={{ rotate: productOpen ? 180 : 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+                </motion.span>
+              </button>
+
+              {/* Clean Minimalist Mega Dropdown */}
+              <AnimatePresence>
+                {productOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="absolute top-[calc(100%+8px)] -left-6 w-[360px] z-50 pointer-events-auto"
+                  >
+                    <div className="bg-white rounded-2xl p-2.5 shadow-[0_16px_48px_-10px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] border border-neutral-100">
+                      <div className="grid grid-cols-1 gap-1">
+                        {PRODUCT_MODULES.map((item) => {
+                          const IconComp = item.icon;
+                          return (
+                            <Link
+                              key={item.title}
+                              href="#workflows"
+                              onClick={() => setProductOpen(false)}
+                              className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-[#FAF9F6] transition-colors group/item"
+                            >
+                              <div
+                                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover/item:scale-105"
+                                style={{ backgroundColor: item.bg, color: item.color }}
+                              >
+                                <IconComp className="w-4.5 h-4.5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13.5px] font-bold text-[#111111]">
+                                  {item.title}
+                                </div>
+                                <p className="text-[12px] text-[#6B6B6B] leading-snug mt-0.5">
+                                  {item.desc}
+                                </p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Nav Links with Smooth Sliding Indicator */}
+            {NAV_ITEMS.map((item) => {
+              const isHovered = hoveredNav === item.label;
               return (
                 <div
                   key={item.label}
                   className="relative"
-                  onMouseEnter={() => setPagesOpen(true)}
-                  onMouseLeave={() => setPagesOpen(false)}
+                  onMouseEnter={() => setHoveredNav(item.label)}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setPagesOpen((prev) => !prev)}
-                    className="flex items-center gap-1.5 transition-colors hover:text-[#111111] py-2 focus:outline-none cursor-pointer"
+                  <Link
+                    href={item.href}
+                    className={`relative z-10 block px-3.5 py-1.5 rounded-full text-[13.5px] font-semibold transition-colors ${
+                      isHovered ? "text-[#111111]" : "text-[#555555] hover:text-[#111111]"
+                    }`}
                   >
-                    <span>{item.label}</span>
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 text-neutral-500 transition-transform duration-200 ${
-                        pagesOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
+                    {item.label}
+                  </Link>
 
-                  <AnimatePresence>
-                    {pagesOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-64"
-                      >
-                        <div className="bg-white rounded-2xl p-2 shadow-[0_12px_36px_rgba(0,0,0,0.1)] border border-neutral-100">
-                          {pagesDropdown.map((page) => (
-                            <Link
-                              key={page.label}
-                              href={page.href}
-                              className="block p-2.5 rounded-xl hover:bg-[#FAF9F6] transition-colors"
-                            >
-                              <div className="text-[13px] font-semibold text-[#111111]">
-                                {page.label}
-                              </div>
-                              <div className="text-[11px] text-[#6B6B6B]">
-                                {page.desc}
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {isHovered && (
+                    <motion.div
+                      layoutId="navbar-hover-pill"
+                      className="absolute inset-0 bg-black/[0.05] rounded-full -z-0 pointer-events-none"
+                      transition={{ type: "spring", stiffness: 420, damping: 30 }}
+                    />
+                  )}
                 </div>
               );
-            }
+            })}
+          </div>
 
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="transition-colors hover:text-[#111111]"
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
+          {/* ── RIGHT: Clean Real SaaS Action Buttons ── */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Log in link */}
+            <Link
+              href="/login"
+              className="hidden sm:inline-flex items-center px-3.5 py-1.5 rounded-full text-[13.5px] font-semibold text-[#111111] hover:bg-black/5 transition-colors"
+            >
+              Log in
+            </Link>
 
-        {/* Right: Controls & Actions */}
-        <div className="hidden md:flex items-center gap-3">
-          {/* Language selector pill */}
-          <button
-            type="button"
-            className="h-9 px-3 bg-[#EFECE0] hover:bg-[#E7E3D5] rounded-full flex items-center gap-1.5 text-xs font-semibold text-[#111111] transition-colors cursor-pointer"
-          >
-            {/* UK Flag SVG */}
-            <span className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center shrink-0 shadow-xs">
-              <svg viewBox="0 0 60 30" width="16" height="16" className="w-full h-full object-cover">
-                <clipPath id="uk-flag">
-                  <path d="M0 0v30h60V0z"/>
-                </clipPath>
-                <path d="M0 0v30h60V0z" fill="#012169"/>
-                <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
-                <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
-                <path d="M30 0v30M0 15h60" stroke="#fff" strokeWidth="10"/>
-                <path d="M30 0v30M0 15h60" stroke="#C8102E" strokeWidth="6"/>
-              </svg>
-            </span>
-            <span>ENG</span>
-            <ChevronDown className="w-3 h-3 text-[#111111]" />
-          </button>
+            {/* Primary Action Button (Clean, Non-AI, Premium SaaS style) */}
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center h-9 sm:h-9.5 px-4.5 sm:px-5 rounded-full text-[13px] font-bold text-white bg-[#111111] hover:bg-black transition-all shadow-sm active:scale-[0.98] shrink-0"
+            >
+              Get started free
+            </Link>
 
-          {/* My Account Button */}
-          <Link
-            href="/login"
-            className="h-10 px-5 bg-[#111111] hover:bg-black text-white rounded-full text-sm font-semibold tracking-tight inline-flex items-center justify-center transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] shadow-sm"
-          >
-            My Account
-          </Link>
-        </div>
+            {/* Mobile Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Toggle navigation menu"
+              className="md:hidden p-2 rounded-full text-[#111111] hover:bg-black/5 transition-colors cursor-pointer"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={mobileOpen ? "close" : "open"}
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </motion.span>
+              </AnimatePresence>
+            </button>
+          </div>
+        </nav>
+      </header>
 
-        {/* Mobile Hamburger Button */}
-        <div className="flex md:hidden items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-label="Toggle Navigation Menu"
-            className="p-2 rounded-xl text-[#111111] hover:bg-neutral-100 transition-colors"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Menu Dropdown Panel */}
+      {/* ── Mobile Slide-In Drawer ── */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="md:hidden overflow-hidden mt-2 mx-auto max-w-6xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[150] md:hidden font-[family-name:var(--font-plus-jakarta)]"
           >
-            <div className="bg-white rounded-2xl p-5 shadow-lg border border-neutral-100 flex flex-col gap-4 font-[family-name:var(--font-plus-jakarta)]">
-              <div className="flex flex-col gap-3 text-sm font-semibold text-[#111111]">
-                {navLinks.map((item) => (
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+              onClick={() => setMobileOpen(false)}
+            />
+
+            {/* Sliding Panel */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute right-0 top-0 bottom-0 w-[84vw] max-w-sm bg-white shadow-2xl flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-[#F0EDE4]">
+                <Link
+                  href="/"
+                  className="flex items-center gap-2.5"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Image
+                    src="/logo/favicon.png"
+                    alt="Ropimo"
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-xl object-contain"
+                  />
+                  <span className="text-[19px] font-extrabold tracking-[-0.04em] text-[#111111]">
+                    Ropimo
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  className="p-2 rounded-full hover:bg-[#FAF9F6] text-[#111111]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Navigation Links */}
+              <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-1">
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
+                  Modules
+                </p>
+                {PRODUCT_MODULES.map((item) => {
+                  const IconComp = item.icon;
+                  return (
+                    <Link
+                      key={item.title}
+                      href="#workflows"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#FAF9F6] transition-colors"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: item.bg, color: item.color }}
+                      >
+                        <IconComp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[13.5px] font-bold text-[#111111]">
+                          {item.title}
+                        </div>
+                        <div className="text-[11px] text-[#6B6B6B] truncate max-w-[210px]">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+
+                <div className="h-px bg-[#F0EDE4] my-3" />
+
+                <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-3 mb-2">
+                  Navigation
+                </p>
+                {NAV_ITEMS.map((item) => (
                   <Link
                     key={item.label}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="py-1.5 px-2 rounded-lg hover:bg-[#FAF9F6] transition-colors"
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2.5 rounded-xl text-[14px] font-semibold text-[#111111] hover:bg-[#FAF9F6] transition-colors"
                   >
                     {item.label}
                   </Link>
                 ))}
               </div>
 
-              <hr className="border-neutral-100" />
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  className="h-9 px-3 bg-[#EFECE0] rounded-full flex items-center gap-1.5 text-xs font-semibold text-[#111111]"
-                >
-                  <span className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 60 30" width="16" height="16">
-                      <path d="M0 0v30h60V0z" fill="#012169"/>
-                      <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
-                      <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
-                      <path d="M30 0v30M0 15h60" stroke="#fff" strokeWidth="10"/>
-                      <path d="M30 0v30M0 15h60" stroke="#C8102E" strokeWidth="6"/>
-                    </svg>
-                  </span>
-                  <span>ENG</span>
-                  <ChevronDown className="w-3 h-3 text-[#111111]" />
-                </button>
-
+              {/* Actions */}
+              <div className="px-5 py-5 border-t border-[#F0EDE4] flex flex-col gap-2.5 bg-[#FAF9F6]/50">
                 <Link
                   href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="h-9 px-5 bg-[#111111] text-white rounded-full text-xs font-semibold inline-flex items-center justify-center"
+                  onClick={() => setMobileOpen(false)}
+                  className="w-full h-11 rounded-full border border-[#E9E6DA] bg-white text-[13.5px] font-bold text-[#111111] flex items-center justify-center hover:bg-neutral-50 transition-colors"
                 >
-                  My Account
+                  Log in
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="w-full h-11 rounded-full text-[13.5px] font-bold text-white bg-[#111111] hover:bg-black flex items-center justify-center transition-colors shadow-sm"
+                >
+                  Get started free
                 </Link>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </>
   );
 }

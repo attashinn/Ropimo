@@ -1,5 +1,5 @@
 export { Hero, default as TaskTideHero } from "./hero";
-export { Navbar as TaskTideNavbar } from "./navbar";
+export { Navbar, Navbar as TaskTideNavbar } from "./navbar";
 export { FloatingAvatar } from "./floating-avatar";
 export { ConnectorLines } from "./connector-lines";
 export { ScallopedEdge } from "./scalloped-edge";

@@ -290,7 +290,7 @@ export function ComparisonSection() {
   const [activeCompetitor, setActiveCompetitor] = useState<"all" | "clickup" | "asana" | "monday">("all");
 
   return (
-    <section className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-[#E9E6DA]">
+    <section id="compare" className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 px-4 sm:px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)] border-t border-[#E9E6DA]">
       <div className="max-w-6xl mx-auto flex flex-col items-center">
         {/* Section Header (Authentic, No marketing fluff) */}
         <div className="text-center max-w-2xl mx-auto flex flex-col items-center mb-10 sm:mb-14">

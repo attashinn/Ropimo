@@ -67,7 +67,7 @@ const cardVariants = {
 
 export function Testimonials() {
   return (
-    <section className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 lg:py-32 px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)]">
+    <section id="testimonials" className="relative w-full bg-[#FAF9F6] py-20 sm:py-28 lg:py-32 px-6 lg:px-8 font-[family-name:var(--font-plus-jakarta)]">
       <div className="max-w-6xl mx-auto flex flex-col items-center">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-14 sm:mb-16">

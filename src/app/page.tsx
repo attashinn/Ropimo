@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import {
+  Navbar,
   TaskTideHero,
   FeaturesSection,
   FeatureRows,
 } from "@/components/tasktide";
 import {
   LogoStrip,
+  DepartmentShowcase,
   ProductShowcase,
   ComparisonSection,
   StatsRow,
@@ -34,12 +36,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FAF9F6] text-[#111111] antialiased selection:bg-[#111111] selection:text-white">
+      {/* Grammarly-style Floating Animated Sticky Navbar */}
+      <Navbar />
+
       <main className="flex-1">
-        {/* Hero Section & Floating Navbar (Untouched) */}
+        {/* Hero Section */}
         <TaskTideHero />
 
         {/* Logo Strip */}
         <LogoStrip />
+
+        {/* Interactive Department Workflow Showcase (Monday.com style) */}
+        <DepartmentShowcase />
 
         {/* Core Workflow 3-Card Section (Untouched) */}
         <FeaturesSection />

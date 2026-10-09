@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { Navbar } from "./navbar";
 import { FloatingAvatar } from "./floating-avatar";
 import { ConnectorLines } from "./connector-lines";
 import { ScallopedEdge } from "./scalloped-edge";
 
 const ROTATING_WORDS = [
-  { text: "TaskTide", tag: "Software" },
+  { text: "Ropimo", tag: "Workspace" },
   { text: "Your Team", tag: "Together" },
   { text: "Zero Chaos", tag: "Clarity" },
   { text: "Every Project", tag: "On Track" },
@@ -63,12 +62,9 @@ export function Hero() {
   const displayText = currentWord.substring(0, subIndex) || "\u00A0";
 
   return (
-    <section className="relative w-full bg-[#EFECE0] pt-2 sm:pt-4 overflow-hidden font-[family-name:var(--font-plus-jakarta)]">
-      {/* Floating Navbar inside the full-width beige hero */}
-      <Navbar />
-
+    <section className="relative w-full bg-[#EFECE0] pt-0 overflow-hidden font-[family-name:var(--font-plus-jakarta)]">
       {/* Main Hero Content Frame (Avatars + Headline + CTA) */}
-      <div className="relative w-full max-w-[1260px] mx-auto min-h-[500px] sm:min-h-[640px] lg:min-h-[740px] pt-6 sm:pt-16 pb-16 sm:pb-28 px-4 flex flex-col items-center justify-center">
+      <div className="relative w-full max-w-[1260px] mx-auto min-h-[500px] sm:min-h-[640px] lg:min-h-[740px] pt-28 sm:pt-36 lg:pt-40 pb-16 sm:pb-28 px-4 flex flex-col items-center justify-center">
         {/* SVG Connector Lines connecting avatars (hidden on mobile & tablet) */}
         <ConnectorLines />
 
@@ -84,7 +80,7 @@ export function Hero() {
           cursorPlacement="top-right"
           floatDuration={4.2}
           floatDelay={0}
-          className="hidden lg:block top-[10%] left-[1%] sm:left-[3%] md:left-[4%] lg:left-[5%]"
+          className="hidden lg:block top-[20%] left-[1%] sm:left-[3%] md:left-[4%] lg:left-[5%]"
         />
 
         {/* Top-Right: Sarah */}
@@ -96,7 +92,7 @@ export function Hero() {
           pillPlacement="left"
           floatDuration={3.8}
           floatDelay={0.5}
-          className="hidden lg:block top-[10%] right-[1%] sm:right-[3%] md:right-[4%] lg:right-[5%]"
+          className="hidden lg:block top-[20%] right-[1%] sm:right-[3%] md:right-[4%] lg:right-[5%]"
         />
 
         {/* Mid-Left: Stokes */}
@@ -108,7 +104,7 @@ export function Hero() {
           pillPlacement="left"
           floatDuration={4.6}
           floatDelay={0.2}
-          className="hidden lg:block top-[37%] left-[8%] sm:left-[11%] md:left-[13%] lg:left-[14%]"
+          className="hidden lg:block top-[44%] left-[8%] sm:left-[11%] md:left-[13%] lg:left-[14%]"
         />
 
         {/* Mid-Right: Starc */}
@@ -120,7 +116,7 @@ export function Hero() {
           pillPlacement="right"
           floatDuration={4.4}
           floatDelay={0.7}
-          className="hidden lg:block top-[37%] right-[8%] sm:right-[11%] md:right-[13%] lg:right-[14%]"
+          className="hidden lg:block top-[44%] right-[8%] sm:right-[11%] md:right-[13%] lg:right-[14%]"
         />
 
         {/* Bottom-Left: Alyssa */}
@@ -132,7 +128,7 @@ export function Hero() {
           pillPlacement="right"
           floatDuration={4.0}
           floatDelay={0.4}
-          className="hidden lg:block top-[63%] left-[1%] sm:left-[3%] md:left-[4%] lg:left-[5%]"
+          className="hidden lg:block top-[68%] left-[1%] sm:left-[3%] md:left-[4%] lg:left-[5%]"
         />
 
         {/* Bottom-Right: Conway */}
@@ -146,7 +142,7 @@ export function Hero() {
           cursorPlacement="top-left"
           floatDuration={4.5}
           floatDelay={0.9}
-          className="hidden lg:block top-[63%] right-[1%] sm:right-[3%] md:right-[4%] lg:right-[5%]"
+          className="hidden lg:block top-[68%] right-[1%] sm:right-[3%] md:right-[4%] lg:right-[5%]"
         />
 
         {/* Centered Hero Content */}
