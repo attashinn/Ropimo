@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { FloatingAvatar } from "./floating-avatar";
@@ -147,6 +148,30 @@ export function Hero() {
 
         {/* Centered Hero Content */}
         <div className="relative z-20 max-w-4xl mx-auto flex flex-col items-center text-center px-2 sm:px-4">
+          {/* Top Announcement Pill / Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="mb-4 sm:mb-6"
+          >
+            <Link
+              href="#workflows"
+              className="group inline-flex items-center gap-2 px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-white/90 hover:bg-white border border-[#E0DCCF] hover:border-[#111111]/30 shadow-[0_2px_10px_rgba(0,0,0,0.04)] text-[12px] sm:text-[13px] font-semibold text-[#111111] transition-all duration-200 select-none hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1F9D55] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1F9D55]" />
+              </span>
+              <span className="font-bold text-neutral-900">Ropimo 2.4</span>
+              <span className="text-neutral-300">|</span>
+              <span className="text-[#555555] font-medium group-hover:text-[#111111] transition-colors">
+                The Calm Workspace for Teams
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-[#111111] group-hover:translate-x-0.5 transition-all" />
+            </Link>
+          </motion.div>
+
           {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 8 }}
