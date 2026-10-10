@@ -23,18 +23,17 @@ export function AssignDepartmentLeadModal({
   onSuccess,
 }: AssignDepartmentLeadModalProps) {
   const router = useRouter();
+  const [prevDepartmentId, setPrevDepartmentId] = React.useState(department.id);
   const [selectedUserId, setSelectedUserId] = React.useState<string>(
     department.members?.[0]?.id || ""
   );
+  if (department.id !== prevDepartmentId) {
+    setPrevDepartmentId(department.id);
+    setSelectedUserId(department.members?.[0]?.id || "");
+  }
   const [jobTitle, setJobTitle] = React.useState("Department Lead");
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (department.members && department.members.length > 0) {
-      setSelectedUserId(department.members[0].id);
-    }
-  }, [department]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +59,8 @@ export function AssignDepartmentLeadModal({
       onClose();
       router.refresh();
       if (onSuccess) onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred.");
       setLoading(false);
     }
   };

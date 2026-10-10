@@ -19,18 +19,23 @@ import {
   Briefcase,
   Calendar,
   Sparkles,
+  Camera,
+  Loader2,
 } from "lucide-react";
 import { RopimoUserAvatar } from "@/components/ropimo/ropimo-user-avatar";
 import { RopimoStatusBadge } from "@/components/ropimo/ropimo-status-badge";
 import { cn } from "@/lib/utils";
+import { updateProfileNameAction, updateProfileAvatarAction, changePasswordAction } from "@/lib/profile/actions";
 
 export interface UserProfileViewProps {
   user: {
     id?: string;
     email?: string | null;
     fullName?: string | null;
+    avatarUrl?: string | null;
   } | null;
   workspaceName?: string;
+  workspaceId?: string;
   myTasksCount?: number;
   completedTasksCount?: number;
 }
@@ -38,24 +43,31 @@ export interface UserProfileViewProps {
 export function UserProfileView({
   user,
   workspaceName = "brnnd",
+  workspaceId = "",
   myTasksCount = 5,
   completedTasksCount = 14,
 }: UserProfileViewProps) {
   const [activeTab, setActiveTab] = React.useState<"general" | "work" | "notifications" | "security">("general");
-  const [fullName, setFullName] = React.useState(user?.fullName || "Tashin Khan");
+  const [fullName, setFullName] = React.useState(user?.fullName || "User");
+  const [avatarUrl, setAvatarUrl] = React.useState(user?.avatarUrl || null);
   const [jobTitle, setJobTitle] = React.useState("Founder & Lead Designer");
   const [bio, setBio] = React.useState("Building scalable workspace software and digital products.");
   const [timezone, setTimezone] = React.useState("Asia/Dhaka (GMT+6)");
   const [copied, setCopied] = React.useState(false);
-  const [saveStatus, setSaveStatus] = React.useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const email = user?.email || "tashinkan360@gmail.com";
-  const userInitials = fullName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
+  // Avatar Upload State
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
+  const avatarInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Password Change State
+  const [newPassword, setNewPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [passwordStatus, setPasswordStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+
+  const email = user?.email || "";
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -63,13 +75,96 @@ export function UserProfileView({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Please select an image file (.png, .jpg, .webp).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Image file size cannot exceed 5MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setErrorMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (workspaceId) {
+        formData.append("workspaceId", workspaceId);
+      }
+      formData.append("folder", "avatars");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setAvatarUrl(data.url);
+        await updateProfileAvatarAction({ avatarUrl: data.url });
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      } else {
+        setErrorMessage(data.error || "Failed to upload avatar image.");
+      }
+    } catch {
+      setErrorMessage("Network error uploading avatar.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMessage("Full name must be at least 2 characters.");
+      return;
+    }
+
     setSaveStatus("saving");
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    const result = await updateProfileNameAction({ fullName: fullName.trim() });
+    if (result.success) {
       setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 2500);
-    }, 600);
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } else {
+      setSaveStatus("error");
+      setErrorMessage(result.error || "Failed to save profile name.");
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirm password do not match.");
+      return;
+    }
+
+    setPasswordStatus("saving");
+    setPasswordError(null);
+
+    const result = await changePasswordAction({ newPassword, confirmPassword });
+    if (result.success) {
+      setPasswordStatus("saved");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordStatus("idle"), 4000);
+    } else {
+      setPasswordStatus("error");
+      setPasswordError(result.error || "Failed to change password.");
+    }
   };
 
   return (
@@ -90,8 +185,28 @@ export function UserProfileView({
         <div className="relative px-6 pb-6 pt-0">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 mb-4">
             <div className="flex items-end gap-4">
-              <div className="relative rounded-full ring-4 ring-white shadow-md bg-[#10251F]">
-                <RopimoUserAvatar name={fullName} size="xl" className="h-20 w-20 text-2xl font-bold" />
+              <div className="relative rounded-full ring-4 ring-white shadow-md bg-[#10251F] group">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={fullName} className="h-20 w-20 rounded-full object-cover" />
+                ) : (
+                  <RopimoUserAvatar name={fullName} size="xl" className="h-20 w-20 text-2xl font-bold" />
+                )}
+                <button
+                  type="button"
+                  disabled={uploadingAvatar}
+                  onClick={() => avatarInputRef.current?.click()}
+                  title="Upload profile photo"
+                  className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-[#10251F] text-white border-2 border-white hover:bg-[#246244] transition-colors cursor-pointer"
+                >
+                  {uploadingAvatar ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+                </button>
               </div>
               <div className="pb-1">
                 <div className="flex items-center gap-2.5">
@@ -134,7 +249,7 @@ export function UserProfileView({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as "overview" | "security" | "notifications" | "workspace")}
                   className={cn(
                     "relative flex items-center gap-2 pb-3 transition-colors cursor-pointer",
                     isActive
@@ -157,6 +272,20 @@ export function UserProfileView({
       {/* TAB CONTENT 1: GENERAL DETAILS */}
       {activeTab === "general" && (
         <form onSubmit={handleSave} className="space-y-6">
+          {saveStatus === "saved" && (
+            <div className="flex items-center gap-2 rounded-[8px] border border-[#246244]/20 bg-[#E8F5E9] px-4 py-3 text-xs text-[#1B5E20]">
+              <CheckCircle2 size={15} className="shrink-0" />
+              <span>Profile details updated successfully.</span>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="flex items-center gap-2 rounded-[8px] border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-5">
             <div>
               <h2 className="text-sm font-bold text-[#18221E]">General Information</h2>
@@ -370,6 +499,71 @@ export function UserProfileView({
               </span>
             </div>
           </div>
+
+          {/* Change Password Card */}
+          <form onSubmit={handlePasswordSubmit} className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4 text-xs">
+            <div>
+              <h3 className="text-sm font-bold text-[#18221E]">Change Password</h3>
+              <p className="text-xs text-[#65706A]">Update your account password. Must be at least 6 characters.</p>
+            </div>
+
+            {passwordStatus === "saved" && (
+              <div className="flex items-center gap-2 rounded-[8px] border border-[#246244]/20 bg-[#E8F5E9] px-3.5 py-2.5 text-xs text-[#1B5E20]">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>Password changed successfully.</span>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="flex items-center gap-2 rounded-[8px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-bold text-[#18221E] mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="w-full rounded-[10px] border border-[#D8DDD4] bg-white px-3.5 py-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:outline-none transition-colors"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#18221E] mb-1.5">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full rounded-[10px] border border-[#D8DDD4] bg-white px-3.5 py-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:outline-none transition-colors"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={passwordStatus === "saving" || !newPassword}
+                className="inline-flex items-center gap-2 rounded-[10px] bg-[#10251F] px-4 py-2 text-xs font-semibold text-[#F4F3EE] hover:bg-[#18342C] transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {passwordStatus === "saving" ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Updating Password...</span>
+                  </>
+                ) : (
+                  <span>Update Password</span>
+                )}
+              </button>
+            </div>
+          </form>
 
           <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-3 text-xs">
             <h3 className="text-sm font-bold text-[#18221E]">Authentication Provider</h3>

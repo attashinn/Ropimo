@@ -49,6 +49,7 @@ export function CandidateOfferView({ offer }: CandidateOfferViewProps) {
   const [acceptModalOpen, setAcceptModalOpen] = React.useState(false);
   const [confirmedTerms, setConfirmedTerms] = React.useState(false);
   const [accepting, setAccepting] = React.useState(false);
+  const [nowFormatted] = React.useState(() => new Date().toLocaleDateString("en-US", { dateStyle: "medium" }));
 
   // Decline modal
   const [declineModalOpen, setDeclineModalOpen] = React.useState(false);
@@ -148,9 +149,7 @@ export function CandidateOfferView({ offer }: CandidateOfferViewProps) {
               <span className="text-xl font-bold text-[#246244]">🎉 Offer Accepted</span>
               <p className="text-xs text-[#246244]/90">
                 You accepted this offer on{" "}
-                {new Date(acceptedAt || Date.now()).toLocaleDateString("en-US", {
-                  dateStyle: "medium",
-                })}
+                {acceptedAt ? new Date(acceptedAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : nowFormatted}
                 . Our hiring team will contact you with onboarding details shortly.
               </p>
             </div>

@@ -123,22 +123,34 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
           </Tooltip>
 
           {/* Bell icon button (small 6px dot ONLY if unread) */}
-          <Tooltip content="Notifications">
-            <div className="relative inline-flex">
-              <IconButton
-                aria-label="Notifications"
-                onClick={() => setNotifCenterOpen((prev) => !prev)}
-              >
-                <Bell className="h-4 w-4 stroke-[1.5]" />
-              </IconButton>
-              {hasUnreadNotifs && (
-                <span
-                  className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-status-overdue ring-1 ring-surface pointer-events-none"
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-          </Tooltip>
+          <div className="relative inline-flex">
+            <Tooltip content="Notifications">
+              <div className="relative inline-flex">
+                <IconButton
+                  aria-label="Notifications"
+                  onClick={() => setNotifCenterOpen((prev) => !prev)}
+                >
+                  <Bell className="h-4 w-4 stroke-[1.5]" />
+                </IconButton>
+                {hasUnreadNotifs && (
+                  <span
+                    className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-status-overdue ring-1 ring-surface pointer-events-none"
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+            </Tooltip>
+
+            {/* Notifications Drawer */}
+            <NotificationCenter
+              workspaceId={workspace?.id || ""}
+              isOpen={notifCenterOpen}
+              onClose={() => {
+                setNotifCenterOpen(false);
+                setHasUnreadNotifs(false);
+              }}
+            />
+          </div>
 
           {/* Avatar (24px) */}
           <Tooltip content={displayName}>
@@ -160,16 +172,6 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
         workspaceId={workspace?.id}
         workspaceName={workspaceName}
         userName={displayName}
-      />
-
-      {/* Notifications Drawer */}
-      <NotificationCenter
-        workspaceId={workspace?.id || ""}
-        isOpen={notifCenterOpen}
-        onClose={() => {
-          setNotifCenterOpen(false);
-          setHasUnreadNotifs(false);
-        }}
       />
     </>
   );

@@ -33,7 +33,7 @@ export function ConvertToEmployeeModal({
   const router = useRouter();
 
   const [employeeId, setEmployeeId] = React.useState(
-    candidate.employee_id || `EMP-${Math.floor(100 + Math.random() * 900)}`
+    () => candidate.employee_id || `EMP-${Math.floor(100 + Math.random() * 900)}`
   );
   const [workEmail, setWorkEmail] = React.useState(candidate.email || "");
   const [personalEmail, setPersonalEmail] = React.useState(candidate.email || "");
@@ -110,8 +110,8 @@ export function ConvertToEmployeeModal({
         onSuccess();
       }
       router.refresh();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred.");
       setLoading(false);
     }
   };
@@ -279,7 +279,7 @@ export function ConvertToEmployeeModal({
                   </label>
                   <select
                     value={role}
-                    onChange={(e) => setRole(e.target.value as any)}
+                    onChange={(e) => setRole(e.target.value as "member" | "manager" | "admin")}
                     className="w-full rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-1.5 text-xs text-[#18221E] focus:border-[#10251F] focus:outline-none"
                   >
                     <option value="member">Member</option>

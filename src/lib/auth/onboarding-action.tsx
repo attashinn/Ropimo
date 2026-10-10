@@ -1,18 +1,27 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
-export interface SaveOnboardingInput {
-  companyName: string;
-  teamSize: string;
-  industry: string;
-  role: string;
-  emails?: string[];
-}
+const SaveOnboardingSchema = z.object({
+  companyName: z.string().min(2, "Workspace name must be at least 2 characters."),
+  teamSize: z.string().optional().default(""),
+  industry: z.string().optional().default(""),
+  role: z.string().optional().default("owner"),
+  emails: z.array(z.string()).optional(),
+});
 
-export async function saveOnboardingAction(input: SaveOnboardingInput) {
+export type SaveOnboardingInput = z.infer<typeof SaveOnboardingSchema>;
+
+export async function saveOnboardingAction(rawInput: SaveOnboardingInput) {
+  const parsed = SaveOnboardingSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
+
   // 1. Verify user session securely on server
   const serverClient = await createClient();
   const {
@@ -25,10 +34,6 @@ export async function saveOnboardingAction(input: SaveOnboardingInput) {
   }
 
   const name = input.companyName.trim();
-  if (!name || name.length < 2) {
-    return { success: false, error: "Workspace name must be at least 2 characters." };
-  }
-
   const adminClient = createAdminClient();
 
   // Generate safe unique slug
@@ -48,7 +53,7 @@ export async function saveOnboardingAction(input: SaveOnboardingInput) {
 
   // Try insert with team_size & industry
   let workspaceId: string | null = null;
-  const fullPayload: Record<string, any> = {
+  const fullPayload: Record<string, unknown> = {
     name,
     slug,
     team_size: input.teamSize,
@@ -72,7 +77,7 @@ export async function saveOnboardingAction(input: SaveOnboardingInput) {
       wsError.message.includes("owner_id"))
   ) {
     // Fallback if older table schema without industry/team_size columns
-    const fallbackPayload: Record<string, any> = {
+    const fallbackPayload: Record<string, unknown> = {
       name,
       slug,
       created_by: user.id,

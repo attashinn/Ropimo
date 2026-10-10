@@ -7,30 +7,53 @@ import {
   Candidate,
   CandidateApplication,
   CandidateActivity,
+  CandidateEvent,
+  CandidateNote,
   Interview,
+  InterviewFeedback,
   JobOffer,
   CandidateStage,
 } from "@/types/recruitment";
 import { Department } from "@/types/department";
 import { WorkspacePerson } from "@/types/people";
 import {
-  updateApplicationStageAction,
-  assignCandidateRecruiterAction,
+  updateCandidateStageAction,
+  updateCandidateRatingAction,
   updateCandidateTagsAction,
   addCandidateNoteAction,
   deleteCandidateNoteAction,
-  archiveCandidateAction,
-  completeInterviewAction,
-  sendOfferAction,
-  withdrawOfferAction,
+  getResumeSignedUrlAction,
 } from "@/lib/recruitment/actions";
+import { STAGE_DEFINITIONS, HIRING_STAGES, HiringStage } from "@/lib/hiring/stages";
 import { ScheduleInterviewModal } from "./schedule-interview-modal";
 import { SubmitFeedbackModal } from "./submit-feedback-modal";
 import { RejectCandidateModal } from "./reject-candidate-modal";
-import { ConvertToEmployeeModal } from "./convert-to-employee-modal";
-import { AppIcon } from "@/components/ui/app-icon";
 import { CreateOfferModal } from "./create-offer-modal";
 import { CompleteHiringModal } from "./complete-hiring-modal";
+import { toast } from "sonner";
+import {
+  Star,
+  Mail,
+  Phone,
+  Globe,
+  FileText,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  X,
+  ExternalLink,
+  Download,
+  AlertCircle,
+  MessageSquare,
+  ShieldAlert,
+  ChevronRight,
+  User,
+  Send,
+  Briefcase,
+  Lock,
+} from "lucide-react";
 
 export interface CandidateDetailViewProps {
   workspaceId: string;
@@ -40,121 +63,125 @@ export interface CandidateDetailViewProps {
   applications: CandidateApplication[];
   interviews?: Interview[];
   offers?: JobOffer[];
-  activities: CandidateActivity[];
+  activities?: CandidateActivity[];
+  events?: CandidateEvent[];
+  notes?: CandidateNote[];
+  feedbacks?: InterviewFeedback[];
   departments: Department[];
   teamMembers: WorkspacePerson[];
 }
 
-type TabKey = "overview" | "applications" | "offers" | "notes" | "resume" | "interviews" | "activity";
+type TabKey = "overview" | "timeline" | "notes" | "interviews" | "offer" | "emails";
 
-const STAGES: CandidateStage[] = [
-  "Applied",
-  "Screening",
-  "Shortlisted",
-  "Interview",
-  "Feedback",
-  "Offer",
-  "Hired",
-  "Rejected",
-  "Archived",
-];
-
-const PRESET_TAGS = ["Senior", "Strong Candidate", "Remote", "Urgent", "Needs Review", "High Salary", "Culture Fit"];
+const PRESET_TAGS = ["Senior", "Strong Fit", "Fast-Track", "Remote", "High Priority", "Leadership"];
 
 export function CandidateDetailView({
   workspaceId,
   workspaceName = "Workspace",
   userRole,
   candidate,
-  applications,
+  applications = [],
   interviews = [],
   offers = [],
   activities = [],
+  events = [],
+  notes = [],
+  feedbacks = [],
   departments,
   teamMembers,
 }: CandidateDetailViewProps) {
   const router = useRouter();
+
   const [activeTab, setActiveTab] = React.useState<TabKey>("overview");
-  const [currentStage, setCurrentStage] = React.useState<CandidateStage>(
-    candidate.latest_stage || "Applied"
+  const [currentStage, setCurrentStage] = React.useState<string>(
+    (candidate.latest_stage || "applied").toLowerCase()
   );
   const [updatingStage, setUpdatingStage] = React.useState(false);
-  const [copiedEmail, setCopiedEmail] = React.useState(false);
-  const [copiedOfferLink, setCopiedOfferLink] = React.useState<string | null>(null);
+  const [rating, setRating] = React.useState<number>(candidate.rating || 0);
+  const [tags, setTags] = React.useState<string[]>(candidate.tags || []);
+  const [newTagInput, setNewTagInput] = React.useState("");
 
   // Notes state
-  const [newNoteContent, setNewNoteContent] = React.useState("");
+  const [noteContent, setNoteContent] = React.useState("");
+  const [noteMentions, setNoteMentions] = React.useState<string[]>([]);
   const [submittingNote, setSubmittingNote] = React.useState(false);
 
-  // Tags state
-  const [customTagInput, setCustomTagInput] = React.useState("");
-  const [tags, setTags] = React.useState<string[]>(candidate.tags || []);
+  // Resume Signed URL state
+  const [signedResumeUrl, setSignedResumeUrl] = React.useState<string | null>(null);
+  const [loadingResumeUrl, setLoadingResumeUrl] = React.useState(false);
 
   // Modals state
   const [scheduleModalOpen, setScheduleModalOpen] = React.useState(false);
   const [rejectModalOpen, setRejectModalOpen] = React.useState(false);
   const [createOfferOpen, setCreateOfferOpen] = React.useState(false);
   const [completeHiringOpen, setCompleteHiringOpen] = React.useState(false);
-  const [feedbackInterview, setFeedbackInterview] = React.useState<Interview | null>(null);
+  const [scorecardInterview, setScorecardInterview] = React.useState<Interview | null>(null);
   const [selectedOfferForHire, setSelectedOfferForHire] = React.useState<JobOffer | undefined>(undefined);
 
-  const canManage = ["owner", "admin", "manager"].includes(userRole);
-  const latestApp = applications[0] || {
-    id: candidate.latest_application_id || candidate.id,
-    workspace_id: workspaceId,
-    candidate_id: candidate.id,
-    job_opening_id: candidate.latest_job_id || "",
-    stage: currentStage,
-    created_at: candidate.created_at,
-    updated_at: candidate.created_at,
-  };
+  const isHiringTeam = ["owner", "admin", "hr", "manager"].includes(userRole);
+  const isInterviewerOnly = !isHiringTeam;
 
-  const isHired = candidate.latest_stage === "Hired" || Boolean(candidate.converted_user_id);
-  const acceptedOffer = offers.find((o) => o.status === "Accepted");
+  const latestApp = applications[0];
 
-  const initials = candidate.full_name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
-
-  const handleStageChange = async (newStage: CandidateStage) => {
-    setCurrentStage(newStage);
-    setUpdatingStage(true);
-    try {
-      await updateApplicationStageAction({
-        workspaceId,
-        applicationId: latestApp.id,
-        candidateId: candidate.id,
-        toStage: newStage,
-      });
-      router.refresh();
-    } catch (err) {
-      console.error("Failed to update stage:", err);
-    } finally {
-      setUpdatingStage(false);
+  // Fetch signed resume URL
+  React.useEffect(() => {
+    async function loadSignedUrl() {
+      if (candidate.cv_storage_key || latestApp?.cv_storage_key) {
+        setLoadingResumeUrl(true);
+        const res = await getResumeSignedUrlAction({
+          workspaceId,
+          candidateId: candidate.id,
+        });
+        if (res.success && res.data?.url) {
+          setSignedResumeUrl(res.data.url);
+        } else {
+          setSignedResumeUrl(`/api/storage/${candidate.cv_storage_key || latestApp?.cv_storage_key}`);
+        }
+        setLoadingResumeUrl(false);
+      }
     }
-  };
+    loadSignedUrl();
+  }, [workspaceId, candidate.id, candidate.cv_storage_key, latestApp?.cv_storage_key]);
 
-  const handleAssignRecruiter = async (userId: string) => {
-    const selected = teamMembers.find((m) => m.user_id === userId);
-    await assignCandidateRecruiterAction({
+  const handleStageChange = async (targetStage: string) => {
+    setUpdatingStage(true);
+    const res = await updateCandidateStageAction({
       workspaceId,
       candidateId: candidate.id,
-      applicationId: latestApp.id,
-      recruiterId: selected ? selected.user_id : null,
-      recruiterName: selected ? (selected.full_name || null) : null,
+      applicationId: latestApp?.id,
+      toStage: targetStage,
     });
+    setUpdatingStage(false);
+
+    if (!res.success) {
+      toast.error(res.error || "Cannot move stage.");
+      return;
+    }
+
+    setCurrentStage(targetStage);
+    toast.success(`Moved to ${STAGE_DEFINITIONS[targetStage as HiringStage]?.label || targetStage}`);
     router.refresh();
   };
 
-  const handleAddTag = async (tagToAdd: string) => {
-    const trimmed = tagToAdd.trim();
-    if (!trimmed || tags.includes(trimmed)) return;
-    const updated = [...tags, trimmed];
+  const handleRatingChange = async (newRating: number) => {
+    setRating(newRating);
+    const res = await updateCandidateRatingAction({
+      workspaceId,
+      candidateId: candidate.id,
+      rating: newRating,
+    });
+    if (res.success) {
+      toast.success(`Rated ${newRating}/5 stars`);
+      router.refresh();
+    }
+  };
+
+  const handleAddTag = async (t: string) => {
+    const clean = t.trim();
+    if (!clean || tags.includes(clean)) return;
+    const updated = [...tags, clean];
     setTags(updated);
-    setCustomTagInput("");
+    setNewTagInput("");
     await updateCandidateTagsAction({
       workspaceId,
       candidateId: candidate.id,
@@ -163,8 +190,8 @@ export function CandidateDetailView({
     router.refresh();
   };
 
-  const handleRemoveTag = async (tagToRemove: string) => {
-    const updated = tags.filter((t) => t !== tagToRemove);
+  const handleRemoveTag = async (t: string) => {
+    const updated = tags.filter((item) => item !== t);
     setTags(updated);
     await updateCandidateTagsAction({
       workspaceId,
@@ -176,339 +203,221 @@ export function CandidateDetailView({
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNoteContent.trim() || submittingNote) return;
+    if (!noteContent.trim() || submittingNote) return;
     setSubmittingNote(true);
-    try {
-      await addCandidateNoteAction({
-        workspaceId,
-        candidateId: candidate.id,
-        content: newNoteContent.trim(),
-      });
-      setNewNoteContent("");
+
+    // Extract @mentions
+    const matches = noteContent.match(/@([a-zA-Z0-9._-]+)/g) || [];
+    const mentions = Array.from(new Set(matches.map((m) => m.substring(1))));
+
+    const res = await addCandidateNoteAction({
+      workspaceId,
+      candidateId: candidate.id,
+      content: noteContent.trim(),
+      mentions,
+    });
+    setSubmittingNote(false);
+
+    if (res.success) {
+      toast.success("Internal note added.");
+      setNoteContent("");
       router.refresh();
-    } catch (err) {
-      console.error("Failed to add note:", err);
-    } finally {
-      setSubmittingNote(false);
+    } else {
+      toast.error(res.error || "Failed to add note.");
     }
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    if (!confirm("Are you sure you want to delete this internal note?")) return;
-    await deleteCandidateNoteAction({
+    if (!confirm("Delete this internal note?")) return;
+    const res = await deleteCandidateNoteAction({
       workspaceId,
       candidateId: candidate.id,
       noteId,
     });
-    router.refresh();
-  };
-
-  const handleArchiveToggle = async () => {
-    const targetState = !candidate.is_archived;
-    await archiveCandidateAction({
-      workspaceId,
-      candidateId: candidate.id,
-      isArchived: targetState,
-    });
-    router.refresh();
-  };
-
-  const handleSendOffer = async (offerId: string) => {
-    await sendOfferAction({
-      workspaceId,
-      offerId,
-    });
-    router.refresh();
-  };
-
-  const handleWithdrawOffer = async (offerId: string) => {
-    if (!confirm("Are you sure you want to withdraw this job offer?")) return;
-    await withdrawOfferAction({
-      workspaceId,
-      offerId,
-      reason: "Withdrawn by hiring team",
-    });
-    router.refresh();
-  };
-
-  const handleCopyOfferLink = (offer: JobOffer) => {
-    if (typeof window !== "undefined") {
-      const url = `${window.location.origin}/jobs/offers/${offer.token || offer.id}`;
-      navigator.clipboard.writeText(url);
-      setCopiedOfferLink(offer.id);
-      setTimeout(() => setCopiedOfferLink(null), 2000);
+    if (res.success) {
+      toast.success("Note removed.");
+      router.refresh();
     }
   };
 
-  const handleCompleteInterview = async (interviewId: string) => {
-    await completeInterviewAction({
-      workspaceId,
-      interviewId,
-    });
-    router.refresh();
-  };
+  // Rejection emails sent
+  const emailsSent = events.filter(
+    (ev) => ev.event_type === "rejection_email_sent" || ev.event_type === "interview_scheduled"
+  );
 
-  const handleCopyEmail = () => {
-    if (typeof window !== "undefined" && candidate.email) {
-      navigator.clipboard.writeText(candidate.email);
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 2000);
-    }
-  };
-
-  const cvKey = candidate.cv_storage_key || latestApp.cv_storage_key;
-  const cvUrl = cvKey ? `/api/storage/${cvKey}` : null;
-  const cvFileName = candidate.cv_file_name || latestApp.cv_file_name || "Resume.pdf";
-  const cvFileSize = candidate.cv_file_size || latestApp.cv_file_size;
-
-  const getStageBadgeColor = (stage?: CandidateStage) => {
-    switch (stage) {
-      case "Applied":
-        return "bg-sky-50 text-sky-700 border-sky-200";
-      case "Screening":
-        return "bg-indigo-50 text-indigo-700 border-indigo-200";
-      case "Shortlisted":
-        return "bg-purple-50 text-purple-700 border-purple-200";
-      case "Interview":
-        return "bg-amber-50 text-amber-700 border-amber-200";
-      case "Feedback":
-        return "bg-teal-50 text-teal-700 border-teal-200";
-      case "Offer":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "Hired":
-        return "bg-[#EAF4E2] text-[#246244] border-[#246244]/20 font-bold";
-      case "Rejected":
-      case "Archived":
-      case "Withdrawn":
-      case "Expired":
-        return "bg-stone-100 text-stone-600 border-stone-200";
-      default:
-        return "bg-stone-100 text-stone-700";
-    }
-  };
-
-  const getOfferBadgeColor = (status: string) => {
-    switch (status) {
-      case "Draft":
-        return "bg-stone-100 text-stone-700 border-stone-200";
-      case "Sent":
-        return "bg-sky-50 text-sky-700 border-sky-200";
-      case "Viewed":
-        return "bg-purple-50 text-purple-700 border-purple-200";
-      case "Accepted":
-        return "bg-[#EAF4E2] text-[#246244] border-[#246244]/20 font-bold";
-      case "Declined":
-      case "Withdrawn":
-      case "Expired":
-        return "bg-red-50 text-red-700 border-red-200";
-      default:
-        return "bg-stone-100 text-stone-700 border-stone-200";
-    }
-  };
+  // Scorecards calculation
+  const totalScorecards = feedbacks.length;
+  const avgSkills =
+    totalScorecards > 0
+      ? (feedbacks.reduce((acc, f) => acc + (f.skills_rating || f.technical_skills_rating || 3), 0) / totalScorecards).toFixed(1)
+      : null;
+  const avgComms =
+    totalScorecards > 0
+      ? (feedbacks.reduce((acc, f) => acc + (f.communication_rating || 3), 0) / totalScorecards).toFixed(1)
+      : null;
+  const avgCulture =
+    totalScorecards > 0
+      ? (feedbacks.reduce((acc, f) => acc + (f.culture_rating || f.culture_fit_rating || 3), 0) / totalScorecards).toFixed(1)
+      : null;
+  const avgOverall =
+    totalScorecards > 0
+      ? (feedbacks.reduce((acc, f) => acc + (f.overall_rating || f.rating || 3), 0) / totalScorecards).toFixed(1)
+      : null;
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6 pb-24 text-[#18221E]">
+    <div className="mx-auto max-w-[1240px] space-y-6 pb-24 text-[#18221E]">
       {/* 1. BREADCRUMB */}
       <div className="flex items-center gap-2 text-xs text-[#65706A]">
         <Link href="/app" className="hover:text-[#18221E] transition-colors">
           {workspaceName}
         </Link>
         <span>/</span>
-        <Link href="/app/people" className="hover:text-[#18221E] transition-colors">
-          People & Candidates
+        <Link href="/app/people?tab=candidates" className="hover:text-[#18221E] transition-colors">
+          Candidates
         </Link>
         <span>/</span>
         <span className="font-semibold text-[#18221E]">{candidate.full_name}</span>
       </div>
 
-      {/* HIRING NOTIFICATION BANNER (IF ACCEPTED BUT NOT HIRED) */}
-      {acceptedOffer && !isHired && canManage && (
-        <div className="rounded-[14px] bg-[#EAF4E2] border border-[#246244]/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎉</span>
-            <div>
-              <p className="font-bold text-xs text-[#246244]">Offer Accepted by Candidate!</p>
-              <p className="text-[11px] text-[#246244]/80">
-                {candidate.full_name} accepted the offer for {acceptedOffer.job_title}. Confirm to activate as employee in Team Directory.
+      {/* 2. CANDIDATE PROFILE HEADER CARD */}
+      <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-lg font-bold text-white shadow-2xs">
+              {candidate.full_name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .substring(0, 2)
+                .toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl font-bold tracking-tight text-[#18221E] truncate">
+                  {candidate.full_name}
+                </h1>
+                <span className="rounded-full border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-0.5 text-xs font-semibold capitalize text-[#18221E]">
+                  {STAGE_DEFINITIONS[currentStage as HiringStage]?.label || currentStage}
+                </span>
+                {candidate.latest_job_title && (
+                  <span className="rounded-full bg-[#EAF4E2] border border-[#246244]/20 px-2.5 py-0.5 text-xs font-bold text-[#246244]">
+                    {candidate.latest_job_title}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-[#65706A] truncate">
+                {candidate.email} {candidate.phone && `• ${candidate.phone}`} • Source: {candidate.source || "Careers Portal"}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedOfferForHire(acceptedOffer);
-              setCompleteHiringOpen(true);
-            }}
-            className="rounded-[8px] bg-[#10251F] text-white px-4 py-2 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs whitespace-nowrap"
-          >
-            Complete Hiring →
-          </button>
-        </div>
-      )}
 
-      {/* 2. CANDIDATE PROFILE HEADER CARD */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#10251F] text-lg font-bold text-white shadow-2xs">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight text-[#18221E] truncate">
-                {candidate.full_name}
-              </h1>
-              <span
-                className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getStageBadgeColor(
-                  currentStage
-                )}`}
-              >
-                {currentStage}
-              </span>
-              {isHired && (
-                <span className="rounded-full bg-[#EAF4E2] border border-[#246244]/30 px-2.5 py-0.5 text-xs font-bold text-[#246244]">
-                  ✓ Active Employee
-                </span>
-              )}
-              {candidate.is_archived && (
-                <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-600">
-                  Archived
-                </span>
-              )}
+          {/* Header Actions */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {/* Rating Stars (1-5) */}
+            <div className="flex items-center gap-1 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-1">
+              <span className="text-[10px] font-bold text-[#65706A] mr-1">Rating:</span>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => handleRatingChange(star)}
+                  className="hover:scale-110 transition-transform"
+                >
+                  <Star
+                    className={`h-4 w-4 ${
+                      star <= rating ? "text-amber-500 fill-amber-500" : "text-[#D8DDD4]"
+                    }`}
+                  />
+                </button>
+              ))}
             </div>
-            <p className="mt-1 text-xs text-[#65706A] truncate">
-              {candidate.latest_job_title || latestApp.job_opening?.title || "Candidate"} • {candidate.email}{" "}
-              {candidate.phone && `• ${candidate.phone}`}
-            </p>
-          </div>
-        </div>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {/* If already hired, view employee profile & onboarding */}
-          {candidate.converted_user_id ? (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/app/people/${candidate.converted_user_id}`}
-                className="rounded-[8px] bg-[#EAF4E2] text-[#246244] border border-[#246244]/30 px-3.5 py-1.5 text-xs font-bold hover:bg-[#d8edd0] transition-colors"
-              >
-                View Employee Profile →
-              </Link>
-              <Link
-                href={`/app/people/onboarding/${candidate.converted_user_id}`}
-                className="rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3.5 py-1.5 text-xs font-bold text-[#18221E] hover:bg-white transition-colors"
-              >
-                Onboarding →
-              </Link>
-            </div>
-          ) : (
-            <>
-              {/* If stage is Hired, prominent Hire Candidate button */}
-              {currentStage === "Hired" && canManage && (
-                <button
-                  type="button"
-                  onClick={() => setCompleteHiringOpen(true)}
-                  className="rounded-[8px] bg-[#246244] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#1b4a33] transition-colors shadow-2xs"
+            {/* Stage Selector */}
+            {isHiringTeam && (
+              <div className="flex items-center gap-1.5 bg-[#FAF9F5] border border-[#D8DDD4] rounded-[8px] px-2.5 py-1">
+                <span className="text-[10px] font-bold uppercase text-[#65706A]">Stage:</span>
+                <select
+                  value={currentStage}
+                  disabled={updatingStage}
+                  onChange={(e) => handleStageChange(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
                 >
-                  ✓ Hire Candidate
-                </button>
-              )}
+                  {HIRING_STAGES.map((stg) => (
+                    <option key={stg} value={stg}>
+                      {STAGE_DEFINITIONS[stg].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-              {/* Recruiter Selector */}
-              {canManage && (
-                <div className="flex items-center gap-1.5 bg-[#FAF9F5] border border-[#D8DDD4] rounded-[8px] px-2.5 py-1">
-                  <span className="text-[10px] font-bold uppercase text-[#65706A]">Assigned:</span>
-                  <select
-                    value={candidate.assigned_recruiter_id || ""}
-                    onChange={(e) => handleAssignRecruiter(e.target.value)}
-                    className="bg-transparent text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Move Stage Selector */}
-              {canManage && (
-                <div className="flex items-center gap-1.5 bg-[#FAF9F5] border border-[#D8DDD4] rounded-[8px] px-2.5 py-1">
-                  <span className="text-[10px] font-bold uppercase text-[#65706A]">Stage:</span>
-                  <select
-                    value={currentStage}
-                    disabled={updatingStage}
-                    onChange={(e) => handleStageChange(e.target.value as CandidateStage)}
-                    className="bg-transparent text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
-                  >
-                    {STAGES.map((stg) => (
-                      <option key={stg} value={stg}>
-                        {stg}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Create Offer Button */}
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => setCreateOfferOpen(true)}
-                  className="rounded-[8px] bg-[#10251F] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
-                >
-                  💼 Create Offer
-                </button>
-              )}
-
-              {/* Schedule Interview */}
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => setScheduleModalOpen(true)}
-                  className="rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-1.5 text-xs font-bold text-[#18221E] hover:bg-[#FAF9F5] transition-colors shadow-2xs"
-                >
-                  📅 Interview
-                </button>
-              )}
-
-              {/* Reject */}
-              {canManage && currentStage !== "Rejected" && (
-                <button
-                  type="button"
-                  onClick={() => setRejectModalOpen(true)}
-                  className="rounded-[8px] border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors shadow-2xs"
-                >
-                  Reject
-                </button>
-              )}
-            </>
-          )}
-
-          {/* Archive / Unarchive */}
-          {canManage && (
+            {/* Schedule Interview */}
             <button
               type="button"
-              onClick={handleArchiveToggle}
-              className="rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-1.5 text-xs font-semibold text-[#65706A] hover:text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
+              onClick={() => setScheduleModalOpen(true)}
+              className="rounded-[8px] bg-[#10251F] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
             >
-              {candidate.is_archived ? "Unarchive" : "Archive"}
+              📅 Schedule Interview
             </button>
-          )}
+
+            {/* Reject Candidate */}
+            {isHiringTeam && currentStage !== "rejected" && (
+              <button
+                type="button"
+                onClick={() => setRejectModalOpen(true)}
+                className="rounded-[8px] border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors shadow-2xs"
+              >
+                Reject Candidate
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tags bar */}
+        <div className="mt-4 pt-4 border-t border-[#D8DDD4]/60 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-semibold text-[#65706A]">Tags:</span>
+          {tags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1 rounded-full border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-0.5 text-[11px] font-semibold text-[#18221E]"
+            >
+              {t}
+              <button
+                type="button"
+                onClick={() => handleRemoveTag(t)}
+                className="text-[#65706A] hover:text-[#D9383A]"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <div className="inline-flex items-center gap-1">
+            <input
+              type="text"
+              placeholder="+ Add tag..."
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTag(newTagInput);
+                }
+              }}
+              className="h-6 w-24 rounded border border-[#D8DDD4] bg-white px-2 text-[11px] text-[#18221E] focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 
-      {/* 3. PROFILE TABS */}
+      {/* 3. PROFILE TABS NAVIGATION */}
       <div className="flex items-center gap-6 border-b border-[#D8DDD4] text-xs font-medium text-[#65706A] overflow-x-auto">
         {[
           { key: "overview", label: "Overview" },
-          { key: "offers", label: `Job Offers (${offers.length})` },
-          { key: "applications", label: `Applications (${applications.length})` },
-          { key: "notes", label: `Private Notes (${candidate.notes_list?.length || 0})` },
-          { key: "resume", label: "Resume / CV" },
+          { key: "timeline", label: `Timeline (${events.length})` },
+          { key: "notes", label: `Notes (${notes.length})` },
           { key: "interviews", label: `Interviews (${interviews.length})` },
-          { key: "activity", label: `Activity Log (${activities.length})` },
+          { key: "offer", label: `Offer (${offers.length})` },
+          { key: "emails", label: `Emails (${emailsSent.length})` },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -530,871 +439,409 @@ export function CandidateDetailView({
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left: Contact Info, Summary, & Tags */}
+          {/* Left Column: Contact & Application Answers */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Contact Details */}
             <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
               <h3 className="text-sm font-bold text-[#18221E]">Contact & Background</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Full Name
-                  </span>
+                  <span className="text-[10px] font-bold uppercase text-[#65706A] block">Full Name</span>
                   <p className="font-semibold text-[#18221E] mt-0.5">{candidate.full_name}</p>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Email Address
-                  </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <a href={`mailto:${candidate.email}`} className="font-semibold text-[#18221E] hover:underline truncate">
-                      {candidate.email}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={handleCopyEmail}
-                      className="text-[10px] text-[#65706A] hover:text-[#18221E] border border-[#D8DDD4] rounded px-1 py-0.5"
-                    >
-                      {copiedEmail ? "✓" : "Copy"}
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-bold uppercase text-[#65706A] block">Email Address</span>
+                  <p className="font-semibold text-[#18221E] mt-0.5">{candidate.email}</p>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Phone Number
-                  </span>
-                  <p className="font-semibold text-[#18221E] mt-0.5">
-                    {candidate.phone ? (
-                      <a href={`tel:${candidate.phone}`} className="hover:underline">
-                        {candidate.phone}
-                      </a>
-                    ) : (
-                      "Not provided"
-                    )}
-                  </p>
+                  <span className="text-[10px] font-bold uppercase text-[#65706A] block">Phone</span>
+                  <p className="font-semibold text-[#18221E] mt-0.5">{candidate.phone || "Not provided"}</p>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Location
-                  </span>
-                  <p className="font-semibold text-[#18221E] mt-0.5">
-                    {candidate.location || latestApp.job_opening?.location || "Not provided"}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Years of Experience
-                  </span>
+                  <span className="text-[10px] font-bold uppercase text-[#65706A] block">Experience</span>
                   <p className="font-semibold text-[#18221E] mt-0.5">
                     {candidate.years_of_experience ? `${candidate.years_of_experience} years` : "Not provided"}
                   </p>
                 </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                    Application Date
-                  </span>
-                  <p className="font-semibold text-[#18221E] mt-0.5">
-                    {new Date(candidate.created_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
               </div>
-            </div>
 
-            {/* Tags Section */}
-            <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-[#18221E]">Recruitment Tags</h3>
-              <div className="flex flex-wrap gap-1.5 items-center">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-1 text-xs font-semibold text-[#18221E]"
+              {/* Links */}
+              <div className="pt-3 border-t border-[#D8DDD4]/60 flex items-center gap-4">
+                {candidate.linkedin_url && (
+                  <a
+                    href={candidate.linkedin_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#246244] hover:underline"
                   >
-                    <span>{tag}</span>
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-[#65706A] hover:text-red-600 text-xs font-bold"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </span>
-                ))}
+                    <Linkedin className="h-3.5 w-3.5" />
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+                {candidate.portfolio_url && (
+                  <a
+                    href={candidate.portfolio_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#246244] hover:underline"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>Portfolio</span>
+                  </a>
+                )}
               </div>
-
-              {canManage && (
-                <div className="pt-2 space-y-2 border-t border-[#D8DDD4]/60">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={customTagInput}
-                      onChange={(e) => setCustomTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddTag(customTagInput);
-                        }
-                      }}
-                      placeholder="Add tag (e.g. Senior, Urgent)..."
-                      className="rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-1 text-xs focus:border-[#10251F] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddTag(customTagInput)}
-                      className="rounded-[8px] bg-[#10251F] text-white px-3 py-1 text-xs font-bold hover:bg-[#18342C]"
-                    >
-                      + Add
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {PRESET_TAGS.filter((pt) => !tags.includes(pt)).map((pt) => (
-                      <button
-                        key={pt}
-                        type="button"
-                        onClick={() => handleAddTag(pt)}
-                        className="text-[10px] font-semibold text-[#65706A] hover:text-[#18221E] border border-dashed border-[#D8DDD4] rounded px-2 py-0.5 hover:bg-[#FAF9F5]"
-                      >
-                        + {pt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Professional Summary */}
-            <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-[#18221E]">Professional Summary</h3>
-              <p className="text-xs text-[#18221E] leading-relaxed">
-                {candidate.bio || candidate.cover_letter || "Not provided"}
-              </p>
+            {/* Application Answers */}
+            <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
+              <h3 className="text-sm font-bold text-[#18221E]">Application Answers & Cover Letter</h3>
+              {latestApp?.cover_letter ? (
+                <div className="rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] p-3.5 text-xs leading-relaxed text-[#18221E] whitespace-pre-line">
+                  {latestApp.cover_letter}
+                </div>
+              ) : (
+                <p className="text-xs text-[#65706A] italic">No cover letter submitted.</p>
+              )}
             </div>
           </div>
 
-          {/* Right: Skills & Online Profiles & Employment */}
+          {/* Right Column: Resume Preview via Short-Lived Signed URL */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Employment Status Card (if Hired or Converted) */}
-            {candidate.converted_user_id && (
-              <div className="rounded-[14px] border border-[#246244]/20 bg-[#EAF4E2]/40 p-5 shadow-2xs space-y-3.5">
-                <div className="flex items-center justify-between border-b border-[#246244]/20 pb-2.5">
-                  <h3 className="text-sm font-bold text-[#18221E]">Employment & HR Status</h3>
-                  <span className="rounded-full bg-[#EAF4E2] text-[#246244] border border-[#246244]/30 px-2 py-0.5 text-[10px] font-bold">
-                    {candidate.employment_status || "Active"}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#65706A]">Employee ID</span>
-                    <span className="font-bold text-[#18221E]">{candidate.employee_id || "EMP-001"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#65706A]">Official Role</span>
-                    <span className="font-semibold text-[#18221E]">
-                      {candidate.hired_job_title || candidate.latest_job_title || "Team Member"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#65706A]">Onboarding</span>
-                    <span className="font-semibold text-[#246244]">
-                      {candidate.onboarding_status || "Completed"}
-                    </span>
-                  </div>
-                  {candidate.hired_start_date && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#65706A]">Start Date</span>
-                      <span className="font-semibold text-[#18221E]">{candidate.hired_start_date}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2 pt-2 border-t border-[#246244]/20">
-                  <Link
-                    href={`/app/people/${candidate.converted_user_id}`}
-                    className="rounded-[8px] bg-[#10251F] text-white py-2 text-center text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
-                  >
-                    View Employee Profile →
-                  </Link>
-                  <Link
-                    href={`/app/people/onboarding/${candidate.converted_user_id}`}
-                    className="rounded-[8px] border border-[#D8DDD4] bg-white py-1.5 text-center text-xs font-bold text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
-                  >
-                    View Onboarding Checklist →
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Online Profiles */}
             <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
-              <h3 className="text-sm font-bold text-[#18221E]">Online Profiles</h3>
-              <div className="space-y-2.5 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block mb-1">
-                    LinkedIn
-                  </span>
-                  {candidate.linkedin_url ? (
-                    <a
-                      href={candidate.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs font-semibold text-[#18221E] hover:bg-white hover:border-[#10251F] transition-colors"
-                    >
-                      <span className="truncate">🔗 {candidate.linkedin_url}</span>
-                      <span className="text-[#65706A] shrink-0">↗</span>
-                    </a>
-                  ) : (
-                    <p className="text-[#8C9489]">Not provided</p>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block mb-1">
-                    GitHub / Code
-                  </span>
-                  {candidate.github_url ? (
-                    <a
-                      href={candidate.github_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs font-semibold text-[#18221E] hover:bg-white hover:border-[#10251F] transition-colors"
-                    >
-                      <span className="truncate">🐙 {candidate.github_url}</span>
-                      <span className="text-[#65706A] shrink-0">↗</span>
-                    </a>
-                  ) : (
-                    <p className="text-[#8C9489]">Not provided</p>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block mb-1">
-                    Portfolio / Website
-                  </span>
-                  {candidate.portfolio_url ? (
-                    <a
-                      href={candidate.portfolio_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-xs font-semibold text-[#18221E] hover:bg-white hover:border-[#10251F] transition-colors"
-                    >
-                      <span className="truncate">🌐 {candidate.portfolio_url}</span>
-                      <span className="text-[#65706A] shrink-0">↗</span>
-                    </a>
-                  ) : (
-                    <p className="text-[#8C9489]">Not provided</p>
-                  )}
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[#18221E]">Resume Preview</h3>
+                {signedResumeUrl && (
+                  <a
+                    href={signedResumeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#246244] hover:underline"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download</span>
+                  </a>
+                )}
               </div>
-            </div>
 
-            {/* Skills */}
-            <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-[#18221E]">Skills & Qualifications</h3>
-              {candidate.skills && candidate.skills.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {candidate.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-1 text-xs font-semibold text-[#18221E]"
+              {loadingResumeUrl ? (
+                <div className="p-8 text-center text-xs text-[#65706A]">Loading secure preview...</div>
+              ) : signedResumeUrl ? (
+                <div className="space-y-3">
+                  <div className="aspect-[3/4] w-full rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] overflow-hidden flex flex-col items-center justify-center p-4 text-center">
+                    <FileText className="h-10 w-10 text-[#246244] mb-2" />
+                    <p className="text-xs font-bold text-[#18221E]">
+                      {candidate.cv_file_name || latestApp?.cv_file_name || "Resume.pdf"}
+                    </p>
+                    <p className="text-[11px] text-[#65706A] mt-1">Short-lived signed access granted</p>
+                    <a
+                      href={signedResumeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-[8px] bg-[#10251F] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors"
                     >
-                      {skill}
-                    </span>
-                  ))}
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>Open Document Preview</span>
+                    </a>
+                  </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#8C9489]">Not provided</p>
+                <p className="text-xs text-[#65706A] italic">No resume uploaded for this candidate.</p>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: OFFERS */}
-      {activeTab === "offers" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-6 text-xs">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-[#18221E]">Job Offers</h3>
-              <p className="text-xs text-[#65706A] mt-0.5">
-                Manage compensation packages, offer letters, and candidate acceptance.
-              </p>
-            </div>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setCreateOfferOpen(true)}
-                className="rounded-[8px] bg-[#10251F] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
-              >
-                + Create Offer
-              </button>
-            )}
-          </div>
-
-          {offers.length > 0 ? (
-            <div className="space-y-4">
-              {offers.map((offer) => (
-                <div
-                  key={offer.id}
-                  className="rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-5 space-y-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D8DDD4]/80 pb-3">
-                    <div>
-                      <h4 className="text-sm font-bold text-[#18221E]">{offer.job_title}</h4>
-                      <p className="text-xs text-[#65706A] mt-0.5">
-                        {offer.employment_type} • Department: {offer.department_name || "General"}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${getOfferBadgeColor(
-                        offer.status
-                      )}`}
-                    >
-                      {offer.status}
-                    </span>
+      {/* TAB 2: TIMELINE */}
+      {activeTab === "timeline" && (
+        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
+          <h3 className="text-sm font-bold text-[#18221E]">Candidate Timeline & Audit Log</h3>
+          {events.length === 0 ? (
+            <p className="text-xs text-[#65706A] italic py-4">No events logged yet.</p>
+          ) : (
+            <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#E7EADF]">
+              {events.map((ev) => (
+                <div key={ev.id} className="relative">
+                  <div className="absolute -left-6 top-1 h-3 w-3 rounded-full border-2 border-white bg-[#246244]" />
+                  <div className="text-xs">
+                    <p className="font-bold text-[#18221E]">{ev.notes}</p>
+                    <p className="text-[11px] text-[#65706A] mt-0.5">
+                      By <span className="font-semibold">{ev.actor_name || "System"}</span> •{" "}
+                      {new Date(ev.created_at).toLocaleString()}
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Compensation
-                      </span>
-                      <p className="font-bold text-sm text-[#246244] mt-0.5">
-                        {offer.salary} {offer.salary_currency || "USD"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Start Date
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {offer.start_date
-                          ? new Date(offer.start_date).toLocaleDateString("en-US", { dateStyle: "medium" })
-                          : "Immediate"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Expiration
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {offer.expiration_date
-                          ? new Date(offer.expiration_date).toLocaleDateString("en-US", { dateStyle: "medium" })
-                          : "None"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Created
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {new Date(offer.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {offer.decline_reason && (
-                    <div className="bg-red-50 p-2.5 rounded-[8px] border border-red-200 text-xs text-red-800">
-                      <strong>Decline Reason:</strong> {offer.decline_reason}
-                    </div>
-                  )}
-
-                  {/* Actions Bar */}
-                  {canManage && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#D8DDD4]/60">
-                      <div className="flex items-center gap-2">
-                        {/* Copy Public Link */}
-                        <button
-                          type="button"
-                          onClick={() => handleCopyOfferLink(offer)}
-                          className="rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
-                        >
-                          {copiedOfferLink === offer.id ? "✓ Link Copied" : "Copy Candidate Link ↗"}
-                        </button>
-
-                        <a
-                          href={`/jobs/offers/${offer.token || offer.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
-                        >
-                          Open Offer Page ↗
-                        </a>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {offer.status === "Draft" && (
-                          <button
-                            type="button"
-                            onClick={() => handleSendOffer(offer.id)}
-                            className="rounded-[6px] bg-[#10251F] text-white px-3 py-1 text-xs font-bold hover:bg-[#18342C] transition-colors"
-                          >
-                            Send Offer →
-                          </button>
-                        )}
-
-                        {["Sent", "Viewed"].includes(offer.status) && (
-                          <button
-                            type="button"
-                            onClick={() => handleWithdrawOffer(offer.id)}
-                            className="rounded-[6px] border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                          >
-                            Withdraw Offer
-                          </button>
-                        )}
-
-                        {(offer.status === "Accepted" || isHired) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedOfferForHire(offer);
-                              setCompleteHiringOpen(true);
-                            }}
-                            className="rounded-[6px] bg-[#10251F] text-white px-3 py-1 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
-                          >
-                            {isHired ? "Update Employee Profile" : "Complete Hiring →"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: NOTES (Internal, @mentions, hiring team only) */}
+      {activeTab === "notes" && (
+        <div className="space-y-6">
+          {isInterviewerOnly ? (
+            <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-6 text-xs text-amber-800 flex items-center gap-3">
+              <Lock className="h-5 w-5 text-amber-600 shrink-0" />
+              <span>Internal notes are restricted to the hiring team. Assigned interviewers cannot view internal evaluation notes.</span>
+            </div>
           ) : (
-            <div className="p-8 text-center text-xs text-[#8C9489] rounded-[10px] border border-dashed border-[#D8DDD4] space-y-2">
-              <p className="font-bold text-[#18221E]">No offers extended yet</p>
-              <p>Create and send official compensation packages and employment terms.</p>
-              {canManage && (
+            <>
+              {/* Add Note Form */}
+              <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
+                <h3 className="text-sm font-bold text-[#18221E]">Internal Hiring Team Notes</h3>
+                <form onSubmit={handleAddNote} className="space-y-3">
+                  <textarea
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    placeholder="Add an internal note. Type @name to mention a teammate..."
+                    rows={3}
+                    className="w-full rounded-[10px] border border-[#D8DDD4] bg-white p-3 text-xs text-[#18221E] focus:border-[#10251F] focus:outline-none"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[#65706A]">
+                      💡 Only visible to owners, admins, HR, and department managers.
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={submittingNote || !noteContent.trim()}
+                      className="rounded-[8px] bg-[#10251F] text-white px-4 py-1.5 text-xs font-bold hover:bg-[#18342C] disabled:opacity-50 transition-colors shadow-2xs"
+                    >
+                      {submittingNote ? "Posting..." : "Post Note"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Notes List */}
+              <div className="space-y-3">
+                {notes.length === 0 ? (
+                  <p className="text-xs text-[#65706A] italic py-4">No internal notes posted yet.</p>
+                ) : (
+                  notes.map((n) => (
+                    <div key={n.id} className="rounded-[12px] border border-[#D8DDD4] bg-white p-4 shadow-2xs text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#18221E]">{n.author_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-[#65706A]">
+                            {new Date(n.created_at).toLocaleDateString()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNote(n.id)}
+                            className="text-[#65706A] hover:text-[#D9383A] text-[11px]"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[#333] leading-relaxed whitespace-pre-line">{n.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: INTERVIEWS */}
+      {activeTab === "interviews" && (
+        <div className="space-y-6">
+          {/* Combined Scorecard Summary if feedbacks available */}
+          {totalScorecards > 0 && (
+            <div className="rounded-[14px] border border-[#246244]/20 bg-[#EAF4E2] p-5 shadow-2xs">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-[#246244] uppercase tracking-wider">Combined Scorecard Result</h4>
+                  <p className="text-[11px] text-[#246244]/80 mt-0.5">
+                    Aggregated across {totalScorecards} submitted interviewer scorecard{totalScorecards > 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-center">
+                  <div className="rounded-[8px] bg-white px-3 py-1.5 border border-[#246244]/20">
+                    <span className="text-[10px] text-[#65706A] block">Overall</span>
+                    <span className="text-sm font-bold text-[#18221E]">{avgOverall} / 5</span>
+                  </div>
+                  <div className="rounded-[8px] bg-white px-3 py-1.5 border border-[#246244]/20">
+                    <span className="text-[10px] text-[#65706A] block">Skills</span>
+                    <span className="text-sm font-bold text-[#18221E]">{avgSkills} / 5</span>
+                  </div>
+                  <div className="rounded-[8px] bg-white px-3 py-1.5 border border-[#246244]/20">
+                    <span className="text-[10px] text-[#65706A] block">Communication</span>
+                    <span className="text-sm font-bold text-[#18221E]">{avgComms} / 5</span>
+                  </div>
+                  <div className="rounded-[8px] bg-white px-3 py-1.5 border border-[#246244]/20">
+                    <span className="text-[10px] text-[#65706A] block">Culture</span>
+                    <span className="text-sm font-bold text-[#18221E]">{avgCulture} / 5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Interviews List */}
+          <div className="space-y-4">
+            {interviews.length === 0 ? (
+              <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-8 text-center text-xs text-[#65706A] shadow-2xs">
+                <p>No interviews scheduled yet for this candidate.</p>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-[8px] bg-[#10251F] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Schedule Interview</span>
+                </button>
+              </div>
+            ) : (
+              interviews.map((iv) => (
+                <div key={iv.id} className="rounded-[14px] border border-[#D8DDD4] bg-white p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-[#18221E]">{iv.round_name}</h4>
+                      <p className="text-xs text-[#65706A]">
+                        {new Date(iv.scheduled_at).toLocaleString()} • {iv.duration_minutes || 45} mins •{" "}
+                        <span className="capitalize">{iv.interview_type || "video"}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-0.5 text-[11px] font-semibold capitalize text-[#18221E]">
+                        {iv.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setScorecardInterview(iv)}
+                        className="rounded-[8px] bg-[#10251F] text-white px-3 py-1 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
+                      >
+                        Submit Scorecard
+                      </button>
+                    </div>
+                  </div>
+
+                  {iv.location_or_link && (
+                    <div className="text-xs text-[#65706A]">
+                      <span className="font-semibold text-[#18221E]">Link / Location:</span>{" "}
+                      <a href={iv.location_or_link} target="_blank" rel="noreferrer" className="text-[#246244] hover:underline">
+                        {iv.location_or_link}
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Feedbacks for this interview */}
+                  {feedbacks.filter((f) => f.interview_id === iv.id).length > 0 && (
+                    <div className="pt-3 border-t border-[#D8DDD4]/60 space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#65706A]">Submitted Scorecards</p>
+                      {feedbacks
+                        .filter((f) => f.interview_id === iv.id)
+                        .map((fb) => (
+                          <div key={fb.id} className="rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[#18221E]">{fb.interviewer_name || "Interviewer"}</span>
+                              <span className="rounded-full bg-white border border-[#D8DDD4] px-2 py-0.5 text-[10px] font-bold capitalize text-[#246244]">
+                                Recommendation: {fb.recommendation.replace("_", " ")}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#65706A]">
+                              Skills: {fb.skills_rating || 3}/5 • Communication: {fb.communication_rating || 3}/5 • Culture: {fb.culture_rating || 3}/5
+                            </p>
+                            {fb.comments && <p className="text-xs text-[#333] pt-1">{fb.comments}</p>}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: OFFER */}
+      {activeTab === "offer" && (
+        <div className="space-y-6">
+          {isInterviewerOnly ? (
+            <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-6 text-xs text-amber-800 flex items-center gap-3">
+              <Lock className="h-5 w-5 text-amber-600 shrink-0" />
+              <span>Compensation and job offers are confidential and restricted to the hiring team.</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[#18221E]">Job Offers</h3>
                 <button
                   type="button"
                   onClick={() => setCreateOfferOpen(true)}
-                  className="rounded-[8px] bg-[#10251F] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#18342C] shadow-2xs"
+                  className="rounded-[8px] bg-[#10251F] text-white px-3.5 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs"
                 >
-                  Create Offer
+                  + Create Offer
                 </button>
+              </div>
+
+              {offers.length === 0 ? (
+                <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-8 text-center text-xs text-[#65706A] shadow-2xs">
+                  <p>No job offers drafted or extended yet.</p>
+                </div>
+              ) : (
+                offers.map((off) => (
+                  <div key={off.id} className="rounded-[14px] border border-[#D8DDD4] bg-white p-5 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-[#18221E]">{off.job_title}</h4>
+                        <p className="text-xs text-[#65706A]">
+                          Salary: <span className="font-bold text-[#18221E]">{off.salary || "Not specified"}</span> • Status: {off.status}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 py-0.5 text-xs font-semibold capitalize text-[#18221E]">
+                        {off.status}
+                      </span>
+                    </div>
+                    {off.offer_notes && <p className="text-xs text-[#555]">{off.offer_notes}</p>}
+                  </div>
+                ))
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 3: APPLICATIONS & HISTORY */}
-      {activeTab === "applications" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-6 text-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#18221E]">Independent Application History</h3>
-            <span className="text-xs text-[#65706A]">{applications.length} Position(s) Applied</span>
-          </div>
-
-          {applications.length > 0 ? (
-            <div className="space-y-4">
-              {applications.map((app) => (
-                <div
-                  key={app.id}
-                  className="rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-5 space-y-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#D8DDD4]/60 pb-3">
-                    <div>
-                      <h4 className="text-sm font-bold text-[#18221E]">
-                        {app.job_opening?.title || candidate.latest_job_title || "General Application"}
-                      </h4>
-                      <p className="text-xs text-[#65706A] mt-0.5">
-                        Department: {app.job_opening?.department_name || "General"} • Location:{" "}
-                        {app.job_opening?.location || "Remote"}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getStageBadgeColor(
-                        app.stage
-                      )}`}
-                    >
-                      {app.stage}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Applied Date
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {new Date(app.created_at || candidate.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Source
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {app.source || "Careers Portal"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Status
-                      </span>
-                      <p className="font-semibold text-[#18221E] mt-0.5">
-                        {app.stage === "Rejected" ? "Rejected" : app.stage === "Hired" ? "Hired" : "Active in Pipeline"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* If Rejected */}
-                  {app.rejection_reason && (
-                    <div className="border-t border-[#D8DDD4]/60 pt-3 text-xs bg-red-50/50 p-3 rounded-[8px] border border-red-200/60">
-                      <span className="font-bold text-red-700 block">Private Rejection Reason:</span>
-                      <p className="text-red-800 mt-0.5">{app.rejection_reason}</p>
-                    </div>
-                  )}
-
-                  {/* Cover letter */}
-                  {app.cover_letter && (
-                    <div className="border-t border-[#D8DDD4]/60 pt-3 space-y-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A] block">
-                        Cover Letter
-                      </span>
-                      <p className="text-xs text-[#18221E] leading-relaxed whitespace-pre-wrap rounded-[8px] bg-white p-3.5 border border-[#D8DDD4]">
-                        {app.cover_letter}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+      {/* TAB 6: EMAILS */}
+      {activeTab === "emails" && (
+        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4">
+          <h3 className="text-sm font-bold text-[#18221E]">Candidate Email History (Sent via Resend)</h3>
+          {emailsSent.length === 0 ? (
+            <p className="text-xs text-[#65706A] italic py-4">No emails dispatched to this candidate yet.</p>
           ) : (
-            <p className="text-xs text-[#8C9489]">No application record on file.</p>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: PRIVATE NOTES */}
-      {activeTab === "notes" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-6 text-xs">
-          <div>
-            <h3 className="text-sm font-bold text-[#18221E]">Internal Recruitment Notes</h3>
-            <p className="text-xs text-[#65706A] mt-0.5">
-              Private notes are visible strictly to authorized internal hiring members.
-            </p>
-          </div>
-
-          {/* Add Note Form */}
-          {canManage && (
-            <form onSubmit={handleAddNote} className="space-y-3 p-4 rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5]">
-              <label className="font-bold text-xs text-[#18221E] block">Add Recruitment Note</label>
-              <textarea
-                rows={3}
-                required
-                value={newNoteContent}
-                onChange={(e) => setNewNoteContent(e.target.value)}
-                placeholder="Write private notes regarding phone screens, salary expectations, follow-ups..."
-                className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-3 text-xs focus:border-[#10251F] focus:outline-none"
-              />
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={submittingNote || !newNoteContent.trim()}
-                  className="rounded-[8px] bg-[#10251F] text-white px-4 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors shadow-2xs disabled:opacity-50"
-                >
-                  {submittingNote ? "Saving..." : "Add Note"}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Notes List */}
-          {candidate.notes_list && candidate.notes_list.length > 0 ? (
             <div className="space-y-3">
-              {candidate.notes_list.map((note) => (
-                <div
-                  key={note.id}
-                  className="rounded-[10px] border border-[#D8DDD4] bg-white p-4 space-y-2 shadow-2xs"
-                >
+              {emailsSent.map((ev) => (
+                <div key={ev.id} className="rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] p-3.5 text-xs space-y-1">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-full bg-[#10251F] text-[10px] font-bold text-white flex items-center justify-center">
-                        {note.author_name[0].toUpperCase()}
-                      </div>
-                      <span className="font-bold text-xs text-[#18221E]">{note.author_name}</span>
-                      <span className="text-[10px] text-[#65706A]">
-                        {new Date(note.created_at).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "numeric",
-                          minute: "numeric",
-                        })}
-                      </span>
-                    </div>
-
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteNote(note.id)}
-                        className="text-[#65706A] hover:text-red-600 text-xs font-semibold"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-xs text-[#18221E] leading-relaxed whitespace-pre-wrap pl-8">
-                    {note.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-[#8C9489] rounded-[10px] border border-dashed border-[#D8DDD4]">
-              No recruitment notes recorded for this candidate yet.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 5: RESUME / CV */}
-      {activeTab === "resume" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-5 text-xs">
-          <h3 className="text-sm font-bold text-[#18221E]">Resume & Documents</h3>
-
-          {cvUrl ? (
-            <div className="rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#D8DDD4] text-[#65706A]">
-                  <AppIcon name="document" size={24} />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-[#18221E] truncate">{cvFileName}</p>
-                  <p className="text-xs text-[#65706A] mt-0.5">
-                    {cvFileSize ? `${Math.round(cvFileSize / 1024)} KB • ` : ""}
-                    Cloudflare R2 Stored Document
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href={cvUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-[8px] bg-[#10251F] text-white px-4 py-2 text-xs font-semibold hover:bg-[#18342C] transition-colors shadow-2xs flex items-center gap-1.5"
-                >
-                  <span>Download / View CV</span>
-                  <span>↗</span>
-                </a>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-[10px] border border-dashed border-[#D8DDD4] p-8 text-center text-xs text-[#8C9489]">
-              No resume document attached to this candidate.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 6: INTERVIEWS */}
-      {activeTab === "interviews" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-5 text-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#18221E]">Interviews & Evaluations</h3>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setScheduleModalOpen(true)}
-                className="rounded-[8px] bg-[#10251F] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#18342C] transition-colors"
-              >
-                + Schedule Interview
-              </button>
-            )}
-          </div>
-
-          {interviews.length > 0 ? (
-            <div className="space-y-4">
-              {interviews.map((iv) => (
-                <div
-                  key={iv.id}
-                  className="rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-4 space-y-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D8DDD4]/60 pb-2.5">
-                    <div>
-                      <h4 className="font-bold text-xs text-[#18221E]">{iv.round_name}</h4>
-                      <p className="text-[11px] text-[#65706A]">
-                        {iv.interview_type || "Video Interview"} • {iv.duration_minutes} minutes
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white border border-[#D8DDD4] px-2.5 py-0.5 text-[10px] font-bold text-[#10251F]">
-                      {iv.status}
+                    <span className="font-bold text-[#18221E]">
+                      {ev.event_type === "rejection_email_sent" ? "Rejection Notification Email" : "Interview Calendar Invitation (.ics)"}
                     </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[#65706A] block">
-                        Schedule
-                      </span>
-                      <p className="font-semibold text-[#18221E]">
-                        {new Date(iv.scheduled_at).toLocaleString("en-US", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[#65706A] block">
-                        Interviewer(s)
-                      </span>
-                      <p className="font-semibold text-[#18221E]">
-                        {iv.interviewer_names?.join(", ") || iv.interviewer_name || "Assigned Team"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[#65706A] block">
-                        Meeting Link / Location
-                      </span>
-                      {iv.meeting_url || iv.location_or_link ? (
-                        <a
-                          href={iv.meeting_url || iv.location_or_link || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#246244] font-semibold hover:underline truncate block"
-                        >
-                          {iv.meeting_url || iv.location_or_link} ↗
-                        </a>
-                      ) : (
-                        <p className="text-[#8C9489]">Not set</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D8DDD4]/60">
-                    {iv.meeting_url && (
-                      <a
-                        href={iv.meeting_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
-                      >
-                        Join Meeting ↗
-                      </a>
-                    )}
-
-                    {iv.status !== "Completed" && canManage && (
-                      <button
-                        type="button"
-                        onClick={() => handleCompleteInterview(iv.id)}
-                        className="rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
-                      >
-                        Mark Completed
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setFeedbackInterview(iv)}
-                      className="rounded-[6px] bg-[#10251F] text-white px-3 py-1 text-xs font-bold hover:bg-[#18342C] transition-colors"
-                    >
-                      {iv.feedback && iv.feedback.length > 0 ? "Edit Feedback" : "Submit Feedback"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-[#8C9489]">No interviews scheduled yet.</p>
-          )}
-        </div>
-      )}
-
-      {/* TAB 7: ACTIVITY LOG */}
-      {activeTab === "activity" && (
-        <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-4 text-xs">
-          <h3 className="text-sm font-bold text-[#18221E]">Recruitment Timeline & Activity</h3>
-
-          {activities.length > 0 ? (
-            <div className="space-y-3">
-              {activities.map((act) => (
-                <div
-                  key={act.id}
-                  className="rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] p-3.5 space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-xs text-[#18221E]">{act.title}</p>
                     <span className="text-[10px] text-[#65706A]">
-                      {new Date(act.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "numeric",
-                      })}
+                      {new Date(ev.created_at).toLocaleString()}
                     </span>
                   </div>
-                  {act.description && <p className="text-xs text-[#65706A]">{act.description}</p>}
+                  <p className="text-[#555]">{ev.notes}</p>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-xs text-[#8C9489]">No activity records logged yet.</p>
           )}
         </div>
       )}
 
-      {/* Modals */}
+      {/* MODALS */}
       {scheduleModalOpen && (
         <ScheduleInterviewModal
           isOpen={scheduleModalOpen}
           onClose={() => setScheduleModalOpen(false)}
           workspaceId={workspaceId}
           candidate={candidate}
-          application={latestApp}
           teamMembers={teamMembers}
-          onSuccess={() => router.refresh()}
-        />
-      )}
-
-      {createOfferOpen && (
-        <CreateOfferModal
-          isOpen={createOfferOpen}
-          onClose={() => setCreateOfferOpen(false)}
-          workspaceId={workspaceId}
-          candidate={candidate}
-          application={latestApp}
-          departments={departments}
-          onSuccess={() => router.refresh()}
-        />
-      )}
-
-      {completeHiringOpen && (
-        <CompleteHiringModal
-          isOpen={completeHiringOpen}
-          onClose={() => setCompleteHiringOpen(false)}
-          workspaceId={workspaceId}
-          candidate={candidate}
-          departments={departments}
-          teamMembers={teamMembers}
-          offer={selectedOfferForHire || acceptedOffer}
-          onSuccess={() => router.refresh()}
+          onSuccess={() => {
+            setScheduleModalOpen(false);
+            router.refresh();
+          }}
         />
       )}
 
@@ -1404,17 +851,38 @@ export function CandidateDetailView({
           onClose={() => setRejectModalOpen(false)}
           workspaceId={workspaceId}
           candidate={candidate}
-          onSuccess={() => router.refresh()}
+          onSuccess={() => {
+            setRejectModalOpen(false);
+            router.refresh();
+          }}
         />
       )}
 
-      {feedbackInterview && (
+      {scorecardInterview && (
         <SubmitFeedbackModal
-          isOpen={Boolean(feedbackInterview)}
-          onClose={() => setFeedbackInterview(null)}
+          isOpen={Boolean(scorecardInterview)}
+          onClose={() => setScorecardInterview(null)}
           workspaceId={workspaceId}
-          interview={feedbackInterview}
-          onSuccess={() => router.refresh()}
+          interview={scorecardInterview}
+          onSuccess={() => {
+            setScorecardInterview(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {createOfferOpen && (
+        <CreateOfferModal
+          isOpen={createOfferOpen}
+          onClose={() => setCreateOfferOpen(false)}
+          workspaceId={workspaceId}
+          candidate={candidate}
+          departments={departments}
+          teamMembers={teamMembers}
+          onSuccess={() => {
+            setCreateOfferOpen(false);
+            router.refresh();
+          }}
         />
       )}
     </div>

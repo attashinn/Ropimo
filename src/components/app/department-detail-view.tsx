@@ -115,10 +115,12 @@ export function DepartmentDetailView({
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
 
   // Dynamic projects state
+  const [prevProjects, setPrevProjects] = React.useState<Project[]>(projects);
   const [localProjects, setLocalProjects] = React.useState<Project[]>(projects);
-  React.useEffect(() => {
+  if (projects !== prevProjects) {
+    setPrevProjects(projects);
     setLocalProjects(projects);
-  }, [projects]);
+  }
 
   const handleProjectCreated = (newProject: Project) => {
     setLocalProjects((prev) => [newProject, ...prev]);
@@ -153,7 +155,8 @@ export function DepartmentDetailView({
       m.job_title?.toLowerCase().includes("head") ||
       m.job_title?.toLowerCase().includes("manager")
   );
-  const leadName = (department as any).lead?.full_name || leadMember?.person?.full_name || "Tashin Khan";
+  const departmentWithLead = department as Department & { lead?: { full_name?: string } };
+  const leadName = departmentWithLead.lead?.full_name || leadMember?.person?.full_name || "Tashin Khan";
   const leadTitle = leadMember?.job_title || "Department Lead";
 
   // Task metrics
@@ -170,6 +173,9 @@ export function DepartmentDetailView({
     leadName,
     leadRole: leadTitle,
     leadId: leadMember?.user_id || department.lead_id || null,
+    members,
+    member_count: members.length,
+    project_count: localProjects.length,
     memberCount: members.length,
     projectCount: localProjects.length,
     taskCount: tasks.length,
@@ -562,7 +568,7 @@ export function DepartmentDetailView({
                     const isDone = task.status === "completed";
                     const assignee = (task.assignees || [])[0];
                     const assigneePerson = allWorkspacePeople.find((p) => p.user_id === assignee?.user_id) || assignee;
-                    const assigneeName = assigneePerson?.full_name || (assignee as any)?.name || "Unassigned";
+                    const assigneeName = assigneePerson?.full_name || (assignee as { name?: string } | undefined)?.name || "Unassigned";
                     const dueLabel = task.due_date
                       ? new Date(task.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
                       : "No deadline";
@@ -656,7 +662,7 @@ export function DepartmentDetailView({
                   <div className="min-w-0 flex-1">
                     <p className="text-[#18221E]">
                       <span className="font-semibold">Tashin Khan</span> created task{" "}
-                      <span className="font-semibold">"Implement new dashboard sidebar"</span>
+                      <span className="font-semibold">&quot;Implement new dashboard sidebar&quot;</span>
                     </p>
                     <span className="text-[10px] text-[#8A958F]">18h ago</span>
                   </div>
@@ -1024,7 +1030,7 @@ export function DepartmentDetailView({
               <div className="min-w-0 flex-1">
                 <p className="text-[#18221E]">
                   <span className="font-semibold">Tashin Khan</span> created task{" "}
-                  <span className="font-semibold">"Implement new dashboard sidebar"</span>
+                  <span className="font-semibold">&quot;Implement new dashboard sidebar&quot;</span>
                 </p>
                 <span className="text-[10px] text-[#8A958F]">18h ago</span>
               </div>
@@ -1066,7 +1072,7 @@ export function DepartmentDetailView({
       <AssignDepartmentLeadModal
         isOpen={assignLeadModalOpen}
         onClose={() => setAssignLeadModalOpen(false)}
-        department={departmentWithStats as any}
+        department={departmentWithStats}
         workspaceId={workspace.id}
       />
 

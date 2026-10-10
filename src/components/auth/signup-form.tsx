@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema, type SignupInput } from "@/lib/validations/auth";
@@ -37,6 +37,11 @@ function getPasswordStrength(password: string): { label: string; textClass: stri
 
 export function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get("email");
+  const isEmailLocked = searchParams.get("locked") === "true";
+  const nextParam = searchParams.get("next");
+
   const [isLoading, setIsLoading] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
 
@@ -44,14 +49,22 @@ export function SignupForm() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
     mode: "onBlur",
     defaultValues: {
+      email: emailParam || "",
       agreeToTerms: false,
     },
   });
+
+  React.useEffect(() => {
+    if (emailParam) {
+      setValue("email", emailParam);
+    }
+  }, [emailParam, setValue]);
 
   const passwordValue = watch("password") || "";
   const strengthHint = getPasswordStrength(passwordValue);
@@ -89,7 +102,11 @@ export function SignupForm() {
       }
 
       if (authData.session) {
-        router.push("/onboarding");
+        if (nextParam) {
+          router.push(nextParam);
+        } else {
+          router.push("/onboarding");
+        }
         return;
       }
 
@@ -148,11 +165,19 @@ export function SignupForm() {
             type="email"
             autoComplete="email"
             placeholder="alex@company.com"
+            readOnly={isEmailLocked}
             {...register("email")}
-            className={`h-11 w-full rounded-2xl border bg-white px-4 text-[14px] text-[#111] placeholder:text-[#999] focus:border-[#111] focus:ring-1 focus:ring-[#111] focus:outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
+            className={`h-11 w-full rounded-2xl border px-4 text-[14px] text-[#111] placeholder:text-[#999] focus:border-[#111] focus:ring-1 focus:ring-[#111] focus:outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
+              isEmailLocked ? "bg-[#FAF9F5] border-[#E5E2D6] cursor-not-allowed text-[#6B6B6B]" : "bg-white"
+            } ${
               errors.email ? "border-[#D93025]" : "border-[#E5E2D6]"
             }`}
           />
+          {isEmailLocked && (
+            <p className="text-[12px] text-[#6B6B6B] mt-1 font-medium flex items-center gap-1">
+              <span>🔒</span> Email locked for this invitation
+            </p>
+          )}
           {errors.email && (
             <p className="text-[13px] text-[#D93025] mt-1 font-medium">
               {errors.email.message}

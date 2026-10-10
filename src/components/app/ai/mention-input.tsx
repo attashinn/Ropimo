@@ -5,12 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Paperclip,
   X,
-  User,
   FileText,
   Loader2,
   AtSign,
   Users,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +61,8 @@ export function MentionInput({
   minHeight = "min-h-[80px]",
   className,
 }: MentionInputProps) {
-  const [localMembers, setLocalMembers] = React.useState<WorkspaceMember[]>(members);
+  const [fetchedMembers, setFetchedMembers] = React.useState<WorkspaceMember[]>([]);
+  const availableMembers = (members && members.length > 0) ? members : fetchedMembers;
   const [internalTaggedMembers, setInternalTaggedMembers] = React.useState<WorkspaceMember[]>([]);
   const [showMentionMenu, setShowMentionMenu] = React.useState(false);
   const [mentionQuery, setMentionQuery] = React.useState("");
@@ -90,7 +89,6 @@ export function MentionInput({
   // If members not provided, fetch from /api/workspace/members
   React.useEffect(() => {
     if (members && members.length > 0) {
-      setLocalMembers(members);
       return;
     }
 
@@ -99,7 +97,7 @@ export function MentionInput({
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data.members) {
-          setLocalMembers(data.members);
+          setFetchedMembers(data.members);
         }
       })
       .catch(() => {});
@@ -111,15 +109,15 @@ export function MentionInput({
 
   // Filter members based on query
   const filteredMembers = React.useMemo(() => {
-    if (!mentionQuery) return localMembers;
+    if (!mentionQuery) return availableMembers;
     const q = mentionQuery.toLowerCase();
-    return localMembers.filter(
+    return availableMembers.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.role.toLowerCase().includes(q) ||
         (m.email && m.email.toLowerCase().includes(q))
     );
-  }, [localMembers, mentionQuery]);
+  }, [availableMembers, mentionQuery]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;

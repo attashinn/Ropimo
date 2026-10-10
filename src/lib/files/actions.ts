@@ -9,6 +9,7 @@ import {
   FileItem,
 } from "@/types/files";
 import { deleteFromR2 } from "@/lib/storage/r2";
+import { requirePermission } from "@/lib/permissions-server";
 import { revalidatePath } from "next/cache";
 
 export interface FileActionResult {
@@ -60,9 +61,28 @@ export async function createFolderAction(
     data: { user },
   } = await authClient.auth.getUser();
 
+  if (!user) {
+    return { success: false, error: "Unauthorized." };
+  }
+
   const trimmedName = name?.trim();
   if (!trimmedName || trimmedName.length < 1) {
     return { success: false, error: "Folder name cannot be empty." };
+  }
+
+  try {
+    await requirePermission(
+      "files:manage",
+      {
+        workspaceId,
+        departmentId: departmentId || undefined,
+        accessLevel: (accessLevel as any) || "company",
+      },
+      user.id
+    );
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
+    return { success: false, error: msg };
   }
 
   const adminClient = createAdminClient();
@@ -99,9 +119,10 @@ export async function createFolderAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error creating folder:", err);
-    return { success: false, error: err?.message || "Failed to create folder" };
+    return { success: false, error: errMessage || "Failed to create folder" };
   }
 }
 
@@ -119,6 +140,26 @@ export async function uploadFilesAction(
   const {
     data: { user },
   } = await authClient.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Unauthorized." };
+  }
+
+  try {
+    const first = files[0];
+    await requirePermission(
+      "files:manage",
+      {
+        workspaceId: first.workspaceId,
+        departmentId: first.departmentId || undefined,
+        accessLevel: (first.accessLevel as any) || "company",
+      },
+      user.id
+    );
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
+    return { success: false, error: msg };
+  }
 
   const adminClient = createAdminClient();
 
@@ -163,9 +204,10 @@ export async function uploadFilesAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error uploading files:", err);
-    return { success: false, error: err?.message || "Failed to upload files" };
+    return { success: false, error: errMessage || "Failed to upload files" };
   }
 }
 
@@ -212,9 +254,10 @@ export async function renameFileItemAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error renaming item:", err);
-    return { success: false, error: err?.message || "Failed to rename item" };
+    return { success: false, error: errMessage || "Failed to rename item" };
   }
 }
 
@@ -264,9 +307,10 @@ export async function moveItemAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error moving item:", err);
-    return { success: false, error: err?.message || "Failed to move item" };
+    return { success: false, error: errMessage || "Failed to move item" };
   }
 }
 
@@ -283,10 +327,33 @@ export async function deleteFileItemAction(
     data: { user },
   } = await authClient.auth.getUser();
 
+  if (!user) {
+    return { success: false, error: "Unauthorized." };
+  }
+
   const adminClient = createAdminClient();
   const table = isFolder ? "workspace_folders" : "workspace_files";
 
   try {
+    // Check permission on target item
+    const { data: targetItem } = await adminClient
+      .from(table)
+      .select("department_id, access_level")
+      .eq("id", id)
+      .eq("workspace_id", workspaceId)
+      .single();
+
+    if (targetItem) {
+      await requirePermission(
+        "files:manage",
+        {
+          workspaceId,
+          departmentId: targetItem.department_id || undefined,
+          accessLevel: (targetItem.access_level as any) || "company",
+        },
+        user.id
+      );
+    }
     // If it's a file, get storage URL to clean up storage object
     if (!isFolder) {
       const { data: fileRecord } = await adminClient
@@ -325,9 +392,10 @@ export async function deleteFileItemAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error deleting item:", err);
-    return { success: false, error: err?.message || "Failed to delete item" };
+    return { success: false, error: errMessage || "Failed to delete item" };
   }
 }
 
@@ -386,9 +454,10 @@ export async function bulkDeleteFilesAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error bulk deleting items:", err);
-    return { success: false, error: err?.message || "Failed to bulk delete items" };
+    return { success: false, error: errMessage || "Failed to bulk delete items" };
   }
 }
 
@@ -417,9 +486,10 @@ export async function toggleStarFileAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error starring item:", err);
-    return { success: false, error: err?.message || "Failed to star item" };
+    return { success: false, error: errMessage || "Failed to star item" };
   }
 }
 
@@ -473,8 +543,9 @@ export async function shareFileItemAction(
 
     revalidatePath("/app/files");
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
     console.error("Error sharing file:", err);
-    return { success: false, error: err?.message || "Failed to share file" };
+    return { success: false, error: errMessage || "Failed to share file" };
   }
 }

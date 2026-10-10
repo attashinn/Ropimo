@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Department, DepartmentWithStats, DepartmentRole } from "@/types/department";
+import { Tables } from "@/types/database";
 
 
 
@@ -35,7 +36,7 @@ export const getWorkspaceDepartments = cache(
   async (workspaceId: string): Promise<Department[]> => {
     if (!workspaceId) return [];
 
-    let client: any;
+    let client: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>;
     try {
       client = await createClient();
     } catch {
@@ -194,7 +195,7 @@ export const getWorkspaceDepartmentsWithStats = cache(
       let userRoleInDept: DepartmentRole | null = null;
       if (myMembership) {
         const jt = (myMembership.job_title || "").toLowerCase();
-        if ((dept as any).lead_id === myMembership.user_id || jt.includes("lead") || jt.includes("head") || jt.includes("director")) {
+        if (dept.lead_id === myMembership.user_id || jt.includes("lead") || jt.includes("head") || jt.includes("director")) {
           userRoleInDept = "lead";
         } else if (jt.includes("manager")) {
           userRoleInDept = "manager";
@@ -206,7 +207,7 @@ export const getWorkspaceDepartmentsWithStats = cache(
       // Determine lead: prefer explicit lead_id on department row, then senior job titles
       const leadMember = deptMembers.find(
         (m) =>
-          (dept as any).lead_id === m.user_id ||
+          dept.lead_id === m.user_id ||
           (m.job_title &&
             (m.job_title.toLowerCase().includes("lead") ||
               m.job_title.toLowerCase().includes("head") ||
@@ -233,7 +234,7 @@ export const getWorkspaceDepartmentsWithStats = cache(
         const initial = (name[0] || "M").toUpperCase();
         const memberJt = (m.job_title || wm?.job_title || "").toLowerCase();
         let memberRole: DepartmentRole = "member";
-        if ((dept as any).lead_id === m.user_id || memberJt.includes("lead") || memberJt.includes("head") || memberJt.includes("director")) {
+        if (dept.lead_id === m.user_id || memberJt.includes("lead") || memberJt.includes("head") || memberJt.includes("director")) {
           memberRole = "lead";
         } else if (memberJt.includes("manager")) {
           memberRole = "manager";
@@ -255,7 +256,7 @@ export const getWorkspaceDepartmentsWithStats = cache(
         ...dept,
         leadName,
         leadRole,
-        leadId: leadMember?.user_id || (dept as any).lead_id || null,
+        leadId: leadMember?.user_id || dept.lead_id || null,
         memberCount,
         projectCount,
         taskCount,
@@ -356,7 +357,7 @@ export async function getDepartmentActivities(
   const taskIds = (deptTasks || []).map((t) => t.id);
   const taskMap = new Map((deptTasks || []).map((t) => [t.id, t]));
 
-  let taskActs: any[] = [];
+  let taskActs: Tables<"task_activities">[] = [];
   if (taskIds.length > 0) {
     const { data: tRows } = await adminClient
       .from("task_activities")

@@ -483,7 +483,7 @@ export function DocumentDetailView({
                         </p>
                         {v.note && (
                           <p className="text-[10px] italic text-[#18221E]">
-                            "{v.note}"
+                            &quot;{v.note}&quot;
                           </p>
                         )}
                         <button

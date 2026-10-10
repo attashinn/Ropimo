@@ -29,7 +29,7 @@ export interface HeroButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof heroButtonVariants> {
   nativeButton?: boolean;
-  render?: React.ReactElement<any>;
+  render?: React.ReactElement<Record<string, unknown>>;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, HeroButtonProps>(
@@ -41,7 +41,7 @@ export const Button = React.forwardRef<HTMLButtonElement, HeroButtonProps>(
       return React.cloneElement(el, {
         className: cn(combinedClassName, el.props?.className),
         children: children ?? el.props?.children,
-        ...(props as any),
+        ...(props as Record<string, unknown>),
       });
     }
 

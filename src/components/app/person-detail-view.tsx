@@ -22,6 +22,35 @@ import {
 import { AppIcon } from "@/components/ui/app-icon";
 import { updateOnboardingChecklistItemAction } from "@/lib/recruitment/actions";
 
+export interface RecruitmentInterviewItem {
+  id: string;
+  title?: string;
+  interview_type?: string;
+  date?: string;
+  time?: string;
+  status?: string;
+}
+
+export interface RecruitmentOfferItem {
+  id: string;
+  status?: string;
+  job_title?: string;
+  salary?: string;
+  start_date?: string;
+}
+
+export interface RecruitmentActivityItem {
+  id: string;
+  title?: string;
+  description?: string;
+}
+
+export interface PersonRecruitmentHistory {
+  interviews?: RecruitmentInterviewItem[];
+  offers?: RecruitmentOfferItem[];
+  activities?: RecruitmentActivityItem[];
+}
+
 export interface PersonDetailViewProps {
   person: WorkspacePerson;
   workspace: Workspace;
@@ -32,7 +61,7 @@ export interface PersonDetailViewProps {
   projects?: MemberProjectSummary[];
   onboarding?: EmployeeOnboarding | null;
   invitation?: WorkspaceInvitation | null;
-  recruitmentHistory?: any;
+  recruitmentHistory?: PersonRecruitmentHistory | null;
   attendanceHistory?: AttendanceRecord[];
   attendanceMonthlySummary?: MonthlyAttendanceSummary | null;
   leaveBalances?: LeaveBalance[];
@@ -103,10 +132,10 @@ export function PersonDetailView({
         employeeId: person.employee_id || undefined,
         email: person.email,
         fullName: person.full_name || undefined,
-        role: (person.role as any) || "member",
+        role: (person.role as "owner" | "admin" | "member" | "guest") || "member",
         jobTitle: person.job_title || undefined,
         departmentId: person.departments[0]?.id || undefined,
-        employmentType: person.employment_type as any,
+        employmentType: person.employment_type ? (person.employment_type as "Full-time" | "Part-time" | "Contract" | "Internship") : undefined,
       });
 
       if (!res.success) {
@@ -118,7 +147,7 @@ export function PersonDetailView({
             id: `inv-${Date.now()}`,
             workspace_id: workspace.id,
             email: person.email,
-            role: (person.role as any) || "member",
+            role: (person.role as "owner" | "admin" | "member" | "guest") || "member",
             token: res.data.token,
             status: "Pending",
             expires_at: res.data.expiresAt,
@@ -126,8 +155,8 @@ export function PersonDetailView({
           });
         }
       }
-    } catch (err: any) {
-      setInvitationMsg({ text: err?.message || "An error occurred.", error: true });
+    } catch (err: unknown) {
+      setInvitationMsg({ text: err instanceof Error ? err.message : "An error occurred.", error: true });
     } finally {
       setInvitationLoading(false);
     }
@@ -161,8 +190,8 @@ export function PersonDetailView({
           );
         }
       }
-    } catch (err: any) {
-      setInvitationMsg({ text: err?.message || "An error occurred.", error: true });
+    } catch (err: unknown) {
+      setInvitationMsg({ text: err instanceof Error ? err.message : "An error occurred.", error: true });
     } finally {
       setInvitationLoading(false);
     }
@@ -186,8 +215,8 @@ export function PersonDetailView({
         setInvitationMsg({ text: "Invitation revoked." });
         setInvitationState((prev) => (prev ? { ...prev, status: "Revoked" } : null));
       }
-    } catch (err: any) {
-      setInvitationMsg({ text: err?.message || "An error occurred.", error: true });
+    } catch (err: unknown) {
+      setInvitationMsg({ text: err instanceof Error ? err.message : "An error occurred.", error: true });
     } finally {
       setInvitationLoading(false);
     }
@@ -864,7 +893,7 @@ export function PersonDetailView({
                   <h3 className="text-sm font-bold text-[#18221E]">Interview History</h3>
                   {recruitmentHistory.interviews && recruitmentHistory.interviews.length > 0 ? (
                     <div className="divide-y divide-[#D8DDD4]/60 text-xs">
-                      {recruitmentHistory.interviews.map((iv: any) => (
+                      {recruitmentHistory.interviews.map((iv: RecruitmentInterviewItem) => (
                         <div key={iv.id} className="py-3 flex items-center justify-between">
                           <div>
                             <p className="font-bold text-[#18221E]">{iv.title}</p>
@@ -890,7 +919,7 @@ export function PersonDetailView({
                 <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-2xs space-y-3 text-xs">
                   <h3 className="text-sm font-bold text-[#18221E]">Job Offer</h3>
                   {recruitmentHistory.offers && recruitmentHistory.offers.length > 0 ? (
-                    recruitmentHistory.offers.map((off: any) => (
+                    recruitmentHistory.offers.map((off: RecruitmentOfferItem) => (
                       <div key={off.id} className="space-y-2 pt-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[#65706A]">Status</span>
@@ -924,7 +953,7 @@ export function PersonDetailView({
                   <h3 className="text-sm font-bold text-[#18221E]">Recruitment Trail</h3>
                   {recruitmentHistory.activities && recruitmentHistory.activities.length > 0 ? (
                     <div className="divide-y divide-[#D8DDD4]/60">
-                      {recruitmentHistory.activities.slice(0, 5).map((act: any) => (
+                      {recruitmentHistory.activities.slice(0, 5).map((act: RecruitmentActivityItem) => (
                         <div key={act.id} className="py-2.5 space-y-0.5">
                           <p className="font-semibold text-[#18221E]">{act.title}</p>
                           <p className="text-[11px] text-[#65706A]">{act.description}</p>

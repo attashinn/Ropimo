@@ -108,7 +108,8 @@ export function Sidebar({
     setSwitchingId(targetId);
     try {
       await switchActiveWorkspaceAction(targetId);
-      window.location.href = "/app";
+      router.push("/app");
+      router.refresh();
     } catch {
       setSwitchingId(null);
     }

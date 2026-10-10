@@ -82,9 +82,9 @@ export async function getDepartmentUserRoleAndPermissions(
 
   let rawRole: string | null = null;
   if (deptMember) {
-    rawRole = (deptMember as any).role?.toLowerCase() || null;
-    if (!rawRole && (deptMember as any).job_title) {
-      const jt = (deptMember as any).job_title.toLowerCase();
+    rawRole = deptMember.role?.toLowerCase() || null;
+    if (!rawRole && deptMember.job_title) {
+      const jt = deptMember.job_title.toLowerCase();
       if (jt.includes("lead") || jt.includes("head") || jt.includes("director")) rawRole = "lead";
       else if (jt.includes("manager")) rawRole = "manager";
       else rawRole = "member";
@@ -92,8 +92,8 @@ export async function getDepartmentUserRoleAndPermissions(
   }
 
   if (!rawRole && deptRow) {
-    if ((deptRow as any).lead_id === userId) rawRole = "lead";
-    else if ((deptRow as any).created_by === userId && isWorkspaceAdmin) rawRole = "lead";
+    if (deptRow.lead_id === userId) rawRole = "lead";
+    else if (deptRow.created_by === userId && isWorkspaceAdmin) rawRole = "lead";
   }
 
   let departmentRole: DepartmentRole | "none" = "none";

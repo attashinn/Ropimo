@@ -37,9 +37,10 @@ export function Hero() {
 
     // Switch to next word when completely deleted
     if (isDeleting && subIndex === 0) {
-      setIsDeleting(false);
-      setWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
-      const timer = setTimeout(() => {}, 300);
+      const timer = setTimeout(() => {
+        setIsDeleting(false);
+        setWordIndex((prev) => (prev + 1) % ROTATING_WORDS.length);
+      }, 300);
       return () => clearTimeout(timer);
     }
 

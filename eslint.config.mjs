@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "dashboard-reference/**",
+    "scripts/**",
+    "supabase/**",
+    "eslint-report.json",
   ]),
 ]);
 

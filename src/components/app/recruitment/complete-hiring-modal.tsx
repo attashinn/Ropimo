@@ -312,7 +312,7 @@ export function CompleteHiringModal({
                     <label className="block font-semibold text-[#18221E] mb-1">Workspace Role</label>
                     <select
                       value={role}
-                      onChange={(e) => setRole(e.target.value as any)}
+                      onChange={(e) => setRole(e.target.value as "member" | "manager" | "admin")}
                       className="w-full rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-1.5 text-xs focus:border-[#10251F] focus:outline-none"
                     >
                       <option value="member">Member</option>

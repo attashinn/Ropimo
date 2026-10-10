@@ -43,36 +43,61 @@ export const getUserContext = cache(
     const adminClient = createAdminClient();
 
     // Fetch workspace role + department memberships in parallel
-    const [{ data: wsMember }, { data: deptRows }] = await Promise.all([
+    const [wsMemberRes, deptRowsRes] = await Promise.all([
       adminClient
         .from("workspace_members")
-        .select("role")
+        .select("role, is_deactivated, employment_status")
         .eq("workspace_id", workspaceId)
         .eq("user_id", user.id)
         .maybeSingle(),
       adminClient
         .from("department_members")
-        .select("department_id, role")
+        .select("department_id, role, is_lead")
         .eq("workspace_id", workspaceId)
         .eq("user_id", user.id),
     ]);
 
+    let wsMember = wsMemberRes.data;
+    if (!wsMember && wsMemberRes.error) {
+      const fallback = await adminClient
+        .from("workspace_members")
+        .select("role, employment_status")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      wsMember = fallback.data as typeof wsMember;
+    }
+
     // User is not a workspace member — no access
     if (!wsMember) return null;
 
-    const workspaceRole = wsMember.role as WorkspaceRole;
-    const isOwnerOrAdmin = ["owner", "admin", "manager"].includes(workspaceRole);
+    let deptRows = deptRowsRes.data;
+    if (!deptRows && deptRowsRes.error) {
+      const fallbackDept = await adminClient
+        .from("department_members")
+        .select("department_id, role")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", user.id);
+      deptRows = (fallbackDept.data || []) as typeof deptRows;
+    }
 
-    const deptMemberships: DeptMembership[] = (deptRows || []).map((row: any) => ({
+    const workspaceRole = wsMember.role as WorkspaceRole;
+    const isOwnerOrAdmin = ["owner", "admin"].includes(workspaceRole);
+
+    const deptMemberships: DeptMembership[] = (deptRows || []).map((row: { department_id: string; role: string | null; is_lead?: boolean | null }) => ({
       deptId: row.department_id,
       role: (row.role || "member") as DepartmentRole,
+      isLead: Boolean(row.is_lead || row.role === "lead"),
     }));
 
     const deptIds = deptMemberships.map((d) => d.deptId);
     const ledDeptIds = deptMemberships
-      .filter((d) => d.role === "lead")
+      .filter((d) => d.isLead || d.role === "lead")
       .map((d) => d.deptId);
     const isDeptLead = ledDeptIds.length > 0;
+    const isDeactivated = Boolean(
+      wsMember.is_deactivated || wsMember.employment_status === "Inactive"
+    );
 
     return {
       userId: user.id,
@@ -83,6 +108,7 @@ export const getUserContext = cache(
       deptIds,
       isDeptLead,
       ledDeptIds,
+      isDeactivated,
     };
   }
 );

@@ -39,9 +39,15 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Refresh auth session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
+    }
+  } catch (err) {
+    // Gracefully continue on auth network error
+  }
 
   const { pathname } = request.nextUrl;
   supabaseResponse.headers.set("x-pathname", pathname);

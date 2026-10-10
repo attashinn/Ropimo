@@ -7,7 +7,7 @@ import { WorkspaceRole } from "@/types/permissions";
 export interface AuthenticatedUser {
   id: string;
   email?: string;
-  user_metadata: Record<string, any>;
+  user_metadata: Record<string, unknown>;
 }
 
 export interface AuthenticatedWorkspaceContext {
@@ -58,13 +58,17 @@ export async function requireWorkspaceRole(
 
   const { data: member, error } = await adminClient
     .from("workspace_members")
-    .select("role, workspace_id, user_id")
+    .select("role, workspace_id, user_id, is_deactivated, employment_status")
     .eq("workspace_id", workspaceId)
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (error || !member) {
     throw new Error("Forbidden: You are not a member of this workspace.");
+  }
+
+  if (member.is_deactivated || member.employment_status === "Inactive") {
+    throw new Error("Forbidden: Your account in this workspace is deactivated.");
   }
 
   const actualRole = member.role as WorkspaceRole;
@@ -83,3 +87,6 @@ export async function requireWorkspaceRole(
     role: actualRole,
   };
 }
+
+export { requirePermission } from "@/lib/permissions-server";
+

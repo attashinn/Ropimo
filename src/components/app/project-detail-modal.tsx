@@ -157,9 +157,11 @@ export function ProjectDetailModal({
   const [taskPriorityDropdownId, setTaskPriorityDropdownId] = React.useState<string | null>(null);
   const [taskStatusDropdownId, setTaskStatusDropdownId] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  const [prevTasks, setPrevTasks] = React.useState(tasks);
+  if (tasks !== prevTasks) {
+    setPrevTasks(tasks);
     setLocalTasks(tasks);
-  }, [tasks]);
+  }
 
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -174,7 +176,9 @@ export function ProjectDetailModal({
   }, []);
 
   // Sync state when project changes
-  React.useEffect(() => {
+  const [prevProject, setPrevProject] = React.useState(project);
+  if (project !== prevProject) {
+    setPrevProject(project);
     if (project) {
       setName(project.name || "Document Project Overview");
       setDescription(
@@ -200,7 +204,7 @@ export function ProjectDetailModal({
       setDepartmentId(project.department_id || "");
       setLeadId(project.lead_id || project.manager_id || (people[0]?.user_id ?? ""));
     }
-  }, [project, people]);
+  }
 
   if (!isOpen || !project) return null;
 

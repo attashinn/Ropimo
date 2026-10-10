@@ -10,15 +10,15 @@ import {
 } from "@/types/attendance";
 import {
   LeaveRequest,
-  LeaveStatus,
   LeaveType,
 } from "@/types/leave";
 import {
   dispatchLeaveRequestedEvent,
   dispatchLeaveReviewedEvent,
 } from "@/lib/notifications/service";
+import { requirePermission } from "@/lib/permissions-server";
 
-interface ActionResult<T = any> {
+interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -185,9 +185,10 @@ export async function checkInAction(params: {
       success: true,
       data: savedRecord as unknown as AttendanceRecord,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     console.error("Check-in error:", error);
-    return { success: false, error: error.message || "Failed to process check-in." };
+    return { success: false, error: errMessage || "Failed to process check-in." };
   }
 }
 
@@ -276,9 +277,10 @@ export async function checkOutAction(params: {
       success: true,
       data: savedRecord as unknown as AttendanceRecord,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     console.error("Check-out error:", error);
-    return { success: false, error: error.message || "Failed to process check-out." };
+    return { success: false, error: errMessage || "Failed to process check-out." };
   }
 }
 
@@ -326,7 +328,8 @@ export async function recordAbsenceAction(params: {
 
     revalidatePath("/app/attendance");
     return { success: true, data: savedRecord as unknown as AttendanceRecord };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     return { success: false, error: error.message };
   }
 }
@@ -348,6 +351,8 @@ export async function submitLeaveRequestAction(params: {
     if (!user) {
       return { success: false, error: "Unauthorized." };
     }
+
+    await requirePermission("leave:request", { workspaceId: params.workspaceId }, user.id);
 
     if (!params.startDate || !params.endDate) {
       return { success: false, error: "Start and end dates are required." };
@@ -451,9 +456,10 @@ export async function submitLeaveRequestAction(params: {
     }
 
     return { success: true, data: newRequest as unknown as LeaveRequest };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     console.error("Submit leave request error:", error);
-    return { success: false, error: error.message || "Failed to submit leave request." };
+    return { success: false, error: errMessage || "Failed to submit leave request." };
   }
 }
 
@@ -471,17 +477,12 @@ export async function reviewLeaveRequestAction(params: {
     const { user, adminClient } = await verifyUserAndRole(params.workspaceId, [
       "owner",
       "admin",
+      "hr",
       "manager",
     ]);
     if (!user) {
       return { success: false, error: "Insufficient permissions to review leave requests." };
     }
-
-    const isApproved =
-      params.action === "approve" ||
-      params.decision === "Approved" ||
-      (!params.action && params.decision !== "Rejected");
-    const finalDecision: "Approved" | "Rejected" = isApproved ? "Approved" : "Rejected";
 
     const { data: request, error: fetchErr } = await adminClient
       .from("leave_requests")
@@ -493,6 +494,26 @@ export async function reviewLeaveRequestAction(params: {
     if (fetchErr || !request) {
       return { success: false, error: "Leave request not found." };
     }
+
+    // Lookup department of the employee requesting leave to verify department manager scope
+    const { data: deptRows } = await adminClient
+      .from("department_members")
+      .select("department_id")
+      .eq("workspace_id", params.workspaceId)
+      .eq("user_id", request.user_id)
+      .limit(1);
+
+    const targetDeptId = deptRows?.[0]?.department_id;
+
+    await requirePermission(
+      "leave:approve",
+      {
+        workspaceId: params.workspaceId,
+        departmentId: targetDeptId,
+        targetUserId: request.user_id,
+      },
+      user.id
+    );
 
     if (request.status !== "Pending") {
       return { success: false, error: `This leave request is already ${request.status}.` };
@@ -571,9 +592,10 @@ export async function reviewLeaveRequestAction(params: {
     }
 
     return { success: true, data: updatedRequest as unknown as LeaveRequest };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     console.error("Review leave request error:", error);
-    return { success: false, error: error.message || "Failed to review leave request." };
+    return { success: false, error: errMessage || "Failed to review leave request." };
   }
 }
 
@@ -656,7 +678,8 @@ export async function cancelLeaveRequestAction(params: {
     revalidatePath("/app/leave");
 
     return { success: true, data: updatedRequest as unknown as LeaveRequest };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     return { success: false, error: error.message };
   }
 }
@@ -673,13 +696,12 @@ export async function updateAttendanceSettingsAction(params: {
   workDays?: number[];
 }): Promise<ActionResult<AttendanceSettings>> {
   try {
-    const { user, adminClient } = await verifyUserAndRole(params.workspaceId, [
-      "owner",
-      "admin",
-    ]);
+    const { user, adminClient } = await verifyUserAndRole(params.workspaceId);
     if (!user) {
       return { success: false, error: "Only workspace owners and admins can edit policy settings." };
     }
+
+    await requirePermission("workspace:settings", { workspaceId: params.workspaceId }, user.id);
 
     const { data: savedSettings, error } = await adminClient
       .from("attendance_settings")
@@ -704,7 +726,8 @@ export async function updateAttendanceSettingsAction(params: {
 
     revalidatePath("/app/attendance");
     return { success: true, data: savedSettings as unknown as AttendanceSettings };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : undefined;
     return { success: false, error: error.message };
   }
 }

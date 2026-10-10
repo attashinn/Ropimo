@@ -88,6 +88,15 @@ export function RichDescriptionEditor({
     return input;
   };
 
+  const checkIsEmpty = () => {
+    const el = editorRef.current;
+    if (!el) return true;
+    const text = el.innerText?.trim() || "";
+    const empty = text.length === 0 && !el.querySelector("img, hr, iframe");
+    setIsEmpty(empty);
+    return empty;
+  };
+
   // Synchronize incoming value changes if not currently being actively typed
   React.useEffect(() => {
     const el = editorRef.current;
@@ -100,15 +109,6 @@ export function RichDescriptionEditor({
       checkIsEmpty();
     }
   }, [value, isFocused]);
-
-  const checkIsEmpty = () => {
-    const el = editorRef.current;
-    if (!el) return true;
-    const text = el.innerText?.trim() || "";
-    const empty = text.length === 0 && !el.querySelector("img, hr, iframe");
-    setIsEmpty(empty);
-    return empty;
-  };
 
   const handleInput = () => {
     const el = editorRef.current;

@@ -68,8 +68,8 @@ function AddDepartmentMemberForm({
       onClose();
       router.refresh();
       if (onSuccess) onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err?.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred.");
       setLoading(false);
     }
   };

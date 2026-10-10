@@ -89,10 +89,12 @@ export function FilesView({
   ]);
 
   // Items State
+  const [prevAllInitialItems, setPrevAllInitialItems] = React.useState(allInitialItems);
   const [allItems, setAllItems] = React.useState<FileItem[]>(allInitialItems);
-  React.useEffect(() => {
+  if (allInitialItems !== prevAllInitialItems) {
+    setPrevAllInitialItems(allInitialItems);
     setAllItems(allInitialItems);
-  }, [allInitialItems]);
+  }
 
   // View & Filter States
   const [viewMode, setViewMode] = React.useState<"list" | "grid">("list");
@@ -503,7 +505,7 @@ export function FilesView({
               {/* Type Select */}
               <select
                 value={selectedFileType}
-                onChange={(e) => setSelectedFileType(e.target.value as any)}
+                onChange={(e) => setSelectedFileType(e.target.value as "all" | FileType)}
                 className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
               >
                 <option value="all">Type: All</option>
@@ -519,7 +521,7 @@ export function FilesView({
               {/* Sort Select */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as "last_modified" | "name" | "size")}
                 className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
               >
                 <option value="last_modified">Last Modified</option>
@@ -2360,7 +2362,7 @@ function MoveItemModal({
         className="relative w-full max-w-sm rounded-[16px] border border-[#D8DDD4] bg-white p-5 shadow-2xl z-10 space-y-4"
       >
         <h4 className="text-sm font-bold text-[#18221E]">
-          Move "{item.name}"
+          Move &quot;{item.name}&quot;
         </h4>
 
         <div className="space-y-2">
@@ -2850,7 +2852,7 @@ function DeleteConfirmDialog({
           Delete {item.is_folder ? "Folder" : "File"}
         </h4>
         <p className="text-xs text-[#65706A] leading-relaxed">
-          Are you sure you want to delete <span className="font-bold text-[#18221E]">"{item.name}"</span>?
+          Are you sure you want to delete <span className="font-bold text-[#18221E]">&quot;{item.name}&quot;</span>?
           {item.is_folder && " All contained files and subfolders will also be removed."}
         </p>
 

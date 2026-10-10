@@ -496,7 +496,7 @@ export async function getAccessibleProjects(
     .eq("workspace_id", workspaceId)
     .eq("user_id", ctx.userId);
 
-  const explicitProjectIds = new Set((projMemberRows || []).map((r: any) => r.project_id));
+  const explicitProjectIds = new Set((projMemberRows || []).map((r: { project_id: string }) => r.project_id));
 
   return allProjects.filter((p) => {
     // Project in user's dept

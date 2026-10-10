@@ -74,6 +74,7 @@ export default async function PeoplePage() {
     <PeopleDirectory
       workspaceId={workspaceId}
       workspaceName={workspace?.name || "brnnd"}
+      workspaceSlug={workspace?.slug || workspaceId}
       userRole={workspace?.role || "owner"}
       people={people}
       departments={departments}

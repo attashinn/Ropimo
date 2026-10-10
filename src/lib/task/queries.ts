@@ -538,7 +538,7 @@ export const getOverviewTaskMetrics = cache(
 
 export interface WorkspaceActivityItem {
   id: string;
-  type: "project_created" | "task_created" | "task_completed" | "activity";
+  type: "project_created" | "task_created" | "task_completed" | "activity" | "leave_requested";
   targetName: string;
   createdAt: string;
   actorName: string;
@@ -663,10 +663,10 @@ export async function getAccessibleTasks(
     .select("task_id")
     .eq("user_id", ctx.userId);
 
-  const assignedTaskIds = new Set((userAssignments || []).map((a: any) => a.task_id));
+  const assignedTaskIds = new Set((userAssignments || []).map((a: { task_id: string }) => a.task_id));
 
   // Fetch all tasks for accessible projects + user's depts
-  let query = adminClient
+  const query = adminClient
     .from("tasks")
     .select(`
       *,

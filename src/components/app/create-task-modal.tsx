@@ -105,20 +105,24 @@ export function CreateTaskModal({
   );
   const [assigneeId, setAssigneeId] = React.useState(defaultAssigneeId || "");
 
-  React.useEffect(() => {
+  const [prevDefaultPhaseId, setPrevDefaultPhaseId] = React.useState(defaultPhaseId);
+  if (defaultPhaseId !== prevDefaultPhaseId) {
+    setPrevDefaultPhaseId(defaultPhaseId);
     if (defaultPhaseId) {
       setPhaseId(defaultPhaseId);
     }
-  }, [defaultPhaseId]);
+  }
 
-  React.useEffect(() => {
+  const [prevDefaultDepartmentId, setPrevDefaultDepartmentId] = React.useState(defaultDepartmentId);
+  if (defaultDepartmentId !== prevDefaultDepartmentId) {
+    setPrevDefaultDepartmentId(defaultDepartmentId);
     if (defaultDepartmentId) {
       setDepartmentId(defaultDepartmentId);
       setCollaborativeDeptIds((prev) =>
         prev.includes(defaultDepartmentId) ? prev : [...prev, defaultDepartmentId]
       );
     }
-  }, [defaultDepartmentId]);
+  }
 
   const handlePrimaryDeptChange = (newDeptId: string) => {
     setDepartmentId(newDeptId);
@@ -188,7 +192,9 @@ export function CreateTaskModal({
   }, []);
 
   // Reset form when opened
-  React.useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = React.useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setTitle("");
       setDescription("");
@@ -203,7 +209,7 @@ export function CreateTaskModal({
       setPriority("normal");
       setErrorMsg(null);
     }
-  }, [isOpen, defaultDepartmentId, defaultProjectId, defaultAssigneeId, departments, projects, people]);
+  }
 
   const trimmedTitle = title.trim();
   const isValid = trimmedTitle.length >= 2;

@@ -5,7 +5,7 @@
  * Used by the personalized member/dept-lead dashboard.
  */
 import { cache } from "react";
-import { Task, CategorizedTasks } from "@/types/task";
+import { CategorizedTasks } from "@/types/task";
 import { Project } from "@/types/project";
 import { Department } from "@/types/department";
 import { AttendanceState, AttendanceRecord } from "@/types/attendance";
@@ -14,7 +14,7 @@ import { CalendarEvent } from "@/types/calendar";
 import { UserContext } from "@/types/permissions";
 import { WorkspaceActivityItem } from "@/lib/task/queries";
 import { getAccessibleProjects } from "@/lib/project/queries";
-import { getAccessibleTasks, getMyTasks } from "@/lib/task/queries";
+import { getMyTasks } from "@/lib/task/queries";
 import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { getTodayAttendanceState } from "@/lib/attendance/queries";
 import { getEmployeeLeaveBalances, getEmployeeLeaveRequests } from "@/lib/attendance/queries";
@@ -77,7 +77,7 @@ async function getMemberRecentActivity(
 
   const activities: WorkspaceActivityItem[] = [];
 
-  (projects || []).forEach((proj: any) => {
+  (projects || []).forEach((proj: { id: string; name: string; created_by: string | null; created_at: string }) => {
     activities.push({
       id: `proj-${proj.id}`,
       type: "project_created",
@@ -87,7 +87,7 @@ async function getMemberRecentActivity(
     });
   });
 
-  (tasks || []).forEach((t: any) => {
+  (tasks || []).forEach((t: { id: string; title: string; status: string; created_by: string | null; created_at: string }) => {
     activities.push({
       id: `task-${t.id}`,
       type: t.status === "completed" ? "task_completed" : "task_created",
@@ -199,7 +199,7 @@ export const getMemberDashboardData = cache(
               .eq("user_id", dept.lead_id)
               .eq("workspace_id", workspaceId)
               .maybeSingle();
-            if (profile) leadName = (profile as any).full_name || null;
+            if (profile) leadName = profile.full_name || null;
           } catch {
             // ignore
           }

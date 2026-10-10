@@ -347,7 +347,7 @@ function ScheduleMeetingModal({ open, onClose, onSubmit, workspaceId }: Schedule
         location_type: locationType,
         location_value: locationValue || undefined,
         is_recurring: isRecurring,
-        recurrence: isRecurring ? (recurrence as any) : "None",
+        recurrence: isRecurring ? (recurrence as "Daily" | "Weekly" | "Bi-weekly" | "Monthly" | "Custom" | "None") : "None",
         notify_attendees: notifyAttendees,
         agenda: agendaItems.filter(a => a.trim()).map((a, i) => ({ order: i + 1, title: a.trim() })),
         attendees: attendees.map(email => ({ full_name: email.split("@")[0], email })),
@@ -703,7 +703,7 @@ function DeleteConfirmModal({ meeting, onConfirm, onClose }: {
         <div className="px-5 py-5">
           <h3 className="text-sm font-bold text-[#18221E]">Delete Meeting</h3>
           <p className="text-xs text-[#65706A] mt-2">
-            Are you sure you want to delete <strong>"{meeting.title}"</strong>? This action cannot be undone.
+            Are you sure you want to delete <strong>&quot;{meeting.title}&quot;</strong>? This action cannot be undone.
           </p>
         </div>
         <div className="flex gap-2.5 px-5 py-4 border-t border-[#D8DDD4] bg-[#FAFAF8]">
@@ -743,8 +743,12 @@ export function MeetingsView({
   meetingInsights,
 }: MeetingsViewProps) {
   const router = useRouter();
+  const [prevInitialMeetings, setPrevInitialMeetings] = React.useState(initialMeetings);
   const [meetings, setMeetings] = React.useState<MeetingItem[]>(initialMeetings);
-  React.useEffect(() => setMeetings(initialMeetings), [initialMeetings]);
+  if (initialMeetings !== prevInitialMeetings) {
+    setPrevInitialMeetings(initialMeetings);
+    setMeetings(initialMeetings);
+  }
 
   // Tabs & filters
   const [activeTab, setActiveTab] = React.useState<"Upcoming" | "Past" | "Cancelled">("Upcoming");
@@ -806,7 +810,12 @@ export function MeetingsView({
 
   const totalPages = Math.max(1, Math.ceil(allMeetings.length / PAGE_SIZE));
   const paginated = allMeetings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  React.useEffect(() => setPage(1), [activeTab, searchQuery, filterType, filterOrganizer, selectedDate]);
+  const filterKey = `${activeTab}|${searchQuery}|${filterType}|${filterOrganizer}|${selectedDate}`;
+  const [prevFilterKey, setPrevFilterKey] = React.useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
 
   const uniqueOrganizers = Array.from(new Set(meetings.map(m => m.organizer_name)));
   const highlightedDates = React.useMemo(() => {
@@ -1230,7 +1239,7 @@ export function MeetingsView({
           {/* Today's Meetings */}
           <div className="bg-white border border-[#D8DDD4] rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-[#18221E]">Today's Meetings</h3>
+              <h3 className="text-xs font-bold text-[#18221E]">Today&apos;s Meetings</h3>
               <button className="text-[11px] text-[#10251F] font-medium hover:underline">View all →</button>
             </div>
             {todayMeetings.length === 0 ? (

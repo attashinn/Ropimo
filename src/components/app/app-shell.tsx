@@ -42,7 +42,10 @@ export function AppShell({
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored !== null) {
-        setIsCollapsed(stored === "true");
+        const val = stored === "true";
+        requestAnimationFrame(() => {
+          setIsCollapsed(val);
+        });
       }
     } catch {
       // Local storage not accessible

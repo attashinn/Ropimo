@@ -87,9 +87,9 @@ export function RopimoDataTable<TData>({
   // Sort
   const sortedData = React.useMemo(() => {
     if (!sortKey) return filteredData;
-    return [...filteredData].sort((a: any, b: any) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+    return [...filteredData].sort((a: T, b: T) => {
+      const aVal = (a as Record<string, unknown>)[sortKey];
+      const bVal = (b as Record<string, unknown>)[sortKey];
       if (aVal === bVal) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
@@ -297,7 +297,7 @@ export function RopimoDataTable<TData>({
                           >
                             {col.render
                               ? col.render(item, idx)
-                              : (item as any)[col.key] ?? "—"}
+                              : ((item as Record<string, unknown>)[col.key] as React.ReactNode) ?? "—"}
                           </td>
                         );
                       })}

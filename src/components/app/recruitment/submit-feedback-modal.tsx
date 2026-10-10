@@ -3,9 +3,10 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import { Interview, InterviewRecommendation } from "@/types/recruitment";
-import { submitInterviewFeedbackAction } from "@/lib/recruitment/actions";
-import { PrimaryButton } from "@/components/ui/primary-button";
+import { X, Star, AlertCircle } from "lucide-react";
+import { Interview } from "@/types/recruitment";
+import { submitInterviewScorecardAction } from "@/lib/recruitment/actions";
+import { toast } from "sonner";
 
 export interface SubmitFeedbackModalProps {
   isOpen: boolean;
@@ -15,12 +16,12 @@ export interface SubmitFeedbackModalProps {
   onSuccess?: () => void;
 }
 
-const RECOMMENDATIONS: { value: InterviewRecommendation; label: string; desc: string }[] = [
-  { value: "Strong Hire", label: "Strong Hire", desc: "Exceeds bar; exceptional fit" },
-  { value: "Hire", label: "Hire", desc: "Meets high bar; recommended" },
-  { value: "Maybe", label: "Maybe", desc: "Borderline; mixed signals" },
-  { value: "No Hire", label: "No Hire", desc: "Does not meet requirements" },
-];
+const RECOMMENDATIONS = [
+  { value: "strong_yes", label: "Strong Yes", desc: "Exceeds standard; exceptional candidate", color: "bg-emerald-50 text-emerald-800 border-emerald-300" },
+  { value: "yes", label: "Yes", desc: "Meets high bar; recommended for hire", color: "bg-green-50 text-green-800 border-green-300" },
+  { value: "no", label: "No", desc: "Does not meet team requirements", color: "bg-amber-50 text-amber-800 border-amber-300" },
+  { value: "strong_no", label: "Strong No", desc: "Significant gaps; not recommended", color: "bg-red-50 text-red-800 border-red-300" },
+] as const;
 
 export function SubmitFeedbackModal({
   isOpen,
@@ -31,11 +32,11 @@ export function SubmitFeedbackModal({
 }: SubmitFeedbackModalProps) {
   const router = useRouter();
 
-  const [overallRating, setOverallRating] = React.useState(4);
-  const [recommendation, setRecommendation] = React.useState<InterviewRecommendation>("Hire");
-  const [strengths, setStrengths] = React.useState("");
-  const [concerns, setConcerns] = React.useState("");
-  const [privateNotes, setPrivateNotes] = React.useState("");
+  const [skillsRating, setSkillsRating] = React.useState(4);
+  const [communicationRating, setCommunicationRating] = React.useState(4);
+  const [cultureRating, setCultureRating] = React.useState(4);
+  const [recommendation, setRecommendation] = React.useState<"strong_yes" | "yes" | "no" | "strong_no">("yes");
+  const [comments, setComments] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -45,24 +46,24 @@ export function SubmitFeedbackModal({
     setErrorMsg(null);
 
     try {
-      const res = await submitInterviewFeedbackAction({
+      const res = await submitInterviewScorecardAction({
         workspaceId,
         interviewId: interview.id,
-        applicationId: interview.application_id,
         candidateId: interview.candidate_id,
-        overallRating,
+        skillsRating,
+        communicationRating,
+        cultureRating,
         recommendation,
-        strengths: strengths.trim() || undefined,
-        concerns: concerns.trim() || undefined,
-        privateNotes: privateNotes.trim() || undefined,
+        comments: comments.trim(),
       });
 
       if (!res.success) {
-        setErrorMsg(res.error || "Failed to submit feedback.");
+        setErrorMsg(res.error || "Failed to submit scorecard.");
         setLoading(false);
         return;
       }
 
+      toast.success("Scorecard submitted successfully!");
       setLoading(false);
       onClose();
       router.refresh();
@@ -72,6 +73,31 @@ export function SubmitFeedbackModal({
       setLoading(false);
     }
   };
+
+  const renderStarInput = (val: number, setVal: (n: number) => void, label: string) => (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-semibold text-[#18221E]">{label}</label>
+        <span className="text-xs font-bold text-[#246244]">{val}/5</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => setVal(star)}
+            className="p-1 rounded-[4px] hover:bg-[#FAF9F5] transition-colors"
+          >
+            <Star
+              className={`h-5 w-5 ${
+                star <= val ? "text-amber-500 fill-amber-500" : "text-[#D8DDD4]"
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <AnimatePresence>
@@ -93,136 +119,93 @@ export function SubmitFeedbackModal({
           >
             <div className="flex items-center justify-between border-b border-[#D8DDD4]/60 pb-3">
               <div>
-                <h2 className="text-base font-bold text-[#18221E]">Submit Interview Feedback</h2>
+                <h2 className="text-base font-bold text-[#18221E]">Submit Interview Scorecard</h2>
                 <p className="text-xs text-[#65706A]">
-                  Interview: <span className="font-semibold text-[#18221E]">{interview.round_name}</span> (
-                  {interview.interview_type || "Interview"})
+                  Round: <span className="font-semibold text-[#18221E]">{interview.round_name}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded text-[#65706A] hover:text-[#18221E]"
+                className="p-1 rounded-[6px] text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             {errorMsg && (
-              <div className="rounded-[8px] bg-red-50 p-2.5 text-xs text-red-600 border border-red-200">
-                {errorMsg}
+              <div className="flex items-center gap-2 rounded-[8px] border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                <span>{errorMsg}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              {/* Overall Rating 1-5 */}
-              <div className="flex items-center justify-between p-3 rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5]">
-                <div>
-                  <span className="font-bold text-xs text-[#18221E] block">Overall Rating</span>
-                  <span className="text-[11px] text-[#65706A]">Rate the candidate from 1 to 5</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setOverallRating(star)}
-                      className={`h-8 w-8 rounded-[8px] text-xs font-bold transition-all ${
-                        star <= overallRating
-                          ? "bg-[#10251F] text-white shadow-2xs"
-                          : "border border-[#D8DDD4] bg-white text-[#65706A] hover:bg-[#FAF9F5]"
-                      }`}
-                    >
-                      {star}
-                    </button>
-                  ))}
-                </div>
+              {/* Ratings */}
+              <div className="rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] p-3 space-y-3">
+                {renderStarInput(skillsRating, setSkillsRating, "Technical & Role Skills")}
+                {renderStarInput(communicationRating, setCommunicationRating, "Communication & Clarity")}
+                {renderStarInput(cultureRating, setCultureRating, "Culture & Team Fit")}
               </div>
 
               {/* Recommendation */}
               <div>
-                <label className="mb-1.5 block font-bold text-xs text-[#18221E]">
-                  Hiring Recommendation *
+                <label className="block font-semibold text-[#18221E] mb-2">
+                  Overall Recommendation <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {RECOMMENDATIONS.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setRecommendation(r.value)}
-                      className={`p-2.5 rounded-[10px] text-left border transition-all ${
-                        recommendation === r.value
-                          ? "border-[#10251F] bg-[#10251F] text-white shadow-2xs"
-                          : "border-[#D8DDD4] bg-white text-[#18221E] hover:bg-[#FAF9F5]"
-                      }`}
-                    >
-                      <p className="font-bold text-xs">{r.label}</p>
-                      <p
-                        className={`text-[10px] mt-0.5 ${
-                          recommendation === r.value ? "text-stone-300" : "text-[#65706A]"
+                  {RECOMMENDATIONS.map((rec) => {
+                    const isSelected = recommendation === rec.value;
+                    return (
+                      <button
+                        key={rec.value}
+                        type="button"
+                        onClick={() => setRecommendation(rec.value)}
+                        className={`text-left p-2.5 rounded-[8px] border text-xs transition-all ${
+                          isSelected
+                            ? `${rec.color} border-current ring-1 ring-current font-bold`
+                            : "border-[#D8DDD4] bg-white text-[#18221E] hover:bg-[#FAF9F5]"
                         }`}
                       >
-                        {r.desc}
-                      </p>
-                    </button>
-                  ))}
+                        <p className="font-bold">{rec.label}</p>
+                        <p className="text-[10px] opacity-80 mt-0.5">{rec.desc}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Strengths */}
+              {/* Comments */}
               <div>
-                <label className="mb-1 block font-semibold text-[#18221E]">Key Strengths</label>
-                <textarea
-                  rows={2}
-                  value={strengths}
-                  onChange={(e) => setStrengths(e.target.value)}
-                  placeholder="What stood out? (e.g. system design depth, communication, problem solving)..."
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
-                />
-              </div>
-
-              {/* Concerns */}
-              <div>
-                <label className="mb-1 block font-semibold text-[#18221E]">Concerns or Red Flags</label>
-                <textarea
-                  rows={2}
-                  value={concerns}
-                  onChange={(e) => setConcerns(e.target.value)}
-                  placeholder="Any skill gaps, mismatch in expectations, or areas for follow-up..."
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
-                />
-              </div>
-
-              {/* Private Notes */}
-              <div>
-                <label className="mb-1 block font-semibold text-[#18221E]">
-                  Private Evaluation Notes (Recruitment Team Only)
+                <label className="block font-semibold text-[#18221E] mb-1">
+                  Comments & Observations
                 </label>
                 <textarea
-                  rows={2}
-                  value={privateNotes}
-                  onChange={(e) => setPrivateNotes(e.target.value)}
-                  placeholder="Private notes for the hiring team and committee..."
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  placeholder="Summarize candidate's performance, key answers, and overall suitability..."
+                  rows={4}
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2.5 text-xs text-[#18221E] focus:border-[#10251F] focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D8DDD4]/60">
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#D8DDD4]/60">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="rounded-[8px] border border-[#D8DDD4] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
+                  className="rounded-[8px] border border-[#D8DDD4] bg-white px-3.5 py-2 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] disabled:opacity-50"
                 >
                   Cancel
                 </button>
-                <PrimaryButton
+                <button
                   type="submit"
                   disabled={loading}
-                  className="rounded-[8px] px-4 py-1.5 text-xs"
+                  className="rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-bold text-white hover:bg-[#18342C] disabled:opacity-50 transition-colors shadow-2xs"
                 >
-                  {loading ? "Submitting..." : "Submit Feedback"}
-                </PrimaryButton>
+                  {loading ? "Submitting..." : "Submit Scorecard"}
+                </button>
               </div>
             </form>
           </motion.div>

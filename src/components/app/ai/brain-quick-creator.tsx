@@ -11,7 +11,7 @@ export interface BrainQuickCreatorProps {
   type: "task" | "project";
   workspaceId: string;
   people?: WorkspacePerson[];
-  onSuccess?: (item: any) => void;
+  onSuccess?: (item: unknown) => void;
   onCancel?: () => void;
   defaultProjectId?: string;
   defaultDepartmentId?: string;
@@ -31,7 +31,7 @@ export function BrainQuickCreator({
   const [attachedFiles, setAttachedFiles] = React.useState<AttachedFileItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [result, setResult] = React.useState<any | null>(null);
+  const [result, setResult] = React.useState<Record<string, unknown> | null>(null);
 
   const isProject = type === "project";
 
@@ -91,8 +91,8 @@ export function BrainQuickCreator({
         router.refresh();
         onSuccess?.(data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to communicate with AI.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to communicate with AI.");
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ export function BrainQuickCreator({
                   onClick={() => setPrompt(ex)}
                   className="text-left text-[11px] text-slate-600 hover:text-[#0F172A] p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 transition-colors cursor-pointer truncate"
                 >
-                  "{ex}"
+                  &quot;{ex}&quot;
                 </button>
               ))}
             </div>

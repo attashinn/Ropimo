@@ -7,6 +7,8 @@ import {
   InterviewFeedback,
   JobOffer,
   CandidateActivity,
+  CandidateEvent,
+  CandidateNote,
 } from "@/types/recruitment";
 
 import { EmployeeOnboarding, OnboardingChecklistItem, WorkspaceInvitation } from "@/types/people";
@@ -16,11 +18,13 @@ interface RecruitmentDataStore {
   job_openings: JobOpening[];
   candidates: Candidate[];
   candidate_applications: CandidateApplication[];
+  candidate_events: CandidateEvent[];
   application_stage_history: ApplicationStageHistory[];
   interviews: Interview[];
   interview_feedback: InterviewFeedback[];
   offers: JobOffer[];
   candidate_activities: CandidateActivity[];
+  candidate_notes: CandidateNote[];
   onboardings: EmployeeOnboarding[];
   invitations: WorkspaceInvitation[];
 }
@@ -29,11 +33,13 @@ let _memoryStore: RecruitmentDataStore = {
   job_openings: [],
   candidates: [],
   candidate_applications: [],
+  candidate_events: [],
   application_stage_history: [],
   interviews: [],
   interview_feedback: [],
   offers: [],
   candidate_activities: [],
+  candidate_notes: [],
   onboardings: [],
   invitations: [],
 };
@@ -69,6 +75,31 @@ export const recruitmentStore = {
       store.job_openings.unshift(job);
     }
     saveStore(store);
+  },
+
+  deleteJobOpening(id: string, workspaceId: string): boolean {
+    const store = ensureStore();
+    const initialLen = store.job_openings.length;
+    store.job_openings = store.job_openings.filter(
+      (j) => !(j.id === id && j.workspace_id === workspaceId)
+    );
+    saveStore(store);
+    return store.job_openings.length < initialLen;
+  },
+
+  // Candidate Events
+  saveCandidateEvent(event: CandidateEvent) {
+    const store = ensureStore();
+    if (!store.candidate_events) store.candidate_events = [];
+    store.candidate_events.unshift(event);
+    saveStore(store);
+  },
+
+  getCandidateEvents(candidateId: string, workspaceId: string): CandidateEvent[] {
+    const store = ensureStore();
+    return (store.candidate_events || []).filter(
+      (e) => e.candidate_id === candidateId && e.workspace_id === workspaceId
+    );
   },
 
   // Candidates
@@ -210,8 +241,95 @@ export const recruitmentStore = {
 
   saveFeedback(fb: InterviewFeedback) {
     const store = ensureStore();
-    store.interview_feedback.push(fb);
+    const idx = store.interview_feedback.findIndex(
+      (f) => f.interview_id === fb.interview_id && f.interviewer_id === fb.interviewer_id
+    );
+    if (idx >= 0) {
+      store.interview_feedback[idx] = fb;
+    } else {
+      store.interview_feedback.push(fb);
+    }
     saveStore(store);
+  },
+
+  getInterviewById(id: string, workspaceId: string): Interview | null {
+    const store = ensureStore();
+    const iv = store.interviews.find((i) => i.id === id && i.workspace_id === workspaceId);
+    if (!iv) return null;
+    const candidate = store.candidates.find((c) => c.id === iv.candidate_id);
+    const job = store.job_openings.find((j) => j.id === iv.job_opening_id);
+    const feedback = store.interview_feedback.filter(
+      (f) => f.interview_id === iv.id && f.workspace_id === workspaceId
+    );
+    return {
+      ...iv,
+      candidate: candidate || undefined,
+      job_opening: job || undefined,
+      feedback,
+    };
+  },
+
+  deleteInterview(id: string, workspaceId: string): boolean {
+    const store = ensureStore();
+    const prevLen = store.interviews.length;
+    store.interviews = store.interviews.filter(
+      (i) => !(i.id === id && i.workspace_id === workspaceId)
+    );
+    saveStore(store);
+    return store.interviews.length < prevLen;
+  },
+
+  // Candidate Events
+  getCandidateEvents(candidateId: string, workspaceId: string): CandidateEvent[] {
+    const store = ensureStore();
+    return (store.candidate_events || [])
+      .filter((e) => e.candidate_id === candidateId && e.workspace_id === workspaceId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  addCandidateEvent(event: CandidateEvent) {
+    const store = ensureStore();
+    if (!store.candidate_events) store.candidate_events = [];
+    store.candidate_events.unshift(event);
+    saveStore(store);
+  },
+
+  saveCandidateEvent(event: CandidateEvent) {
+    const store = ensureStore();
+    if (!store.candidate_events) store.candidate_events = [];
+    store.candidate_events.unshift(event);
+    saveStore(store);
+  },
+
+  // Candidate Notes
+  getCandidateNotes(candidateId: string, workspaceId: string): CandidateNote[] {
+    const store = ensureStore();
+    return (store.candidate_notes || [])
+      .filter((n) => n.candidate_id === candidateId && n.workspace_id === workspaceId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  saveCandidateNote(note: CandidateNote) {
+    const store = ensureStore();
+    if (!store.candidate_notes) store.candidate_notes = [];
+    const idx = store.candidate_notes.findIndex((n) => n.id === note.id);
+    if (idx >= 0) {
+      store.candidate_notes[idx] = note;
+    } else {
+      store.candidate_notes.unshift(note);
+    }
+    saveStore(store);
+  },
+
+  deleteCandidateNote(noteId: string, workspaceId: string): boolean {
+    const store = ensureStore();
+    if (!store.candidate_notes) return false;
+    const prev = store.candidate_notes.length;
+    store.candidate_notes = store.candidate_notes.filter(
+      (n) => !(n.id === noteId && n.workspace_id === workspaceId)
+    );
+    saveStore(store);
+    return store.candidate_notes.length < prev;
   },
 
   // Offers
@@ -317,6 +435,44 @@ export const recruitmentStore = {
 
     const nextNum = maxId + 1;
     return `EMP-${String(nextNum).padStart(3, "0")}`;
+  },
+
+  getInvitations(workspaceId: string): WorkspaceInvitation[] {
+    const store = ensureStore();
+    return (store.invitations || []).filter((i) => i.workspace_id === workspaceId);
+  },
+
+  getInvitationByToken(token: string): WorkspaceInvitation | null {
+    if (!token) return null;
+    const store = ensureStore();
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    return (
+      (store.invitations || []).find((i) => i.token === token || i.token === tokenHash) || null
+    );
+  },
+
+  getInvitationByEmail(email: string, workspaceId: string): WorkspaceInvitation | null {
+    if (!email) return null;
+    const store = ensureStore();
+    return (
+      (store.invitations || []).find(
+        (i) => i.workspace_id === workspaceId && i.email?.toLowerCase() === email.toLowerCase()
+      ) || null
+    );
+  },
+
+  saveInvitation(inv: WorkspaceInvitation) {
+    const store = ensureStore();
+    if (!store.invitations) store.invitations = [];
+    const idx = store.invitations.findIndex(
+      (i) => i.id === inv.id || (i.workspace_id === inv.workspace_id && i.email?.toLowerCase() === inv.email?.toLowerCase())
+    );
+    if (idx >= 0) {
+      store.invitations[idx] = inv;
+    } else {
+      store.invitations.unshift(inv);
+    }
+    saveStore(store);
   },
 };
 
@@ -492,44 +648,3 @@ export function createDefaultOnboardingChecklist(): OnboardingChecklistItem[] {
     },
   ];
 }
-
-// Attach invitation methods to recruitmentStore
-Object.assign(recruitmentStore, {
-  getInvitations(workspaceId: string): WorkspaceInvitation[] {
-    const store = ensureStore();
-    return (store.invitations || []).filter((i) => i.workspace_id === workspaceId);
-  },
-
-  getInvitationByToken(token: string): WorkspaceInvitation | null {
-    if (!token) return null;
-    const store = ensureStore();
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    return (
-      (store.invitations || []).find((i) => i.token === token || i.token === tokenHash) || null
-    );
-  },
-
-  getInvitationByEmail(email: string, workspaceId: string): WorkspaceInvitation | null {
-    if (!email) return null;
-    const store = ensureStore();
-    return (
-      (store.invitations || []).find(
-        (i) => i.workspace_id === workspaceId && i.email?.toLowerCase() === email.toLowerCase()
-      ) || null
-    );
-  },
-
-  saveInvitation(inv: WorkspaceInvitation) {
-    const store = ensureStore();
-    if (!store.invitations) store.invitations = [];
-    const idx = store.invitations.findIndex(
-      (i) => i.id === inv.id || (i.workspace_id === inv.workspace_id && i.email?.toLowerCase() === inv.email?.toLowerCase())
-    );
-    if (idx >= 0) {
-      store.invitations[idx] = inv;
-    } else {
-      store.invitations.unshift(inv);
-    }
-    saveStore(store);
-  },
-});

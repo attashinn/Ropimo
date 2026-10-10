@@ -108,7 +108,7 @@ export function FeatureRows() {
       tag: "Tasks",
       title: (
         <>
-          Everyone knows what's{" "}
+          Everyone knows what&apos;s{" "}
           <ScribbleUnderline color="#FF6B3D">next</ScribbleUnderline>.
         </>
       ),

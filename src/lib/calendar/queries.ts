@@ -4,7 +4,10 @@ import {
   CalendarEvent,
   CalendarEventType,
   CalendarEventStatus,
+  CalendarAttachment,
+  CalendarComment,
 } from "@/types/calendar";
+import { Tables } from "@/types/database";
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { getWorkspaceProjects } from "@/lib/project/queries";
 import { getWorkspaceTasks } from "@/lib/task/queries";
@@ -594,7 +597,7 @@ export const getWorkspaceCalendarEvents = cache(
         }
       });
 
-      const attachmentsMap = new Map<string, any[]>();
+      const attachmentsMap = new Map<string, CalendarAttachment[]>();
       (attachmentsRes.data || []).forEach((row) => {
         const list = attachmentsMap.get(row.event_id) || [];
         list.push({
@@ -607,7 +610,7 @@ export const getWorkspaceCalendarEvents = cache(
         attachmentsMap.set(row.event_id, list);
       });
 
-      const commentsMap = new Map<string, any[]>();
+      const commentsMap = new Map<string, CalendarComment[]>();
       (commentsRes.data || []).forEach((row) => {
         const list = commentsMap.get(row.event_id) || [];
         list.push({
@@ -621,7 +624,7 @@ export const getWorkspaceCalendarEvents = cache(
         commentsMap.set(row.event_id, list);
       });
 
-      dbEvents.forEach((row: any) => {
+      dbEvents.forEach((row: Tables<"calendar_events">) => {
         const dateOnly = row.start_date.includes("T")
           ? row.start_date.split("T")[0]
           : row.start_date;

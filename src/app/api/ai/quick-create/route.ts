@@ -1,8 +1,39 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { createTaskAction } from "@/lib/task/actions";
 import { createProjectAction } from "@/lib/project/actions";
+import { ProjectPriority } from "@/types/project";
+import { TaskPriority } from "@/types/task";
+
+const AttachedFileSchema = z.object({
+  name: z.string(),
+  type: z.string().optional(),
+  sizeInBytes: z.number().optional(),
+  url: z.string().optional(),
+});
+
+type AttachedFile = z.infer<typeof AttachedFileSchema>;
+
+const QuickCreateSchema = z.object({
+  prompt: z.string().min(1, "Prompt is required."),
+  type: z.enum(["task", "project"]).default("task"),
+  workspaceId: z.string().uuid("workspaceId must be a valid UUID."),
+  autoCreate: z.boolean().default(true),
+  attachedFiles: z.array(AttachedFileSchema).default([]),
+});
+
+interface ParsedAIOutput {
+  name?: string;
+  title?: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string | null;
+  leadId?: string | null;
+  assigneeIds?: string[];
+  acceptanceCriteria?: string[];
+}
 
 export async function POST(request: Request) {
   try {
@@ -16,16 +47,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { prompt, type, workspaceId, autoCreate = true, attachedFiles = [] } = body;
+    const rawBody = await request.json();
+    const parseResult = QuickCreateSchema.safeParse(rawBody);
 
-    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
-      return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parseResult.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    if (!workspaceId) {
-      return NextResponse.json({ error: "workspaceId is required." }, { status: 400 });
-    }
+    const { prompt, type, workspaceId, autoCreate, attachedFiles } = parseResult.data;
 
     // Fetch team members to resolve @mentions
     const people = await getWorkspacePeople(workspaceId);
@@ -51,7 +83,7 @@ Given a user instruction and workspace team members, extract or generate the str
 Available Team Members:
 ${memberContext.map((m) => `- "${m.name}" (Role: ${m.role}, user_id: "${m.user_id}")`).join("\n")}
 
-${attachedFiles.length > 0 ? `Attached Documents/Files:\n${attachedFiles.map((f: any) => `- ${f.name}`).join("\n")}` : ""}
+${attachedFiles.length > 0 ? `Attached Documents/Files:\n${attachedFiles.map((f: AttachedFile) => `- ${f.name}`).join("\n")}` : ""}
 
 Today's date is ${new Date().toISOString().split("T")[0]}.
 
@@ -103,9 +135,9 @@ ${
       content = content.split("</think>")[1].trim();
     }
 
-    let parsed: any;
+    let parsed: ParsedAIOutput;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(content) as ParsedAIOutput;
     } catch {
       // Fallback manual parse
       parsed = isProject
@@ -129,7 +161,7 @@ ${
     // Auto-create in database if requested
     if (autoCreate) {
       if (isProject) {
-        let dbPriority: any = "medium";
+        let dbPriority: ProjectPriority = "medium";
         if (parsed.priority === "urgent") dbPriority = "urgent";
         else if (parsed.priority === "high") dbPriority = "high";
         else if (parsed.priority === "low") dbPriority = "low";
@@ -147,7 +179,7 @@ ${
         if (projRes.success && projRes.project && attachedFiles.length > 0) {
           try {
             const adminClient = (await import("@/lib/supabase/admin")).createAdminClient();
-            const fileRows = attachedFiles.map((f: any) => ({
+            const fileRows = attachedFiles.map((f: AttachedFile) => ({
               workspace_id: workspaceId,
               project_id: projRes.project!.id,
               name: f.name || "Attached Asset",
@@ -170,7 +202,7 @@ ${
           error: projRes.error,
         });
       } else {
-        let dbPriority: any = "medium";
+        let dbPriority: TaskPriority = "medium";
         if (parsed.priority === "urgent") dbPriority = "urgent";
         else if (parsed.priority === "high") dbPriority = "high";
         else if (parsed.priority === "low") dbPriority = "low";
@@ -188,7 +220,7 @@ ${
         if (taskRes.success && taskRes.taskId && attachedFiles.length > 0) {
           try {
             const adminClient = (await import("@/lib/supabase/admin")).createAdminClient();
-            const fileRows = attachedFiles.map((f: any) => ({
+            const fileRows = attachedFiles.map((f: AttachedFile) => ({
               workspace_id: workspaceId,
               task_id: taskRes.taskId,
               file_name: f.name || "Attached Asset",
@@ -213,10 +245,11 @@ ${
     }
 
     return NextResponse.json({ success: true, parsed });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to generate item with AI.";
     console.error("AI quick-create error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to generate item with AI." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

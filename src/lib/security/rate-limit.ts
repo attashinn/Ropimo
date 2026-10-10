@@ -1,4 +1,6 @@
-import "server-only";
+if (typeof window !== "undefined") {
+  throw new Error("rate-limit must never be executed on the client.");
+}
 
 interface RateLimitRecord {
   count: number;

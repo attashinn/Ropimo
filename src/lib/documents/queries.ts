@@ -1,4 +1,4 @@
-﻿import { cache } from "react";
+import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   DocumentItem,
@@ -9,6 +9,10 @@ import {
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { getWorkspaceProjects } from "@/lib/project/queries";
 import { getWorkspaceDepartments } from "@/lib/department/queries";
+import { WorkspacePerson } from "@/types/people";
+import { Project } from "@/types/project";
+import { Department } from "@/types/department";
+import { Tables } from "@/types/database";
 
 /** Category color map â€” used for stats sidebar */
 const CATEGORY_COLORS: Record<string, string> = {
@@ -87,10 +91,10 @@ export const getWorkspaceDocuments = cache(
   async (workspaceId: string): Promise<DocumentItem[]> => {
     const adminClient = createAdminClient();
 
-    let dbDocs: any[] | null = null;
-    let allPeople: any[] = [];
-    let allProjects: any[] = [];
-    let allDepts: any[] = [];
+    let dbDocs: Tables<"workspace_documents">[] | null = null;
+    let allPeople: WorkspacePerson[] = [];
+    let allProjects: Project[] = [];
+    let allDepts: Department[] = [];
 
     try {
       const [
@@ -123,7 +127,7 @@ export const getWorkspaceDocuments = cache(
     const parsedDocs: DocumentItem[] = [];
 
     if (dbDocs && dbDocs.length > 0) {
-      dbDocs.forEach((d: any) => {
+      dbDocs.forEach((d: Tables<"workspace_documents">) => {
         const author = d.author_id ? peopleMap.get(d.author_id) || null : null;
         const project = d.project_id ? projectMap.get(d.project_id) || null : null;
         const dept = d.department_id ? deptMap.get(d.department_id) || null : null;

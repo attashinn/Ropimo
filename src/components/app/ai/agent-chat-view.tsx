@@ -217,13 +217,14 @@ export function AgentChatView({
 
         setMessages((prev) => [...prev, assistantMessage]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reach AI route.";
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "assistant",
-          content: `Connection error: ${err.message || "Failed to reach AI route."}`,
+          content: `Connection error: ${msg}`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           model: selectedModel,
         },
@@ -237,11 +238,12 @@ export function AgentChatView({
     setActionLoading((prev) => ({ ...prev, [action.id]: true }));
     try {
       if (action.type === "create_task") {
+        const taskPriority = typeof action.payload.priority === "string" ? (action.payload.priority as "urgent" | "high" | "normal" | "low" | "medium") : "medium";
         const res = await createTaskAction({
           workspaceId,
-          title: action.payload.title || action.title,
-          description: action.payload.description || action.description,
-          priority: (action.payload.priority as any) || "medium",
+          title: (typeof action.payload.title === "string" && action.payload.title) || action.title,
+          description: (typeof action.payload.description === "string" && action.payload.description) || action.description,
+          priority: taskPriority,
           status: "todo",
         });
         if (res.success) {
@@ -291,12 +293,13 @@ export function AgentChatView({
             setExecutedActions((prev) => ({ ...prev, [act.id]: true }));
           }
         } else if (act.type === "create_task") {
+          const actPriority = typeof act.payload.priority === "string" ? (act.payload.priority as "urgent" | "high" | "normal" | "low" | "medium") : "medium";
           const res = await createTaskAction({
             workspaceId,
-            projectId: createdProjectId || act.payload.projectId,
-            title: act.payload.title || act.title,
-            description: act.payload.description || act.description,
-            priority: (act.payload.priority as any) || "medium",
+            projectId: createdProjectId || (typeof act.payload.projectId === "string" ? act.payload.projectId : undefined),
+            title: (typeof act.payload.title === "string" && act.payload.title) || act.title,
+            description: (typeof act.payload.description === "string" && act.payload.description) || act.description,
+            priority: actPriority,
             status: "todo",
           });
           if (res.success) {

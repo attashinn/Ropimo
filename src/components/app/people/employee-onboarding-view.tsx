@@ -436,7 +436,7 @@ export function EmployeeOnboardingView({
               </label>
               <select
                 value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value as any)}
+                onChange={(e) => setSelectedRole(e.target.value as "member" | "manager")}
                 className="w-full rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-2 text-xs font-semibold text-[#18221E] focus:border-[#10251F] focus:outline-none shadow-2xs"
               >
                 <option value="member">Member (Standard Employee)</option>
@@ -677,7 +677,7 @@ export function EmployeeOnboardingView({
                   <label className="font-semibold text-[#18221E]">Document Category *</label>
                   <select
                     value={docType}
-                    onChange={(e) => setDocType(e.target.value as any)}
+                    onChange={(e) => setDocType(e.target.value as "CV/Resume" | "Offer Letter" | "Contract" | "NDA" | "Identity" | "Certificate" | "Other")}
                     className="w-full rounded-[8px] border border-[#D8DDD4] bg-white px-3 py-2 text-xs focus:border-[#10251F] focus:outline-none"
                   >
                     <option value="Contract">Employment Contract</option>

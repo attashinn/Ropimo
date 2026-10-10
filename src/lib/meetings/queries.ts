@@ -6,8 +6,8 @@ import {
   MeetingInsights,
   MeetingType,
   MeetingStatus,
-  MeetingAttendee,
 } from "@/types/meetings";
+import { Tables } from "@/types/database";
 
 export const getWorkspaceMeetings = cache(
   async (
@@ -31,7 +31,7 @@ export const getWorkspaceMeetings = cache(
       .order("start_time", { ascending: false });
 
     if (!wmErr && wmRows && wmRows.length > 0) {
-      let list: MeetingItem[] = wmRows.map((r: any) => {
+      let list: MeetingItem[] = wmRows.map((r: Tables<"workspace_meetings">) => {
         const rawDate = r.start_time
           ? new Date(r.start_time).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0];

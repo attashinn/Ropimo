@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -9,14 +10,72 @@ import {
   DepartmentRole,
 } from "@/types/department";
 import { getDepartmentUserRoleAndPermissions } from "./permissions";
+import { requirePermission } from "@/lib/permissions-server";
 import { revalidatePath } from "next/cache";
 
 export interface DepartmentActionResult {
   success: boolean;
   department?: Department;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
+
+const CreateDepartmentSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  name: z.string().min(2, "Department name must be at least 2 characters."),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional().default("building"),
+  color: z.string().optional().default("#10251F"),
+  leadId: z.string().optional().nullable(),
+});
+
+const UpdateDepartmentSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  name: z.string().min(2, "Department name must be at least 2 characters."),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+  leadId: z.string().optional().nullable(),
+});
+
+const DeleteDepartmentSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
+
+const AddDepartmentMemberSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  role: z.enum(["lead", "manager", "member"]).optional().default("member"),
+  jobTitle: z.string().optional(),
+});
+
+const RemoveDepartmentMemberSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+});
+
+const UpdateDepartmentMemberRoleSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  role: z.enum(["lead", "manager", "member"]),
+});
+
+const AssignDepartmentLeadSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  jobTitle: z.string().optional(),
+});
+
+const ArchiveDepartmentSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
 
 function generateSlug(name: string): string {
   const base = name
@@ -44,18 +103,15 @@ async function getCallerUser() {
 // ─── 1. CREATE DEPARTMENT ────────────────────────────────────────────────────
 
 export async function createDepartmentAction(
-  input: CreateDepartmentInput
+  rawInput: CreateDepartmentInput
 ): Promise<DepartmentActionResult> {
+  const parsed = CreateDepartmentSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { workspaceId, name, description, icon, color, leadId } = input;
-
-  if (!workspaceId) {
-    return { success: false, error: "Workspace ID is required." };
-  }
-
-  const trimmedName = name?.trim();
-  if (!trimmedName || trimmedName.length < 2) {
-    return { success: false, error: "Department name must be at least 2 characters." };
-  }
+  const trimmedName = name.trim();
 
   const adminClient = createAdminClient();
   const user = await getCallerUser();
@@ -64,18 +120,13 @@ export async function createDepartmentAction(
     return { success: false, error: "You must be logged in to create a department." };
   }
 
-  // Verify workspace owner/admin
-  const { data: member } = await adminClient
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!member || (member.role !== "owner" && member.role !== "admin")) {
+  try {
+    await requirePermission("departments:create_delete", { workspaceId }, user.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Only workspace owners and admins can create departments.",
+      error: msg,
     };
   }
 
@@ -152,32 +203,34 @@ export async function createDepartmentAction(
 // ─── 2. UPDATE DEPARTMENT SETTINGS ───────────────────────────────────────────
 
 export async function updateDepartmentAction(
-  input: UpdateDepartmentInput
+  rawInput: UpdateDepartmentInput
 ): Promise<DepartmentActionResult> {
+  const parsed = UpdateDepartmentSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { departmentId, workspaceId, name, description, icon, color, leadId } = input;
-
-  if (!departmentId || !workspaceId) {
-    return { success: false, error: "Department ID and Workspace ID are required." };
-  }
-
-  const trimmedName = name?.trim();
-  if (!trimmedName || trimmedName.length < 2) {
-    return { success: false, error: "Department name must be at least 2 characters." };
-  }
+  const trimmedName = name.trim();
 
   const user = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, user?.id);
+  if (!user) {
+    return { success: false, error: "You must be logged in to update department settings." };
+  }
 
-  if (!perms.canEditSettings) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, user.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can update department settings.",
+      error: msg,
     };
   }
 
   const adminClient = createAdminClient();
 
-  const updates: Record<string, any> = {
+  const updates: Record<string, unknown> = {
     name: trimmedName,
     description: description?.trim() || null,
     icon: icon || "building",
@@ -243,17 +296,23 @@ export async function deleteDepartmentAction(
   departmentId: string,
   workspaceId: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!departmentId || !workspaceId) {
-    return { success: false, error: "Department ID and Workspace ID are required." };
+  const parsed = DeleteDepartmentSchema.safeParse({ departmentId, workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
 
   const user = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, user?.id);
+  if (!user) {
+    return { success: false, error: "You must be logged in to delete a department." };
+  }
 
-  if (!perms.canDeleteDepartment) {
+  try {
+    await requirePermission("departments:create_delete", { workspaceId }, user.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Workspace Owners and Admins can delete departments.",
+      error: msg,
     };
   }
 
@@ -289,19 +348,24 @@ export async function addDepartmentMemberAction(params: {
   role?: DepartmentRole;
   jobTitle?: string;
 }): Promise<DepartmentActionResult> {
-  const { departmentId, workspaceId, userId, role = "member", jobTitle } = params;
-
-  if (!departmentId || !workspaceId || !userId) {
-    return { success: false, error: "Department, Workspace, and User ID are required." };
+  const parsed = AddDepartmentMemberSchema.safeParse(params);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
+  const { departmentId, workspaceId, userId, role = "member", jobTitle } = parsed.data;
 
   const callerUser = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, callerUser?.id);
+  if (!callerUser) {
+    return { success: false, error: "You must be logged in to add department members." };
+  }
 
-  if (!perms.canManageMembers) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, callerUser.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can add members.",
+      error: msg,
     };
   }
 
@@ -385,19 +449,24 @@ export async function removeDepartmentMemberAction(params: {
   workspaceId: string;
   userId: string;
 }): Promise<DepartmentActionResult> {
-  const { departmentId, workspaceId, userId } = params;
-
-  if (!departmentId || !workspaceId || !userId) {
-    return { success: false, error: "Department, Workspace, and User ID are required." };
+  const parsed = RemoveDepartmentMemberSchema.safeParse(params);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
+  const { departmentId, workspaceId, userId } = parsed.data;
 
   const callerUser = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, callerUser?.id);
+  if (!callerUser) {
+    return { success: false, error: "You must be logged in to remove department members." };
+  }
 
-  if (!perms.canManageMembers) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, callerUser.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can remove members.",
+      error: msg,
     };
   }
 
@@ -445,19 +514,24 @@ export async function updateDepartmentMemberRoleAction(params: {
   userId: string;
   role: DepartmentRole;
 }): Promise<DepartmentActionResult> {
-  const { departmentId, workspaceId, userId, role } = params;
-
-  if (!departmentId || !workspaceId || !userId || !role) {
-    return { success: false, error: "Missing required parameters." };
+  const parsed = UpdateDepartmentMemberRoleSchema.safeParse(params);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
+  const { departmentId, workspaceId, userId, role } = parsed.data;
 
   const callerUser = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, callerUser?.id);
+  if (!callerUser) {
+    return { success: false, error: "You must be logged in to change member roles." };
+  }
 
-  if (!perms.canManageMembers) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, callerUser.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can change member roles.",
+      error: msg,
     };
   }
 
@@ -507,17 +581,23 @@ export async function assignDepartmentLeadAction(
   userId: string,
   jobTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!departmentId || !workspaceId || !userId) {
-    return { success: false, error: "Missing required parameters." };
+  const parsed = AssignDepartmentLeadSchema.safeParse({ departmentId, workspaceId, userId, jobTitle });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
 
   const callerUser = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, callerUser?.id);
+  if (!callerUser) {
+    return { success: false, error: "You must be logged in to assign a department lead." };
+  }
 
-  if (!perms.canAssignLead) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, callerUser.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can assign a department lead.",
+      error: msg,
     };
   }
 
@@ -588,13 +668,22 @@ export async function archiveDepartmentAction(
   departmentId: string,
   workspaceId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const parsed = ArchiveDepartmentSchema.safeParse({ departmentId, workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
   const callerUser = await getCallerUser();
-  const perms = await getDepartmentUserRoleAndPermissions(departmentId, workspaceId, callerUser?.id);
+  if (!callerUser) {
+    return { success: false, error: "You must be logged in to archive departments." };
+  }
 
-  if (!perms.canEditSettings) {
+  try {
+    await requirePermission("departments:edit", { workspaceId, departmentId }, callerUser.id);
+  } catch (permErr: unknown) {
+    const msg = permErr instanceof Error ? permErr.message : "Forbidden";
     return {
       success: false,
-      error: "Unauthorized: Only Department Leads, Workspace Owners, and Admins can archive departments.",
+      error: msg,
     };
   }
 

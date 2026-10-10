@@ -12,7 +12,16 @@ export interface InvitePageProps {
 
 export default async function InvitePage({ params }: InvitePageProps) {
   const { token } = await params;
-  const { invitation, workspaceName, departmentName, inviterName, error } = await getInvitationByToken(token);
+  const {
+    invitation,
+    state,
+    workspaceName,
+    departmentNames,
+    departmentName,
+    inviterName,
+    inviterEmail,
+    error,
+  } = await getInvitationByToken(token);
 
   // Check currently authenticated user
   const supabase = await createClient();
@@ -20,11 +29,10 @@ export default async function InvitePage({ params }: InvitePageProps) {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  // Check if invitation target email already has an account & is already a member
+  // Check if invitation target email already has an account
   let hasExistingAccount = false;
   let existingUserName: string | null = null;
   let isAlreadyMember = false;
-  const isAccepted = (invitation?.status || "").toLowerCase() === "accepted";
 
   if (invitation?.email) {
     try {
@@ -58,16 +66,19 @@ export default async function InvitePage({ params }: InvitePageProps) {
 
   return (
     <AcceptInvitationView
+      token={token}
       invitation={invitation}
+      state={state}
       workspaceName={workspaceName}
+      departmentNames={departmentNames}
       departmentName={departmentName}
       inviterName={inviterName}
+      inviterEmail={inviterEmail}
       error={error}
       currentUser={currentUser ? { id: currentUser.id, email: currentUser.email || "" } : null}
       hasExistingAccount={hasExistingAccount}
       existingUserName={existingUserName}
       isAlreadyMember={isAlreadyMember}
-      isAccepted={isAccepted}
     />
   );
 }

@@ -100,13 +100,13 @@ export function OverviewDashboard({
   const [activeTab, setActiveTab] = React.useState<string>("tasks");
 
   // Local task list for instant optimistic completion updates
-  const [tasks, setTasks] = React.useState<Task[]>(
-    myOpenTasks.length > 0 ? myOpenTasks : allTasks
-  );
-
-  React.useEffect(() => {
-    setTasks(myOpenTasks.length > 0 ? myOpenTasks : allTasks);
-  }, [myOpenTasks, allTasks]);
+  const currentInitialTasks = myOpenTasks.length > 0 ? myOpenTasks : allTasks;
+  const [prevInitialTasks, setPrevInitialTasks] = React.useState(currentInitialTasks);
+  const [tasks, setTasks] = React.useState<Task[]>(currentInitialTasks);
+  if (currentInitialTasks !== prevInitialTasks) {
+    setPrevInitialTasks(currentInitialTasks);
+    setTasks(currentInitialTasks);
+  }
 
   // Global 'C' shortcut to create task
   React.useEffect(() => {

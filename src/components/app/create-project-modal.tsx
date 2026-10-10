@@ -111,7 +111,9 @@ export function CreateProjectModal({
   }, [isOpen, statusOpen, priorityOpen, onClose]);
 
   // Reset form when modal opens
-  React.useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = React.useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setName("");
       setDescription("");
@@ -119,13 +121,13 @@ export function CreateProjectModal({
       setLeadId(people[0]?.user_id || "");
       setStatus("planning");
       setPriority("normal");
-      setStartDate(new Date().toISOString().split("T")[0]);
-      setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0]);
+      setStartDate("");
+      setDueDate("");
       setClientName("");
       setBudget("");
       setErrorMsg(null);
     }
-  }, [isOpen, defaultDepartmentId, departments, people]);
+  }
 
   const trimmedName = name.trim();
   const isValid = trimmedName.length >= 2;

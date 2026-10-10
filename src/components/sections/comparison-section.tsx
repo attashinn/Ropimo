@@ -335,7 +335,7 @@ export function ComparisonSection() {
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveCompetitor(tab.key as any)}
+                  onClick={() => setActiveCompetitor(tab.key as "all" | "clickup" | "asana" | "monday")}
                   className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${
                     activeCompetitor === tab.key
                       ? "bg-[#111111] text-white border-[#111111]"

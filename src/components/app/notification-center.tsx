@@ -33,22 +33,35 @@ export interface NotificationCenterProps {
   onClose: () => void;
 }
 
+const EMPTY_NOTIFICATIONS: AppNotification[] = [];
+
 export function NotificationCenter({
   workspaceId,
-  initialNotifications = [],
+  initialNotifications = EMPTY_NOTIFICATIONS,
   isOpen,
   onClose,
 }: NotificationCenterProps) {
   const router = useRouter();
   const [notifications, setNotifications] = React.useState<AppNotification[]>(initialNotifications);
   const [activeTab, setActiveTab] = React.useState<NotificationFilterTab>("all");
+  const drawerRef = React.useRef<HTMLDivElement>(null);
 
   // Sync initial notifications if updated
   React.useEffect(() => {
-    if (initialNotifications && initialNotifications.length > 0) {
-      setNotifications(initialNotifications);
-    }
+    setNotifications(initialNotifications);
   }, [initialNotifications]);
+
+  // Close when clicking outside
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -239,7 +252,10 @@ export function NotificationCenter({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute right-0 top-full mt-2 z-40 w-88 sm:w-96 rounded-[16px] border border-[#D8DDD4] bg-white p-3.5 shadow-elevated animate-in zoom-in-95 duration-150 space-y-3">
+    <div
+      ref={drawerRef}
+      className="absolute right-0 top-full mt-2 z-40 w-88 sm:w-96 rounded-[16px] border border-[#D8DDD4] bg-white p-3.5 shadow-elevated animate-in zoom-in-95 duration-150 space-y-3"
+    >
       {/* Header with Title, Unread Badge, and Mark All Read */}
       <div className="flex items-center justify-between pb-2 border-b border-[#E7EADF]">
         <div className="flex items-center gap-2">

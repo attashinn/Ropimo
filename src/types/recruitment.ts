@@ -1,8 +1,40 @@
-export type JobOpeningStatus = "Draft" | "Open" | "Paused" | "Closed";
+export type JobOpeningStatus = "draft" | "published" | "paused" | "closed" | "Draft" | "Open" | "Paused" | "Closed";
+export type JobWorkMode = "onsite" | "hybrid" | "remote";
+export type JobExperienceLevel = "entry" | "mid" | "senior" | "lead" | "executive";
 export type EmploymentType = "Full-time" | "Part-time" | "Contractor" | "Intern";
 export type JobLocationType = "Remote" | "On-site" | "Hybrid";
 
+export type ApplicationQuestionType = "short_text" | "long_text" | "yes_no" | "select";
+
+export interface ApplicationQuestion {
+  id: string;
+  type: ApplicationQuestionType;
+  question: string;
+  required: boolean;
+  options?: string[];
+}
+
+export interface CandidateEvent {
+  id: string;
+  workspace_id: string;
+  candidate_id: string;
+  job_opening_id?: string | null;
+  event_type: string;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
 export type CandidateStage =
+  | "applied"
+  | "screening"
+  | "interview"
+  | "offer"
+  | "hired"
+  | "rejected"
+  | "withdrawn"
   | "Applied"
   | "Screening"
   | "Shortlisted"
@@ -18,6 +50,9 @@ export type CandidateStage =
   | "Expired";
 
 export type InterviewType =
+  | "phone"
+  | "video"
+  | "onsite"
   | "Phone Screen"
   | "Video Interview"
   | "Technical Interview"
@@ -26,13 +61,25 @@ export type InterviewType =
   | "Other";
 
 export type InterviewStatus =
+  | "scheduled"
+  | "completed"
+  | "cancelled"
+  | "no-show"
   | "Scheduled"
   | "Completed"
   | "Cancelled"
   | "Rescheduled"
   | "No-show";
 
-export type InterviewRecommendation = "Strong Hire" | "Hire" | "Maybe" | "No Hire";
+export type InterviewRecommendation =
+  | "strong_yes"
+  | "yes"
+  | "no"
+  | "strong_no"
+  | "Strong Hire"
+  | "Hire"
+  | "Maybe"
+  | "No Hire";
 
 export type OfferStatus =
   | "Draft"
@@ -51,6 +98,7 @@ export interface CandidateNote {
   author_name: string;
   author_avatar?: string | null;
   content: string;
+  mentions?: string[];
   created_at: string;
   updated_at?: string;
 }
@@ -65,16 +113,27 @@ export interface JobOpening {
   title: string;
   slug?: string | null;
   description?: string | null;
-  responsibilities: string[];
-  requirements: string[];
-  skills: string[];
+  responsibilities?: string[];
+  requirements: string[] | string;
+  skills?: string[];
   employment_type: EmploymentType;
+  work_mode?: JobWorkMode;
+  experience_level?: JobExperienceLevel | string | null;
   location: string;
+  openings_count?: number;
   salary_range?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  currency?: string | null;
+  show_salary?: boolean;
+  benefits?: string[] | string | null;
+  application_questions?: ApplicationQuestion[];
   hiring_manager_id?: string | null;
   hiring_manager_name?: string | null;
   application_deadline?: string | null;
   status: JobOpeningStatus;
+  published_at?: string | null;
+  closes_at?: string | null;
   applicants_count?: number;
   interviews_count?: number;
   created_by?: string | null;
@@ -99,6 +158,7 @@ export interface Candidate {
   bio?: string | null;
   notes?: string | null;
   notes_list?: CandidateNote[];
+  department_id?: string | null;
   assigned_recruiter_id?: string | null;
   assigned_recruiter_name?: string | null;
   assigned_recruiter_avatar?: string | null;
@@ -122,6 +182,9 @@ export interface Candidate {
   cv_file_type?: string | null;
   cover_letter?: string | null;
   source?: string | null;
+  rating?: number | null;
+  rejection_reason?: string | null;
+  rejected_at?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -145,6 +208,7 @@ export interface CandidateApplication {
   hired_at?: string | null;
   is_archived?: boolean;
   source?: string | null;
+  answers?: Record<string, any> | null;
   created_at: string;
   updated_at: string;
   // Joined relation data
@@ -184,6 +248,12 @@ export interface Interview {
   location_or_link?: string | null;
   meeting_url?: string | null;
   status: InterviewStatus;
+  timezone?: string;
+  candidate_timezone?: string;
+  calendar_event_id?: string | null;
+  ics_uid?: string;
+  ics_sequence?: number;
+  reminder_sent_at?: string | null;
   notes?: string | null;
   created_by?: string | null;
   created_at: string;
@@ -203,15 +273,19 @@ export interface InterviewFeedback {
   interviewer_id: string;
   interviewer_name?: string | null;
   technical_skills_rating?: number | null; // 1-5
+  skills_rating?: number | null; // 1-5
   communication_rating?: number | null; // 1-5
   problem_solving_rating?: number | null; // 1-5
   culture_fit_rating?: number | null; // 1-5
+  culture_rating?: number | null; // 1-5
   overall_rating?: number | null; // 1-5
   recommendation: InterviewRecommendation;
   strengths?: string | null;
   concerns?: string | null;
+  comments?: string | null;
   private_notes?: string | null;
   notes?: string | null;
+  submitted_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -262,7 +336,7 @@ export interface CandidateActivity {
   action_type: string;
   title: string;
   description?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 

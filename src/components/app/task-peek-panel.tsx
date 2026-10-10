@@ -24,11 +24,12 @@ export function TaskPeekPanel({
   onTaskDeleted,
   workspaceId,
 }: TaskPeekPanelProps) {
+  const [prevStatus, setPrevStatus] = React.useState(task?.status);
   const [isCompleted, setIsCompleted] = React.useState(task?.status === "completed");
-
-  React.useEffect(() => {
+  if (task?.status !== prevStatus) {
+    setPrevStatus(task?.status);
     setIsCompleted(task?.status === "completed");
-  }, [task?.status]);
+  }
 
   // Handle escape key
   React.useEffect(() => {

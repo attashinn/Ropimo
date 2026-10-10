@@ -49,11 +49,19 @@ import { JobOpeningsView } from "./recruitment/job-openings-view";
 import { CandidatesView } from "./recruitment/candidates-view";
 import { InterviewsView } from "./recruitment/interviews-view";
 import { OnboardingInvitationsView } from "./recruitment/onboarding-invitations-view";
+import {
+  ChangeRoleModal,
+  ChangeDepartmentsModal,
+  SetDepartmentLeadModal,
+  DeactivateMemberModal,
+  RemoveMemberModal,
+} from "./team-action-dialogs";
 import { cn } from "@/lib/utils";
 
 export interface PeopleDirectoryProps {
   workspaceId: string;
   workspaceName?: string;
+  workspaceSlug?: string;
   userRole: string;
   people: WorkspacePerson[];
   departments: Department[];
@@ -71,6 +79,7 @@ type MainSectionTab = "team" | "onboarding" | "candidates" | "jobs" | "interview
 export function PeopleDirectory({
   workspaceId,
   workspaceName = "brnnd",
+  workspaceSlug,
   userRole,
   people = [],
   departments = [],
@@ -82,10 +91,24 @@ export function PeopleDirectory({
   interviews = [],
   recruitmentStats,
 }: PeopleDirectoryProps) {
-  const router = useRouter();
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialTab = (searchParams?.get("tab") as MainSectionTab) || "team";
 
   // Top Section Tab
-  const [activeSection, setActiveSection] = React.useState<MainSectionTab>("team");
+  const [activeSection, setActiveSection] = React.useState<MainSectionTab>(
+    ["team", "onboarding", "candidates", "jobs", "interviews"].includes(initialTab)
+      ? initialTab
+      : "team"
+  );
+
+  const handleTabSwitch = (tabId: MainSectionTab) => {
+    setActiveSection(tabId);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tabId);
+      router.replace(url.pathname + url.search, { scroll: false });
+    }
+  };
 
   // Filter & Search State
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -106,11 +129,22 @@ export function PeopleDirectory({
   const [rowMenuPersonId, setRowMenuPersonId] = React.useState<string | null>(null);
   const [isStarred, setIsStarred] = React.useState(false);
 
+  // Team tab row menu dialogs
+  const [changeRolePerson, setChangeRolePerson] = React.useState<WorkspacePerson | null>(null);
+  const [changeDeptsPerson, setChangeDeptsPerson] = React.useState<WorkspacePerson | null>(null);
+  const [setLeadPerson, setSetLeadPerson] = React.useState<WorkspacePerson | null>(null);
+  const [deactivatePerson, setDeactivatePerson] = React.useState<WorkspacePerson | null>(null);
+  const [removePerson, setRemovePerson] = React.useState<WorkspacePerson | null>(null);
+
   const canManage = ["owner", "admin", "manager"].includes(userRole);
   const canEditRole = ["owner", "admin"].includes(userRole);
 
   const pendingInvsCount = React.useMemo(() => {
-    return invitations.filter((i) => (i.status || "Pending").toLowerCase() === "pending").length;
+    return invitations.filter((i) => {
+      const s = (i.status || "Pending").toLowerCase();
+      const isExpired = i.expires_at && new Date() > new Date(i.expires_at);
+      return s === "pending" && !isExpired;
+    }).length;
   }, [invitations]);
 
   // Close drawer on Escape
@@ -304,7 +338,7 @@ export function PeopleDirectory({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSection(tab.id as any)}
+              onClick={() => handleTabSwitch(tab.id as MainSectionTab)}
               className={cn(
                 "flex items-center gap-2 rounded-[8px] px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap",
                 isActive
@@ -540,15 +574,43 @@ export function PeopleDirectory({
                                     <MoreHorizontal className="h-4 w-4" />
                                   </button>
 
-                                  {rowMenuPersonId === person.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[175px] rounded-[10px] border border-[#D8DDD4] bg-white p-1 shadow-elevated text-left">
-                                      <Link
-                                        href={`/app/people/onboarding/${person.user_id || person.id}`}
-                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs font-semibold text-[#246244] hover:bg-[#EAF4E2] transition-colors no-underline"
+                                   {rowMenuPersonId === person.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[190px] rounded-[10px] border border-[#D8DDD4] bg-white p-1 shadow-elevated text-left">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRowMenuPersonId(null);
+                                          setChangeRolePerson(person);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
                                       >
-                                        <Clock className="h-3.5 w-3.5 text-[#246244]" />
-                                        <span>Onboarding Checklist</span>
-                                      </Link>
+                                        <Shield className="h-3.5 w-3.5 text-[#65706A]" />
+                                        <span>Change role</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRowMenuPersonId(null);
+                                          setChangeDeptsPerson(person);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
+                                      >
+                                        <Building2 className="h-3.5 w-3.5 text-[#65706A]" />
+                                        <span>Change departments</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRowMenuPersonId(null);
+                                          setSetLeadPerson(person);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
+                                      >
+                                        <Star className="h-3.5 w-3.5 text-[#65706A]" />
+                                        <span>Set as department lead</span>
+                                      </button>
 
                                       <button
                                         type="button"
@@ -559,23 +621,33 @@ export function PeopleDirectory({
                                         className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
                                       >
                                         <Edit className="h-3.5 w-3.5 text-[#65706A]" />
-                                        <span>Edit Details</span>
+                                        <span>Edit details</span>
+                                      </button>
+
+                                      <div className="my-1 border-t border-[#E9E6DA]" />
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRowMenuPersonId(null);
+                                          setDeactivatePerson(person);
+                                        }}
+                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
+                                      >
+                                        <UserX className="h-3.5 w-3.5 text-[#65706A]" />
+                                        <span>Deactivate</span>
                                       </button>
 
                                       <button
                                         type="button"
                                         onClick={() => {
                                           setRowMenuPersonId(null);
-                                          handleToggleStatus(person);
+                                          setRemovePerson(person);
                                         }}
-                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#18221E] hover:bg-[#FAF9F5] transition-colors"
+                                        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs text-[#D93025] hover:bg-[#FEF2F2] transition-colors"
                                       >
-                                        <UserX className="h-3.5 w-3.5 text-[#65706A]" />
-                                        <span>
-                                          {person.employment_status === "Inactive"
-                                            ? "Activate Member"
-                                            : "Deactivate Member"}
-                                        </span>
+                                        <X className="h-3.5 w-3.5 text-[#D93025]" />
+                                        <span>Remove</span>
                                       </button>
                                     </div>
                                   )}
@@ -652,6 +724,7 @@ export function PeopleDirectory({
       {activeSection === "jobs" && (
         <JobOpeningsView
           workspaceId={workspaceId}
+          workspaceSlug={workspaceSlug || workspaceId}
           userRole={userRole}
           jobOpenings={jobOpenings}
           departments={departments}
@@ -664,6 +737,7 @@ export function PeopleDirectory({
           workspaceId={workspaceId}
           userRole={userRole}
           interviews={interviews}
+          candidates={candidates}
           teamMembers={people}
         />
       )}
@@ -902,8 +976,8 @@ export function PeopleDirectory({
         isOpen={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
         workspaceId={workspaceId}
+        userRole={userRole}
         departments={departments}
-        people={people}
       />
 
       {editingPerson && (
@@ -913,6 +987,61 @@ export function PeopleDirectory({
           person={editingPerson}
           departments={departments}
           canEditRole={canEditRole}
+        />
+      )}
+
+      {/* Row Menu Action Modals */}
+      {changeRolePerson && (
+        <ChangeRoleModal
+          isOpen={true}
+          onClose={() => setChangeRolePerson(null)}
+          person={changeRolePerson}
+          workspaceId={workspaceId}
+          onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {changeDeptsPerson && (
+        <ChangeDepartmentsModal
+          isOpen={true}
+          onClose={() => setChangeDeptsPerson(null)}
+          person={changeDeptsPerson}
+          workspaceId={workspaceId}
+          departments={departments}
+          onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {setLeadPerson && (
+        <SetDepartmentLeadModal
+          isOpen={true}
+          onClose={() => setSetLeadPerson(null)}
+          person={setLeadPerson}
+          workspaceId={workspaceId}
+          departments={departments}
+          onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {deactivatePerson && (
+        <DeactivateMemberModal
+          isOpen={true}
+          onClose={() => setDeactivatePerson(null)}
+          person={deactivatePerson}
+          workspaceId={workspaceId}
+          allMembers={people}
+          onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {removePerson && (
+        <RemoveMemberModal
+          isOpen={true}
+          onClose={() => setRemovePerson(null)}
+          person={removePerson}
+          workspaceId={workspaceId}
+          allMembers={people}
+          onSuccess={() => router.refresh()}
         />
       )}
     </div>

@@ -699,7 +699,7 @@ export function MemberDashboard({
                       <p className="text-[11px] text-[#18221E] leading-snug">
                         <span className="font-semibold">{act.actorName}</span>{" "}
                         {act.type === "project_created" ? "created project" : act.type === "task_completed" ? "completed" : "added task"}{" "}
-                        <span className="font-medium">"{act.targetName}"</span>
+                        <span className="font-medium">&quot;{act.targetName}&quot;</span>
                       </p>
                     </div>
                   </div>

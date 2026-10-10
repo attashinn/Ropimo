@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+const AnalyzeCompanySchema = z.object({
+  url: z.string().min(1, "A valid website URL or domain is required."),
+});
 
 export interface AnalyzedDepartment {
   id: string;
@@ -73,14 +78,17 @@ function formatCompanyName(domain: string): string {
 
 export async function POST(request: Request) {
   try {
-    const { url } = await request.json();
+    const raw = await request.json();
+    const parsed = AnalyzeCompanySchema.safeParse(raw);
 
-    if (!url || typeof url !== "string") {
+    if (!parsed.success) {
       return NextResponse.json(
         { error: "A valid website URL or domain is required." },
         { status: 400 }
       );
     }
+
+    const { url } = parsed.data;
 
     const domain = extractHostname(url);
     const companyName = formatCompanyName(domain);
@@ -201,7 +209,7 @@ export async function POST(request: Request) {
     };
 
     return NextResponse.json({ success: true, data: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Company analysis error:", error);
     return NextResponse.json(
       { error: "Failed to analyze website. You can continue with manual setup." },

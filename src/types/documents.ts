@@ -1,5 +1,4 @@
 import { WorkspacePerson } from "./people";
-import { Project } from "./project";
 import { Department } from "./department";
 
 export type DocumentCategory =

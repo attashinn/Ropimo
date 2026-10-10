@@ -22,6 +22,8 @@ async function main() {
     "task_activities",
     "documents",
     "attachments",
+    "email_log",
+    "email_outbox",
   ];
 
   for (const t of tables) {

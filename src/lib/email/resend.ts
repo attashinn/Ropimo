@@ -88,8 +88,8 @@ async function sendEmail(opts: {
 
     console.log(`[Ropimo Email][${opts.tag || "send"}] Sent → ${opts.to} | id=${data?.id}`);
     return { success: true, emailId: data?.id };
-  } catch (err: any) {
-    const msg = err?.message || String(err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error(`[Ropimo Email][${opts.tag || "send"}] Unexpected error:`, msg);
     return { success: false, error: msg };
   }

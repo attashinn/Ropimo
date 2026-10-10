@@ -108,6 +108,7 @@ export interface CreateMeetingInput {
   is_recurring?: boolean;
   recurrence?: RecurrenceFrequency;
   notify_attendees?: boolean;
+  status?: MeetingStatus;
 }
 
 export interface UpdateMeetingInput extends Partial<CreateMeetingInput> {

@@ -1,668 +1,644 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
-  WorkspaceRole,
-  EmploymentType,
-  EmploymentStatus,
-  WorkspacePerson,
-} from "@/types/people";
+  X,
+  Mail,
+  Check,
+  AlertCircle,
+  Copy,
+  CheckCircle2,
+  Building2,
+  Shield,
+  User,
+  Users,
+  Send,
+  Sparkles,
+  ArrowRight,
+  Info,
+} from "lucide-react";
 import { Department } from "@/types/department";
-import { invitePersonAction } from "@/lib/people/actions";
-import { AppIcon } from "@/components/ui/app-icon";
-import { DatePicker } from "@/components/ui/date-picker";
+import { PERMISSION_MATRIX } from "@/lib/permissions";
+import {
+  inviteMembersBatchAction,
+  InviteEmailResult,
+  checkEmailsAvailability,
+  EmailAvailabilityMap,
+} from "@/lib/invitations/actions";
+import { cn } from "@/lib/utils";
 
 export interface InvitePersonModalProps {
   isOpen: boolean;
   onClose: () => void;
   workspaceId: string;
+  userRole?: string;
   departments?: Department[];
-  people?: WorkspacePerson[];
   onSuccess?: () => void;
 }
 
-const EMPLOYMENT_TYPES: { label: string; value: EmploymentType; dot: string }[] = [
-  { label: "Full-time", value: "Full-time", dot: "bg-emerald-500" },
-  { label: "Part-time", value: "Part-time", dot: "bg-blue-500" },
-  { label: "Contractor", value: "Contractor", dot: "bg-amber-500" },
-  { label: "Intern", value: "Intern", dot: "bg-purple-500" },
-];
+type AssignableRole = "admin" | "hr" | "manager" | "member";
 
-const WORKSPACE_ROLES: { label: string; value: WorkspaceRole; desc: string; badge: string }[] = [
-  { label: "Member", value: "member", desc: "Access to assigned work and department tasks", badge: "bg-slate-100 text-slate-700" },
-  { label: "Manager", value: "manager", desc: "Manage projects, tasks, attendance, and team", badge: "bg-blue-50 text-blue-700" },
-  { label: "Admin", value: "admin", desc: "Full administrative access and billing settings", badge: "bg-amber-50 text-amber-800" },
-];
-
-function CustomDropdown({
-  label,
-  icon,
-  triggerContent,
-  isOpen,
-  onToggle,
-  onClose,
-  children,
-}: {
+interface RoleConfig {
+  key: AssignableRole;
   label: string;
-  icon: React.ReactNode;
-  triggerContent: React.ReactNode;
-  isOpen: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, onClose]);
-
-  return (
-    <div ref={containerRef} className="relative flex items-center justify-between px-3.5 py-2.5 hover:bg-[#FAF9F5] transition-colors rounded-[8px]">
-      <div className="flex items-center gap-2.5 text-xs font-medium text-[#65706A]">
-        <span className="text-[#8A958F]">{icon}</span>
-        <span>{label}</span>
-      </div>
-
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-semibold text-[#18221E] hover:bg-[#EAEFE5] transition-all cursor-pointer"
-      >
-        {triggerContent}
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-[#8A958F] ml-0.5">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-3.5 top-full z-40 mt-1 min-w-[220px] max-h-56 overflow-y-auto rounded-[10px] border border-[#D8DDD4] bg-white p-1.5 shadow-2xl text-xs"
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+  badge: string;
+  summary: string;
+  canDo: string[];
+  cannotDo: string[];
 }
 
-function InvitePersonPanel({
-  workspaceId,
-  departments = [],
-  people = [],
-  onClose,
-  onSuccess,
-}: {
-  workspaceId: string;
-  departments?: Department[];
-  people?: WorkspacePerson[];
-  onClose: () => void;
-  onSuccess?: () => void;
-}) {
-  const router = useRouter();
-
-  const [fullName, setFullName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [phone, setPhone] = React.useState("");
-  const [jobTitle, setJobTitle] = React.useState("");
-  const [departmentId, setDepartmentId] = React.useState(departments[0]?.id || "");
-  const [employmentType, setEmploymentType] = React.useState<EmploymentType>("Full-time");
-  const [employmentStatus, setEmploymentStatus] = React.useState<EmploymentStatus>("Active");
-  const [managerId, setManagerId] = React.useState("");
-  const [startDate, setStartDate] = React.useState(new Date().toISOString().split("T")[0]);
-  const [role, setRole] = React.useState<WorkspaceRole>("member");
-
-  React.useEffect(() => {
-    if (!departmentId && departments.length > 0) {
-      setDepartmentId(departments[0].id);
-    }
-  }, [departments, departmentId]);
-
-  // Dropdown States
-  const [openDropdown, setOpenDropdown] = React.useState<string | null>(null);
-
-  const [loading, setLoading] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
-  const [generatedInviteUrl, setGeneratedInviteUrl] = React.useState<string | null>(null);
-  const [copied, setCopied] = React.useState(false);
-  const [isSuccess, setIsSuccess] = React.useState(false);
-  const [invitedEmail, setInvitedEmail] = React.useState("");
-  const [invitedName, setInvitedName] = React.useState("");
-
-  const isValid = fullName.trim().length > 1 && email.trim().includes("@");
-
-  // Filter unique team members for manager dropdown
-  const uniquePeople = React.useMemo(() => {
-    const seen = new Set<string>();
-    return (people || []).filter((p) => {
-      if (seen.has(p.user_id)) return false;
-      seen.add(p.user_id);
-      return true;
-    });
-  }, [people]);
-
-  const selectedDepartment = departments.find((d) => d.id === departmentId);
-  const selectedManager = uniquePeople.find((p) => p.user_id === managerId);
-  const selectedRole = WORKSPACE_ROLES.find((r) => r.value === role) || WORKSPACE_ROLES[0];
-  const selectedEmpType = EMPLOYMENT_TYPES.find((t) => t.value === employmentType) || EMPLOYMENT_TYPES[0];
-
-  const handleCopyLink = () => {
-    if (!generatedInviteUrl) return;
-    navigator.clipboard.writeText(generatedInviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isValid || loading) return;
-
-    setLoading(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const res = await invitePersonAction({
-        workspaceId,
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim() || undefined,
-        jobTitle: jobTitle.trim() || undefined,
-        departmentId: departmentId || undefined,
-        employmentType,
-        employmentStatus,
-        managerId: managerId || undefined,
-        startDate,
-        role,
-      });
-
-      if (!res.success) {
-        setErrorMsg(res.error || "Failed to send invitation.");
-        setLoading(false);
-        return;
-      }
-
-      setInvitedEmail(email.trim().toLowerCase());
-      setInvitedName(fullName.trim());
-      setGeneratedInviteUrl(res.data?.inviteUrl || null);
-      setIsSuccess(true);
-      setLoading(false);
-      if (onSuccess) onSuccess();
-      router.refresh();
-    } catch {
-      setErrorMsg("An unexpected error occurred.");
-      setLoading(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-[560px] flex-col border-l border-[#D8DDD4] bg-[#FCFCFA] shadow-2xl text-[#18221E]"
-    >
-      {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7EADF] bg-white shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#10251F] text-white font-bold text-sm shadow-xs">
-            +
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-[#18221E] tracking-tight">
-              Invite teammate
-            </h2>
-            <p className="text-[11px] text-[#65706A]">
-              Add a new member to your workspace operating system.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors cursor-pointer"
-          title="Close (Esc)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-
-      {/* ── STATUS BANNERS ──────────────────────────────────────────────── */}
-      {errorMsg && (
-        <div className="px-6 pt-3 shrink-0">
-          <div className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
-            {errorMsg}
-          </div>
-        </div>
-      )}
-
-      {/* ── SUCCESS SCREEN ──────────────────────────────────────────────── */}
-      {isSuccess ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-8 py-12 text-center bg-[#FCFCFA]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#EAF4E2] text-[#246244] mb-4 shadow-2xs border border-[#246244]/20">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </div>
-
-          <h3 className="text-xl font-bold text-[#18221E] tracking-tight mb-2">
-            Invitation Email Sent!
-          </h3>
-
-          <p className="text-xs text-[#65706A] max-w-sm leading-relaxed mb-6">
-            An invitation email has been sent to <span className="font-semibold text-[#18221E]">{invitedEmail}</span>. They can accept it directly from their email inbox to join your workspace.
-          </p>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSuccess(false);
-                setFullName("");
-                setEmail("");
-                setJobTitle("");
-                setPhone("");
-                setGeneratedInviteUrl(null);
-                setErrorMsg(null);
-              }}
-              className="rounded-[8px] border border-[#D8DDD4] bg-white px-4 py-2 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] transition-all cursor-pointer shadow-2xs"
-            >
-              Invite another teammate
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.refresh();
-              }}
-              className="rounded-[8px] bg-[#10251F] px-5 py-2 text-xs font-bold text-white hover:bg-[#18342C] transition-all shadow-xs cursor-pointer"
-            >
-              Done ✓
-            </button>
-          </div>
-
-          {generatedInviteUrl && (
-            <div className="mt-8 pt-5 border-t border-[#E7EADF] w-full max-w-xs text-center">
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="text-[11px] font-medium text-[#65706A] hover:text-[#18221E] underline cursor-pointer"
-              >
-                {copied ? "Link copied to clipboard! ✓" : "Copy invitation link directly"}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-6 flex flex-col justify-between">
-        <div className="space-y-5">
-          {/* PRIMARY PROFILE INPUTS */}
-          <div className="rounded-[12px] border border-[#E7EADF] bg-white p-4 space-y-3.5 shadow-xs">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                autoFocus
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Elena Rostova"
-                className="w-full text-base font-bold tracking-tight text-[#18221E] placeholder:text-[#65706A]/30 bg-transparent border-0 border-b border-[#E7EADF] pb-1.5 focus:border-[#10251F] focus:outline-none transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
-                Work Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. elena@company.com"
-                className="w-full text-sm font-medium text-[#18221E] placeholder:text-[#65706A]/30 bg-transparent border-0 border-b border-[#E7EADF] pb-1.5 focus:border-[#10251F] focus:outline-none transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
-                Job Title
-              </label>
-              <input
-                type="text"
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="e.g. Principal Product Designer"
-                className="w-full text-xs font-semibold text-[#18221E] placeholder:text-[#65706A]/30 bg-transparent border-0 border-b border-[#E7EADF] pb-1 focus:border-[#10251F] focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* CLICKUP STYLE CUSTOM PROPERTY ROWS */}
-          <div className="space-y-1.5">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] px-1">
-              Member Properties
-            </span>
-
-            <div className="rounded-[12px] border border-[#E7EADF] bg-white divide-y divide-[#E7EADF] shadow-xs">
-              {/* Department */}
-              <CustomDropdown
-                label="Department"
-                icon={
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                  </svg>
-                }
-                triggerContent={
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF4E2] px-2.5 py-0.5 text-[11px] font-semibold text-[#246244]">
-                    <AppIcon name="departments" size={12} />
-                    <span>{selectedDepartment?.name || "No department"}</span>
-                  </span>
-                }
-                isOpen={openDropdown === "department"}
-                onToggle={() => setOpenDropdown(openDropdown === "department" ? null : "department")}
-                onClose={() => setOpenDropdown(null)}
-              >
-                <div className="p-1 space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDepartmentId("");
-                      setOpenDropdown(null);
-                    }}
-                    className={`flex items-center justify-between w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                      !departmentId ? "bg-[#EAF4E2] font-bold text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                    }`}
-                  >
-                    <span>No department</span>
-                    {!departmentId && <AppIcon name="check" size={12} className="text-[#246244]" />}
-                  </button>
-                  {departments.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => {
-                        setDepartmentId(d.id);
-                        setOpenDropdown(null);
-                      }}
-                      className={`flex items-center justify-between w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                        departmentId === d.id ? "bg-[#EAF4E2] font-bold text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <AppIcon name="departments" size={12} />
-                        <span>{d.name}</span>
-                      </span>
-                      {departmentId === d.id && <AppIcon name="check" size={12} className="text-[#246244]" />}
-                    </button>
-                  ))}
-                </div>
-              </CustomDropdown>
-
-              {/* Reports To (Manager) */}
-              <CustomDropdown
-                label="Reports to"
-                icon={<AppIcon name="people" size={14} />}
-                triggerContent={
-                  selectedManager ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10251F] text-white px-2 py-0.5 text-[11px] font-medium">
-                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#EAF4E2] text-[8px] font-bold text-[#246244]">
-                        {(selectedManager.full_name || selectedManager.email)[0].toUpperCase()}
-                      </span>
-                      <span className="truncate max-w-[120px]">{selectedManager.full_name || selectedManager.email}</span>
-                    </span>
-                  ) : (
-                    <span className="text-[#65706A] font-medium">None (Founder)</span>
-                  )
-                }
-                isOpen={openDropdown === "manager"}
-                onToggle={() => setOpenDropdown(openDropdown === "manager" ? null : "manager")}
-                onClose={() => setOpenDropdown(null)}
-              >
-                <div className="p-1 space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setManagerId("");
-                      setOpenDropdown(null);
-                    }}
-                    className={`flex items-center justify-between w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                      !managerId ? "bg-[#EAF4E2] font-bold text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                    }`}
-                  >
-                    <span>None (Reports to Founder)</span>
-                    {!managerId && <AppIcon name="check" size={12} className="text-[#246244]" />}
-                  </button>
-                  {uniquePeople.map((p) => (
-                    <button
-                      key={p.user_id}
-                      type="button"
-                      onClick={() => {
-                        setManagerId(p.user_id);
-                        setOpenDropdown(null);
-                      }}
-                      className={`flex items-center justify-between w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                        managerId === p.user_id ? "bg-[#EAF4E2] font-bold text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                      }`}
-                    >
-                      <div className="truncate">
-                        <p className="font-semibold">{p.full_name || p.email}</p>
-                        <p className="text-[10px] text-[#8A958F]">{p.job_title || p.role}</p>
-                      </div>
-                      {managerId === p.user_id && <AppIcon name="check" size={12} className="text-[#246244] ml-2" />}
-                    </button>
-                  ))}
-                </div>
-              </CustomDropdown>
-
-              {/* Workspace Access Role */}
-              <CustomDropdown
-                label="Access role"
-                icon={<AppIcon name="shield" size={14} />}
-                triggerContent={
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${selectedRole.badge}`}>
-                    <AppIcon name="shield" size={10} />
-                    <span>{selectedRole.label}</span>
-                  </span>
-                }
-                isOpen={openDropdown === "role"}
-                onToggle={() => setOpenDropdown(openDropdown === "role" ? null : "role")}
-                onClose={() => setOpenDropdown(null)}
-              >
-                <div className="p-1 space-y-1">
-                  {WORKSPACE_ROLES.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => {
-                        setRole(r.value);
-                        setOpenDropdown(null);
-                      }}
-                      className={`flex flex-col w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                        role === r.value ? "bg-[#EAF4E2] text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold">{r.label}</span>
-                        {role === r.value && <AppIcon name="check" size={12} className="text-[#246244]" />}
-                      </div>
-                      <span className="text-[10px] text-[#65706A] mt-0.5">{r.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </CustomDropdown>
-
-              {/* Employment Type */}
-              <CustomDropdown
-                label="Employment type"
-                icon={
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                }
-                triggerContent={
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[#18221E]">
-                    <span className={`h-2 w-2 rounded-full ${selectedEmpType.dot}`} />
-                    <span>{selectedEmpType.label}</span>
-                  </span>
-                }
-                isOpen={openDropdown === "employmentType"}
-                onToggle={() => setOpenDropdown(openDropdown === "employmentType" ? null : "employmentType")}
-                onClose={() => setOpenDropdown(null)}
-              >
-                <div className="p-1 space-y-0.5">
-                  {EMPLOYMENT_TYPES.map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => {
-                        setEmploymentType(t.value);
-                        setOpenDropdown(null);
-                      }}
-                      className={`flex items-center justify-between w-full rounded-[6px] px-2.5 py-1.5 text-left text-xs ${
-                        employmentType === t.value ? "bg-[#EAF4E2] font-bold text-[#246244]" : "hover:bg-[#FAF9F5] text-[#18221E]"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${t.dot}`} />
-                        <span>{t.label}</span>
-                      </span>
-                      {employmentType === t.value && <span>✓</span>}
-                    </button>
-                  ))}
-                </div>
-              </CustomDropdown>
-
-              {/* Start Date */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 hover:bg-[#FAF9F5] transition-colors rounded-[8px]">
-                <div className="flex items-center gap-2.5 text-xs font-medium text-[#65706A]">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  <span>Start date</span>
-                </div>
-                <div className="w-44">
-                  <DatePicker
-                    value={startDate}
-                    onChange={(val) => setStartDate(val)}
-                    placeholder="Select start date"
-                  />
-                </div>
-              </div>
-
-              {/* Phone Number */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 hover:bg-[#FAF9F5] transition-colors rounded-[8px]">
-                <div className="flex items-center gap-2.5 text-xs font-medium text-[#65706A]">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                  </svg>
-                  <span>Phone (optional)</span>
-                </div>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
-                  className="font-medium text-xs text-[#18221E] bg-transparent text-right focus:outline-none placeholder:text-[#8A958F]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── FIXED BOTTOM ACTION BAR ─────────────────────────────────────── */}
-        <div className="flex items-center justify-between pt-4 border-t border-[#E7EADF] bg-[#FAF9F5] -mx-6 -mb-5 px-6 py-3.5 shrink-0 rounded-b-[16px]">
-          <p className="text-[11px] text-[#65706A]">
-            Teammate will receive an onboarding invite link.
-          </p>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-[8px] px-3.5 py-1.5 text-xs font-semibold text-[#65706A] hover:bg-white hover:text-[#18221E] border border-transparent hover:border-[#D8DDD4] transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={!isValid || loading}
-              className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#10251F] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#18342C] disabled:opacity-40 transition-all shadow-md focus:outline-none cursor-pointer"
-            >
-              <span>{loading ? "Sending..." : "Send Invitation"}</span>
-              <span className="text-[#C7F34A]">→</span>
-            </button>
-          </div>
-        </div>
-      </form>
-      )}
-    </motion.div>
-  );
-}
+const ROLE_CONFIGS: Record<AssignableRole, RoleConfig> = {
+  admin: {
+    key: "admin",
+    label: "Admin",
+    badge: "bg-[#ECE9DD] text-[#111111]",
+    summary: "Full administrative workspace access except billing & ownership transfer.",
+    canDo: [
+      "Manage workspace settings & branding",
+      "Invite members (HR, Manager, Member)",
+      "Create & edit all departments & projects",
+      "Publish jobs & manage hiring offers",
+      "Inspect workspace audit logs",
+    ],
+    cannotDo: [
+      "Manage billing or payment subscriptions",
+      "Delete workspace or transfer ownership",
+      "Invite or demote workspace owners",
+    ],
+  },
+  hr: {
+    key: "hr",
+    label: "HR",
+    badge: "bg-[#EAEFE5] text-[#246244]",
+    summary: "Manage hiring pipelines, department onboarding, and member leave.",
+    canDo: [
+      "Invite team members & managers",
+      "Publish job openings & manage offers",
+      "View sensitive employee profile info",
+      "Approve leave requests across departments",
+      "Access company & HR-only folders",
+    ],
+    cannotDo: [
+      "Edit workspace settings or branding",
+      "Manage billing or audit logs",
+      "Assign Admin or Owner roles",
+      "Delete organizational departments",
+    ],
+  },
+  manager: {
+    key: "manager",
+    label: "Manager",
+    badge: "bg-[#E8F0FE] text-[#1A73E8]",
+    summary: "Leads projects and coordinates work within assigned departments.",
+    canDo: [
+      "Manage projects & tasks in own departments",
+      "Draft job openings for own departments",
+      "Approve leave & view team attendance for own department",
+      "Conduct candidate interviews & scorecards",
+    ],
+    cannotDo: [
+      "Invite new workspace members",
+      "Publish job listings publicly",
+      "Access other departments' private folders",
+      "Modify workspace settings or roles",
+    ],
+  },
+  member: {
+    key: "member",
+    label: "Member",
+    badge: "bg-[#FAF9F5] text-[#6B6B6B]",
+    summary: "Collaborate on assigned projects, tasks, and team deliverables.",
+    canDo: [
+      "View & complete assigned project tasks",
+      "Submit leave requests for themselves",
+      "Access official company & department files",
+      "Submit interview scorecards if assigned",
+    ],
+    cannotDo: [
+      "Invite members or manage roles",
+      "Approve team leave or view timesheets",
+      "Publish job listings or send offers",
+      "Create or delete departments",
+    ],
+  },
+};
 
 export function InvitePersonModal({
   isOpen,
   onClose,
   workspaceId,
+  userRole = "owner",
   departments = [],
-  people = [],
   onSuccess,
 }: InvitePersonModalProps) {
+  const router = useRouter();
+
+  // Determine allowed roles the inviter may assign
+  const allowedRoles = React.useMemo<AssignableRole[]>(() => {
+    const r = userRole.toLowerCase();
+    if (r === "owner") return ["admin", "hr", "manager", "member"];
+    if (r === "admin") return ["hr", "manager", "member"];
+    if (r === "hr") return ["manager", "member"];
+    return [];
+  }, [userRole]);
+
+  // Form State
+  const [emailInput, setEmailInput] = React.useState("");
+  const [emailChips, setEmailChips] = React.useState<string[]>([]);
+  const [availabilityMap, setAvailabilityMap] = React.useState<EmailAvailabilityMap>({});
+  const [checkingAvailability, setCheckingAvailability] = React.useState(false);
+
+  const [selectedRole, setSelectedRole] = React.useState<AssignableRole>(
+    allowedRoles[0] || "member"
+  );
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = React.useState<string[]>([]);
+  const [isLead, setIsLead] = React.useState(false);
+  const [message, setMessage] = React.useState("");
+
+  // Submission & Results State
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errorNotice, setErrorNotice] = React.useState<string | null>(null);
+  const [results, setResults] = React.useState<InviteEmailResult[] | null>(null);
+  const [copiedLinkEmail, setCopiedLinkEmail] = React.useState<string | null>(null);
+
+  // Sync role when allowedRoles change
+  React.useEffect(() => {
+    if (!allowedRoles.includes(selectedRole) && allowedRoles.length > 0) {
+      setSelectedRole(allowedRoles[0]);
+    }
+  }, [allowedRoles, selectedRole]);
+
+  // Parse raw text into emails (supports comma, space, newline)
+  const addEmailsFromText = React.useCallback(
+    (text: string) => {
+      const rawTokens = text.split(/[\s,;]+/);
+      const newValidEmails: string[] = [];
+
+      for (const token of rawTokens) {
+        const clean = token.trim().toLowerCase();
+        if (clean && clean.includes("@") && !emailChips.includes(clean)) {
+          newValidEmails.push(clean);
+        }
+      }
+
+      if (newValidEmails.length > 0) {
+        const updated = Array.from(new Set([...emailChips, ...newValidEmails]));
+        setEmailChips(updated);
+        setEmailInput("");
+        checkAvailability(updated);
+      }
+    },
+    [emailChips]
+  );
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+      e.preventDefault();
+      if (emailInput.trim()) {
+        addEmailsFromText(emailInput);
+      }
+    } else if (e.key === "Backspace" && !emailInput && emailChips.length > 0) {
+      const updated = emailChips.slice(0, -1);
+      setEmailChips(updated);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text");
+    if (pasted) {
+      addEmailsFromText(pasted);
+    }
+  };
+
+  const removeChip = (emailToRemove: string) => {
+    const updated = emailChips.filter((e) => e !== emailToRemove);
+    setEmailChips(updated);
+  };
+
+  const checkAvailability = async (emailsToCheck: string[]) => {
+    if (emailsToCheck.length === 0) return;
+    setCheckingAvailability(true);
+    try {
+      const map = await checkEmailsAvailability(workspaceId, emailsToCheck);
+      setAvailabilityMap((prev) => ({ ...prev, ...map }));
+    } catch {}
+    setCheckingAvailability(false);
+  };
+
+  const handleDepartmentToggle = (deptId: string) => {
+    setSelectedDepartmentIds((prev) =>
+      prev.includes(deptId) ? prev.filter((id) => id !== deptId) : [...prev, deptId]
+    );
+  };
+
+  const isDepartmentRequired = selectedRole === "member" || selectedRole === "manager";
+  const hasSelectedDepartment = selectedDepartmentIds.length > 0;
+  const isFormValid =
+    emailChips.length > 0 &&
+    (!isDepartmentRequired || hasSelectedDepartment) &&
+    !isSubmitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFormValid) return;
+
+    setErrorNotice(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await inviteMembersBatchAction({
+        workspaceId,
+        emails: emailChips,
+        role: selectedRole,
+        departmentIds: selectedDepartmentIds,
+        isLead,
+        message: message.trim() || null,
+      });
+
+      if (!res.success && res.results.length === 0) {
+        setErrorNotice(res.error || "Failed to dispatch invitations.");
+      } else {
+        setResults(res.results);
+        router.refresh();
+        onSuccess?.();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorNotice(msg || "An unexpected error occurred.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyInviteUrl = (email: string, url?: string) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedLinkEmail(email);
+    setTimeout(() => setCopiedLinkEmail(null), 2500);
+  };
+
+  const handleResetAndClose = () => {
+    setEmailChips([]);
+    setEmailInput("");
+    setSelectedDepartmentIds([]);
+    setIsLead(false);
+    setMessage("");
+    setResults(null);
+    setErrorNotice(null);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
   return (
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Subtle backdrop overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-[#10251F]/15"
-          />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98, y: 8 }}
+          transition={{ duration: 0.16 }}
+          className="w-full max-w-2xl bg-[#FFFFFF] border border-[#E9E6DA] rounded-[12px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        >
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-[#E9E6DA] flex items-center justify-between bg-[#FAF9F5]">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-[8px] bg-[#111111] text-white flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </span>
+              <div>
+                <h2 className="text-[14px] font-semibold text-[#111111]">Invite people</h2>
+                <p className="text-[12px] text-[#6B6B6B]">
+                  Send invitations to teammates to join your workspace
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetAndClose}
+              className="w-7 h-7 rounded-[6px] text-[#6B6B6B] hover:text-[#111111] hover:bg-[#ECE9DD] flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-          <InvitePersonPanel
-            workspaceId={workspaceId}
-            departments={departments}
-            people={people}
-            onClose={onClose}
-            onSuccess={onSuccess}
-          />
-        </div>
-      )}
+          {/* Results Screen */}
+          {results ? (
+            <div className="p-6 space-y-5 overflow-y-auto">
+              <div className="p-4 rounded-[8px] bg-[#FAF9F5] border border-[#E9E6DA]">
+                <h3 className="text-[13px] font-semibold text-[#111111] mb-1">
+                  Invitation dispatch results
+                </h3>
+                <p className="text-[12px] text-[#6B6B6B]">
+                  {results.filter((r) => r.status === "Sent").length} of {results.length} invites
+                  dispatched successfully.
+                </p>
+              </div>
+
+              <div className="divide-y divide-[#E9E6DA] border border-[#E9E6DA] rounded-[8px] overflow-hidden">
+                {results.map((r) => {
+                  const isCopied = copiedLinkEmail === r.email;
+                  return (
+                    <div
+                      key={r.email}
+                      className="p-3.5 flex items-center justify-between gap-3 bg-white hover:bg-[#FAF9F5]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium text-[#111111] truncate">
+                            {r.email}
+                          </span>
+                          {r.status === "Sent" ? (
+                            <span className="px-2 py-0.5 rounded-[4px] bg-[#EAF4E2] text-[#246244] text-[11px] font-semibold">
+                              Sent
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-[4px] bg-[#FCE8E6] text-[#D93025] text-[11px] font-semibold">
+                              Failed
+                            </span>
+                          )}
+                        </div>
+                        {r.reason && (
+                          <p className="text-[11px] text-[#D93025] mt-0.5">{r.reason}</p>
+                        )}
+                      </div>
+
+                      {r.inviteUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyInviteUrl(r.email, r.inviteUrl)}
+                          className="h-7 px-2.5 rounded-[6px] border border-[#E9E6DA] bg-white text-[11px] font-medium text-[#111111] hover:bg-[#ECE9DD] transition-colors flex items-center gap-1.5 flex-shrink-0"
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check className="w-3 h-3 text-[#246244]" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-[#6B6B6B]" />
+                              Copy link
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetAndClose}
+                  className="h-9 px-4 rounded-[8px] bg-[#111111] text-white text-[12px] font-semibold hover:bg-[#222222] transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Main Form */
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {errorNotice && (
+                <div className="p-3 rounded-[8px] bg-[#FCE8E6] border border-[#F5C2C7] text-[#D93025] text-[12px] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{errorNotice}</span>
+                </div>
+              )}
+
+              {/* Multi-Email Chips Input */}
+              <div className="space-y-1.5">
+                <label className="block text-[12px] font-semibold text-[#111111]">
+                  Email addresses
+                </label>
+                <div className="min-h-[72px] p-2 rounded-[8px] border border-[#E9E6DA] bg-white focus-within:border-[#111111] transition-colors flex flex-wrap gap-1.5 items-center">
+                  {emailChips.map((email) => {
+                    const status = availabilityMap[email];
+                    const isMember = status?.isMember;
+                    const isPending = status?.isPending;
+
+                    return (
+                      <span
+                        key={email}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[12px] font-medium transition-colors border",
+                          isMember
+                            ? "bg-[#FCE8E6] border-[#F5C2C7] text-[#D93025]"
+                            : isPending
+                            ? "bg-[#FEF6E4] border-[#F8E3B6] text-[#B58500]"
+                            : "bg-[#FAF9F5] border-[#E9E6DA] text-[#111111]"
+                        )}
+                      >
+                        <span className="truncate max-w-[200px]">{email}</span>
+                        {isMember && (
+                          <span className="text-[10px] font-bold px-1 py-0.2 rounded bg-white text-[#D93025]">
+                            Already member
+                          </span>
+                        )}
+                        {isPending && !isMember && (
+                          <span className="text-[10px] font-bold px-1 py-0.2 rounded bg-white text-[#B58500]">
+                            Invite pending, resend?
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeChip(email)}
+                          className="hover:opacity-75 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <input
+                    type="text"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
+                    placeholder={
+                      emailChips.length === 0
+                        ? "Paste comma or newline separated emails..."
+                        : "Add another email..."
+                    }
+                    className="flex-1 min-w-[180px] border-none bg-transparent text-[12px] text-[#111111] placeholder:text-[#9A9A9A] focus:outline-none py-1 px-1"
+                  />
+                </div>
+                <p className="text-[11px] text-[#9A9A9A]">
+                  Paste multiple emails separated by comma or newlines. Press Enter to add.
+                </p>
+              </div>
+
+              {/* Role Select with Live Permissions Preview */}
+              <div className="space-y-2">
+                <label className="block text-[12px] font-semibold text-[#111111]">
+                  Role assignment
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {allowedRoles.map((r) => {
+                    const cfg = ROLE_CONFIGS[r];
+                    const isSelected = selectedRole === r;
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setSelectedRole(r)}
+                        className={cn(
+                          "p-3 rounded-[8px] border text-left transition-all",
+                          isSelected
+                            ? "bg-[#FAF9F5] border-[#111111] ring-1 ring-[#111111]"
+                            : "bg-white border-[#E9E6DA] hover:border-[#CCCCCC]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[12px] font-semibold text-[#111111]">{cfg.label}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#111111]" />}
+                        </div>
+                        <p className="text-[11px] text-[#6B6B6B] line-clamp-2 leading-relaxed">
+                          {cfg.summary}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Live Permission Matrix Capabilities Preview */}
+                <div className="p-3.5 rounded-[8px] bg-[#FAF9F5] border border-[#E9E6DA] space-y-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6B6B6B] uppercase tracking-wide">
+                    <Shield className="w-3 h-3 text-[#111111]" />
+                    <span>What {ROLE_CONFIGS[selectedRole].label} can & cannot do</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-[11px]">
+                    <div>
+                      <p className="font-semibold text-[#246244] mb-1">Allowed capabilities:</p>
+                      <ul className="space-y-1 text-[#333333]">
+                        {ROLE_CONFIGS[selectedRole].canDo.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-[#246244] font-bold">✓</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#6B6B6B] mb-1">Restrictions:</p>
+                      <ul className="space-y-1 text-[#6B6B6B]">
+                        {ROLE_CONFIGS[selectedRole].cannotDo.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-1.5">
+                            <span className="text-[#9A9A9A]">✕</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Department Multi-Select & Lead Toggle */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[12px] font-semibold text-[#111111]">
+                    Departments{" "}
+                    {isDepartmentRequired ? (
+                      <span className="text-[#D93025] font-normal">*required for {ROLE_CONFIGS[selectedRole].label}</span>
+                    ) : (
+                      <span className="text-[#9A9A9A] font-normal">(optional)</span>
+                    )}
+                  </label>
+                  {selectedDepartmentIds.length > 0 && (
+                    <label className="flex items-center gap-1.5 text-[12px] text-[#111111] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isLead}
+                        onChange={(e) => setIsLead(e.target.checked)}
+                        className="rounded-[4px] border-[#E9E6DA] text-[#111111] focus:ring-0"
+                      />
+                      <span>Department lead</span>
+                    </label>
+                  )}
+                </div>
+
+                {departments.length === 0 ? (
+                  <p className="text-[12px] text-[#9A9A9A] italic">No departments created yet.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                    {departments.map((dept) => {
+                      const isChecked = selectedDepartmentIds.includes(dept.id);
+                      return (
+                        <button
+                          key={dept.id}
+                          type="button"
+                          onClick={() => handleDepartmentToggle(dept.id)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-[6px] text-[12px] font-medium border transition-colors flex items-center gap-1.5",
+                            isChecked
+                              ? "bg-[#111111] text-white border-[#111111]"
+                              : "bg-white text-[#333333] border-[#E9E6DA] hover:bg-[#FAF9F5]"
+                          )}
+                        >
+                          <Building2 className="w-3 h-3" />
+                          <span>{dept.name}</span>
+                          {isChecked && <Check className="w-3 h-3" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Personal Message */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[12px] font-semibold text-[#111111]">
+                    Personal message <span className="text-[#9A9A9A] font-normal">(optional)</span>
+                  </label>
+                  <span className="text-[11px] text-[#9A9A9A] tabular-nums">
+                    {message.length} / 300
+                  </span>
+                </div>
+                <textarea
+                  rows={2}
+                  maxLength={300}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Welcome to the team! Looking forward to working together."
+                  className="w-full p-2.5 rounded-[8px] border border-[#E9E6DA] bg-white text-[12px] text-[#111111] placeholder:text-[#9A9A9A] focus:border-[#111111] focus:outline-none transition-colors"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#E9E6DA]">
+                <button
+                  type="button"
+                  onClick={handleResetAndClose}
+                  className="h-9 px-4 rounded-[8px] border border-[#E9E6DA] bg-white text-[12px] font-medium text-[#6B6B6B] hover:text-[#111111] hover:bg-[#FAF9F5] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isFormValid || isSubmitting}
+                  className="h-9 px-4 rounded-[8px] bg-[#111111] text-white text-[12px] font-semibold hover:bg-[#222222] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isSubmitting ? (
+                    "Sending invitations..."
+                  ) : (
+                    <>
+                      <span>Send {emailChips.length > 0 ? `${emailChips.length} ` : ""}invitation{emailChips.length > 1 ? "s" : ""}</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </motion.div>
+      </div>
     </AnimatePresence>
   );
 }

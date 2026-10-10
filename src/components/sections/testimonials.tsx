@@ -110,7 +110,7 @@ export function Testimonials() {
 
               {/* Quote */}
               <p className="text-[15px] sm:text-[16px] text-[#2D2D2C] leading-[1.65] font-medium mb-8">
-                "{t.quote}"
+                &ldquo;{t.quote}&rdquo;
               </p>
 
               {/* Author Row */}

@@ -21,9 +21,11 @@ export function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
   const [email] = React.useState(user?.email || "tashinkan360@gmail.com");
   const [saved, setSaved] = React.useState(false);
 
-  React.useEffect(() => {
+  const [prevUserFullName, setPrevUserFullName] = React.useState(user?.fullName);
+  if (user?.fullName !== prevUserFullName) {
+    setPrevUserFullName(user?.fullName);
     if (user?.fullName) setFullName(user.fullName);
-  }, [user]);
+  }
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();

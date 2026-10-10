@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { z } from "zod";
 import { uploadToR2, getR2PresignedUploadUrl } from "@/lib/storage/r2";
-import { requireWorkspaceRole, requireUser } from "@/lib/auth/require-user";
+import { requireWorkspaceRole } from "@/lib/auth/require-user";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+
+const PresignedUrlRequestSchema = z.object({
+  filename: z.string().min(1, "filename is required"),
+  fileType: z.string().optional(),
+  workspaceId: z.string().uuid("workspaceId must be a valid UUID"),
+  folder: z.string().default("general"),
+});
 
 const ALLOWED_TYPES: Record<string, { mimes: string[]; maxSize: number }> = {
   // Images (Max 5MB)
@@ -72,21 +80,22 @@ export async function POST(request: NextRequest) {
 
     // 2. JSON Request for Presigned Upload URL
     if (contentType.includes("application/json")) {
-      const body = await request.json();
-      const { filename, fileType, workspaceId, folder = "general" } = body;
+      const rawBody = await request.json();
+      const parseResult = PresignedUrlRequestSchema.safeParse(rawBody);
 
-      if (!workspaceId) {
-        return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
+      if (!parseResult.success) {
+        return NextResponse.json(
+          { error: "Validation failed", details: parseResult.error.flatten() },
+          { status: 400 }
+        );
       }
+
+      const { filename, fileType, workspaceId, folder } = parseResult.data;
 
       // Check authentication & workspace membership (Never trust client-sent workspaceId)
-      const isCandidateUpload = folder === "resumes";
+      const isCandidateUpload = folder === "resumes" || folder === "candidates";
       if (!isCandidateUpload) {
         await requireWorkspaceRole(workspaceId);
-      }
-
-      if (!filename) {
-        return NextResponse.json({ error: "filename is required" }, { status: 400 });
       }
 
       const { safeExt } = validateFilenameAndExtension(filename);
@@ -105,9 +114,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Format key strictly as workspaceId/uuid.ext to prevent guessability and collision
+      // Format key strictly as workspaceId/candidates/uuid.ext for candidates
       const fileUuid = crypto.randomUUID();
-      const key = `${workspaceId}/${fileUuid}.${safeExt}`;
+      const key = isCandidateUpload
+        ? `${workspaceId}/candidates/${fileUuid}.${safeExt}`
+        : `${workspaceId}/${fileUuid}.${safeExt}`;
 
       const presigned = await getR2PresignedUploadUrl(key, fileType || typeConfig.mimes[0]);
 
@@ -134,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Authenticate unless candidate resume submission
-    const isCandidateUpload = folder === "resumes";
+    const isCandidateUpload = folder === "resumes" || folder === "candidates";
     if (!isCandidateUpload) {
       await requireWorkspaceRole(workspaceId);
     }
@@ -148,12 +159,13 @@ export async function POST(request: NextRequest) {
     }
     const typeConfig = ALLOWED_TYPES[safeExt];
 
-    if (file.size > typeConfig.maxSize) {
+    const maxAllowedSize = isCandidateUpload ? 5 * 1024 * 1024 : typeConfig.maxSize;
+    if (file.size > maxAllowedSize) {
       return NextResponse.json(
         {
-          error: `File size (${Math.round(file.size / 1024 / 1024)}MB) exceeds maximum allowed limit (${Math.round(
-            typeConfig.maxSize / 1024 / 1024
-          )}MB) for .${safeExt}.`,
+          error: `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds maximum allowed limit (${Math.round(
+            maxAllowedSize / 1024 / 1024
+          )}MB) for ${isCandidateUpload ? "resume submissions" : `.${safeExt}`}.`,
         },
         { status: 400 }
       );
@@ -168,7 +180,9 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileUuid = crypto.randomUUID();
-    const key = `${workspaceId}/${fileUuid}.${safeExt}`;
+    const key = isCandidateUpload
+      ? `${workspaceId}/candidates/${fileUuid}.${safeExt}`
+      : `${workspaceId}/${fileUuid}.${safeExt}`;
 
     const uploadResult = await uploadToR2({
       key,
@@ -190,18 +204,19 @@ export async function POST(request: NextRequest) {
       size: file.size,
       type: file.type || typeConfig.mimes[0],
     });
-  } catch (error: any) {
-    console.error("[Upload API] Error:", error?.message);
-    const statusCode = error?.message?.includes("Forbidden")
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to upload file.";
+    console.error("[Upload API] Error:", message);
+    const statusCode = message.includes("Forbidden")
       ? 403
-      : error?.message?.includes("Unauthorized")
+      : message.includes("Unauthorized")
       ? 401
-      : error?.message?.includes("prohibited") || error?.message?.includes("extension")
+      : message.includes("prohibited") || message.includes("extension")
       ? 400
       : 500;
 
     return NextResponse.json(
-      { error: error?.message || "Failed to upload file." },
+      { error: message },
       { status: statusCode }
     );
   }

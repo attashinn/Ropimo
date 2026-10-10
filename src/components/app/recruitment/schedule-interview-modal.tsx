@@ -3,55 +3,105 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
-import { Candidate, CandidateApplication, InterviewType } from "@/types/recruitment";
+import { Candidate, CandidateApplication } from "@/types/recruitment";
 import { WorkspacePerson } from "@/types/people";
-import { scheduleInterviewAction } from "@/lib/recruitment/actions";
-import { PrimaryButton } from "@/components/ui/primary-button";
+import {
+  scheduleInterviewAction,
+  checkInterviewConflictsAction,
+} from "@/lib/recruitment/actions";
+import { X, Calendar, Clock, AlertTriangle, Video, Phone, MapPin, Users, Globe } from "lucide-react";
+import { toast } from "sonner";
 
 export interface ScheduleInterviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   workspaceId: string;
-  candidate: Candidate;
-  application: CandidateApplication;
+  candidate?: Candidate | null;
+  candidates?: Candidate[];
+  application?: CandidateApplication;
   teamMembers: WorkspacePerson[];
   onSuccess?: () => void;
 }
 
-const INTERVIEW_TYPES: InterviewType[] = [
-  "Phone Screen",
-  "Video Interview",
-  "Technical Interview",
-  "HR Interview",
-  "Final Interview",
-  "Other",
-];
+const INTERVIEW_TYPES = [
+  { value: "phone", label: "Phone Screen", icon: Phone },
+  { value: "video", label: "Video Call (Google Meet / Zoom)", icon: Video },
+  { value: "onsite", label: "Onsite Interview", icon: MapPin },
+] as const;
 
 export function ScheduleInterviewModal({
   isOpen,
   onClose,
   workspaceId,
-  candidate,
+  candidate: initialCandidate,
+  candidates = [],
   application,
   teamMembers,
   onSuccess,
 }: ScheduleInterviewModalProps) {
   const router = useRouter();
 
+  const [selectedCandidateId, setSelectedCandidateId] = React.useState<string>(
+    initialCandidate?.id || candidates[0]?.id || ""
+  );
   const [roundName, setRoundName] = React.useState("Round 1 — Initial Screen");
-  const [interviewType, setInterviewType] = React.useState<InterviewType>("Video Interview");
+  const [interviewType, setInterviewType] = React.useState<"phone" | "video" | "onsite">("video");
   const [selectedInterviewerIds, setSelectedInterviewerIds] = React.useState<string[]>(
     teamMembers[0]?.user_id ? [teamMembers[0].user_id] : []
   );
+
+  // Time and Timezone
   const [scheduledAt, setScheduledAt] = React.useState("");
+  const [timezone, setTimezone] = React.useState("Asia/Dhaka");
+  const [candidateTimezone, setCandidateTimezone] = React.useState("Asia/Dhaka");
   const [durationMinutes, setDurationMinutes] = React.useState(45);
+
   const [meetingUrl, setMeetingUrl] = React.useState("https://meet.google.com/");
   const [location, setLocation] = React.useState("");
   const [notes, setNotes] = React.useState("");
+
+  // Conflict warning state
+  const [conflictWarning, setConflictWarning] = React.useState<string | null>(null);
+  const [checkingConflict, setCheckingConflict] = React.useState(false);
+
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  const isValid = roundName.trim().length > 1 && Boolean(scheduledAt);
+  const activeCandidate = initialCandidate || candidates.find((c) => c.id === selectedCandidateId);
+
+  // Check for interviewer schedule conflicts
+  React.useEffect(() => {
+    async function checkConflict() {
+      if (!scheduledAt || selectedInterviewerIds.length === 0) {
+        setConflictWarning(null);
+        return;
+      }
+
+      setCheckingConflict(true);
+      try {
+        const res = await checkInterviewConflictsAction({
+          workspaceId,
+          interviewerIds: selectedInterviewerIds,
+          scheduledAt,
+          durationMinutes,
+        });
+
+        if (res.hasConflict && res.conflicts.length > 0) {
+          const names = res.conflicts.map((c) => c.title).join(", ");
+          setConflictWarning(`Conflict detected: Interviewer already has an event: ${names}`);
+        } else {
+          setConflictWarning(null);
+        }
+      } catch {
+        // Ignored
+      } finally {
+        setCheckingConflict(false);
+      }
+    }
+
+    const timer = setTimeout(checkConflict, 400);
+    return () => clearTimeout(timer);
+  }, [workspaceId, scheduledAt, durationMinutes, selectedInterviewerIds]);
 
   const handleInterviewerToggle = (userId: string) => {
     if (selectedInterviewerIds.includes(userId)) {
@@ -65,29 +115,30 @@ export function ScheduleInterviewModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || loading) return;
+    if (!activeCandidate || !scheduledAt || loading) return;
 
     setLoading(true);
     setErrorMsg(null);
 
     const interviewerNames = selectedInterviewerIds.map(
-      (id) => teamMembers.find((m) => m.user_id === id)?.full_name || "Recruiter"
+      (id) => teamMembers.find((m) => m.user_id === id)?.full_name || "Interviewer"
     );
 
     try {
       const res = await scheduleInterviewAction({
         workspaceId,
-        applicationId: application.id,
-        candidateId: candidate.id,
-        jobOpeningId: application.job_opening_id,
+        candidateId: activeCandidate.id,
+        applicationId: application?.id,
         roundName: roundName.trim(),
         interviewType,
         interviewerIds: selectedInterviewerIds,
         interviewerNames,
         scheduledAt,
+        timezone,
+        candidateTimezone,
         durationMinutes,
-        meetingUrl: meetingUrl.trim() || undefined,
-        location: location.trim() || undefined,
+        meetingUrl: interviewType === "video" ? meetingUrl.trim() : undefined,
+        location: interviewType === "onsite" ? location.trim() : undefined,
         notes: notes.trim() || undefined,
       });
 
@@ -97,6 +148,7 @@ export function ScheduleInterviewModal({
         return;
       }
 
+      toast.success("Interview scheduled! Invitation & .ics calendar file sent via Resend.");
       setLoading(false);
       onClose();
       router.refresh();
@@ -123,22 +175,21 @@ export function ScheduleInterviewModal({
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
-            className="relative w-full max-w-lg rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-xl text-[#18221E] space-y-4 max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-xl rounded-[16px] border border-[#D8DDD4] bg-white p-6 shadow-xl text-[#18221E] space-y-4 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-[#D8DDD4]/60 pb-3">
               <div>
                 <h2 className="text-base font-bold text-[#18221E]">Schedule Interview</h2>
                 <p className="text-xs text-[#65706A]">
-                  Candidate: <span className="font-semibold text-[#18221E]">{candidate.full_name}</span> •{" "}
-                  Position: <span className="font-semibold text-[#18221E]">{candidate.latest_job_title || "Role"}</span>
+                  Default timezone: <span className="font-semibold text-[#18221E]">Asia/Dhaka</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded text-[#65706A] hover:text-[#18221E]"
+                className="p-1 rounded-[6px] text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -148,7 +199,33 @@ export function ScheduleInterviewModal({
               </div>
             )}
 
+            {conflictWarning && (
+              <div className="flex items-center gap-2 rounded-[8px] border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>{conflictWarning}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {/* Candidate Selection (if scheduling from tab) */}
+              {!initialCandidate && candidates.length > 0 && (
+                <div>
+                  <label className="mb-1 block font-semibold text-[#18221E]">Select Candidate *</label>
+                  <select
+                    value={selectedCandidateId}
+                    onChange={(e) => setSelectedCandidateId(e.target.value)}
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    required
+                  >
+                    {candidates.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name} ({c.email}) — {c.latest_job_title || "Candidate"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Round Name & Type */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -158,8 +235,8 @@ export function ScheduleInterviewModal({
                     required
                     value={roundName}
                     onChange={(e) => setRoundName(e.target.value)}
-                    placeholder="e.g. Technical Interview"
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    placeholder="e.g. Technical System Design"
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
                   />
                 </div>
 
@@ -167,53 +244,81 @@ export function ScheduleInterviewModal({
                   <label className="mb-1 block font-semibold text-[#18221E]">Interview Type *</label>
                   <select
                     value={interviewType}
-                    onChange={(e) => setInterviewType(e.target.value as InterviewType)}
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    onChange={(e) => setInterviewType(e.target.value as any)}
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
                   >
                     {INTERVIEW_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                      <option key={t.value} value={t.value}>
+                        {t.label}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Date, Time & Duration */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block font-semibold text-[#18221E]">Date & Time *</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
-                  />
+              {/* Date, Time & Timezones */}
+              <div className="rounded-[10px] border border-[#D8DDD4] bg-[#FAF9F5] p-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block font-semibold text-[#18221E]">Date & Time *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-semibold text-[#18221E]">Duration *</label>
+                    <select
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                      className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    >
+                      <option value={15}>15 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={45}>45 minutes</option>
+                      <option value={60}>60 minutes</option>
+                      <option value={90}>90 minutes</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block font-semibold text-[#18221E]">Duration (Minutes) *</label>
-                  <select
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
-                  >
-                    <option value={15}>15 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes (1 hour)</option>
-                    <option value={90}>90 minutes</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#D8DDD4]/60">
+                  <div>
+                    <label className="mb-1 block font-medium text-[#65706A]">
+                      Company Timezone (Default: Asia/Dhaka)
+                    </label>
+                    <input
+                      type="text"
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1.5 text-xs text-[#18221E] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-medium text-[#65706A]">
+                      Candidate Timezone
+                    </label>
+                    <input
+                      type="text"
+                      value={candidateTimezone}
+                      onChange={(e) => setCandidateTimezone(e.target.value)}
+                      className="w-full rounded-[6px] border border-[#D8DDD4] bg-white px-2.5 py-1.5 text-xs text-[#18221E] focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Interviewer(s) Multi-Select */}
+              {/* Interviewers Multi-Select */}
               <div>
-                <label className="mb-1 block font-semibold text-[#18221E]">
-                  Interviewer(s) (Workspace Members) *
+                <label className="mb-1.5 block font-semibold text-[#18221E]">
+                  Assign Interviewers *
                 </label>
-                <div className="flex flex-wrap gap-1.5 p-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] max-h-32 overflow-y-auto">
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 rounded-[8px] border border-[#D8DDD4] bg-white">
                   {teamMembers.map((m) => {
                     const isSelected = selectedInterviewerIds.includes(m.user_id);
                     return (
@@ -221,74 +326,75 @@ export function ScheduleInterviewModal({
                         key={m.user_id}
                         type="button"
                         onClick={() => handleInterviewerToggle(m.user_id)}
-                        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all ${
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border transition-all ${
                           isSelected
-                            ? "bg-[#10251F] text-white shadow-2xs"
-                            : "border border-[#D8DDD4] bg-white text-[#65706A] hover:bg-[#FAF9F5]"
+                            ? "bg-[#10251F] text-white border-[#10251F]"
+                            : "bg-[#FAF9F5] text-[#18221E] border-[#D8DDD4] hover:bg-white"
                         }`}
                       >
-                        <span>{isSelected ? "✓" : "+"}</span>
-                        <span>{m.full_name}</span>
-                        <span className="text-[10px] opacity-70">({m.role})</span>
+                        {m.full_name} {isSelected && "✓"}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Meeting Link & Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Meeting Link or Location */}
+              {interviewType === "video" && (
                 <div>
-                  <label className="mb-1 block font-semibold text-[#18221E]">Meeting Link / URL</label>
+                  <label className="mb-1 block font-semibold text-[#18221E]">Meeting URL</label>
                   <input
                     type="url"
                     value={meetingUrl}
                     onChange={(e) => setMeetingUrl(e.target.value)}
                     placeholder="https://meet.google.com/..."
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
                   />
                 </div>
+              )}
 
+              {interviewType === "onsite" && (
                 <div>
-                  <label className="mb-1 block font-semibold text-[#18221E]">Location / Room</label>
+                  <label className="mb-1 block font-semibold text-[#18221E]">Office Location</label>
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Conference Room A / Remote"
-                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                    placeholder="e.g. Floor 4, Meeting Room B"
+                    className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
                   />
                 </div>
-              </div>
+              )}
 
               {/* Notes */}
               <div>
-                <label className="mb-1 block font-semibold text-[#18221E]">Internal Notes / Instructions</label>
+                <label className="mb-1 block font-semibold text-[#18221E]">Preparation Notes</label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Topics to evaluate, resume notes, or questions..."
-                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-2 text-xs focus:border-[#10251F] focus:outline-none"
+                  placeholder="Notes for interviewers and candidate..."
+                  className="w-full rounded-[8px] border border-[#D8DDD4] bg-white p-2 text-xs focus:border-[#10251F] focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D8DDD4]/60">
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#D8DDD4]/60">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="rounded-[8px] border border-[#D8DDD4] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5]"
+                  className="rounded-[8px] border border-[#D8DDD4] bg-white px-3.5 py-2 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] disabled:opacity-50"
                 >
                   Cancel
                 </button>
-                <PrimaryButton
+                <button
                   type="submit"
-                  disabled={!isValid || loading}
-                  className="rounded-[8px] px-4 py-1.5 text-xs"
+                  disabled={loading || !scheduledAt}
+                  className="rounded-[8px] bg-[#10251F] px-4 py-2 text-xs font-bold text-white hover:bg-[#18342C] disabled:opacity-50 transition-colors shadow-2xs"
                 >
-                  {loading ? "Scheduling..." : "Schedule Interview"}
-                </PrimaryButton>
+                  {loading ? "Scheduling..." : "Schedule & Send .ICS"}
+                </button>
               </div>
             </form>
           </motion.div>

@@ -86,17 +86,17 @@ export function DocumentsView({
   departments,
 }: DocumentsViewProps) {
   const router = useRouter();
+  const [prevInitialDocs, setPrevInitialDocs] = React.useState(initialDocuments);
   const [documents, setDocuments] = React.useState<DocumentItem[]>(initialDocuments);
-  React.useEffect(() => {
+  if (initialDocuments !== prevInitialDocs) {
+    setPrevInitialDocs(initialDocuments);
     setDocuments((prev) => {
       const map = new Map<string, DocumentItem>();
-      // Keep existing client documents (including newly uploaded)
       prev.forEach((d) => map.set(d.id, d));
-      // Merge in incoming server documents
       initialDocuments.forEach((d) => map.set(d.id, d));
       return Array.from(map.values());
     });
-  }, [initialDocuments]);
+  }
 
   // View & Filtering State
   const [viewMode, setViewMode] = React.useState<"list" | "grid">("list");
@@ -445,7 +445,7 @@ export function DocumentsView({
               {/* Category Filter */}
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value as any)}
+                onChange={(e) => setSelectedCategory(e.target.value as "all" | DocumentCategory)}
                 className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
               >
                 <option value="all">All Categories</option>
@@ -462,7 +462,7 @@ export function DocumentsView({
               {/* Status Filter */}
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value as any)}
+                onChange={(e) => setSelectedStatus(e.target.value as "all" | DocumentStatus)}
                 className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
               >
                 <option value="all">All Statuses</option>
@@ -2059,7 +2059,7 @@ function DeleteDocConfirmDialog({
       >
         <h4 className="text-sm font-bold text-[#18221E]">Delete Document</h4>
         <p className="text-xs text-[#65706A] leading-relaxed">
-          Are you sure you want to delete <span className="font-bold text-[#18221E]">"{document.title}"</span>?
+          Are you sure you want to delete <span className="font-bold text-[#18221E]">&quot;{document.title}&quot;</span>?
           This document will be moved to the recycle bin.
         </p>
 

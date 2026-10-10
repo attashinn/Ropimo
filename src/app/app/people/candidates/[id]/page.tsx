@@ -11,7 +11,7 @@ export const metadata = {
 };
 
 export default async function CandidateDetailPage(props: {
-  params: Promise<{ candidateId: string }>;
+  params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
   const workspace = await getDefaultWorkspace();
@@ -21,12 +21,15 @@ export default async function CandidateDetailPage(props: {
     notFound();
   }
 
-  const [{ candidate, applications, interviews, offers, activities }, departments, teamMembers] =
-    await Promise.all([
-      getCandidateById(params.candidateId, workspaceId),
-      getWorkspaceDepartments(workspaceId),
-      getWorkspacePeople(workspaceId),
-    ]);
+  const [
+    { candidate, applications, interviews, offers, activities, events, notes, feedbacks },
+    departments,
+    teamMembers,
+  ] = await Promise.all([
+    getCandidateById(params.id, workspaceId),
+    getWorkspaceDepartments(workspaceId),
+    getWorkspacePeople(workspaceId),
+  ]);
 
   if (!candidate) {
     notFound();
@@ -42,6 +45,9 @@ export default async function CandidateDetailPage(props: {
       interviews={interviews}
       offers={offers}
       activities={activities}
+      events={events}
+      notes={notes}
+      feedbacks={feedbacks}
       departments={departments}
       teamMembers={teamMembers}
     />

@@ -42,10 +42,10 @@ export function CreateOfferModal({
   const [salary, setSalary] = React.useState("$150,000");
   const [salaryCurrency, setSalaryCurrency] = React.useState("USD");
   const [startDate, setStartDate] = React.useState(
-    new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0]
+    () => new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0]
   );
   const [expirationDate, setExpirationDate] = React.useState(
-    new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]
+    () => new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]
   );
   const [offerNotes, setOfferNotes] = React.useState("");
   const [loading, setLoading] = React.useState(false);

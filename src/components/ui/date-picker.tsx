@@ -101,17 +101,17 @@ export function DatePicker({
   });
 
   // Sync view date on open
-  React.useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = React.useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       if (activeInput === "start" && selectedStartDate) {
         setViewDate(new Date(selectedStartDate));
       } else if (selectedDueDate) {
         setViewDate(new Date(selectedDueDate));
-      } else {
-        setViewDate(new Date());
       }
     }
-  }, [isOpen, activeInput, selectedStartDate, selectedDueDate]);
+  }
 
   // Click outside listener
   React.useEffect(() => {

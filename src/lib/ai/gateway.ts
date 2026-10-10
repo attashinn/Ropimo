@@ -33,9 +33,9 @@ export interface AgentAction {
   type: "create_task" | "create_project" | "draft_job" | "draft_policy";
   title: string;
   description: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   executed?: boolean;
-  result?: any;
+  result?: unknown;
 }
 
 export const SUPPORTED_MODELS = [
@@ -324,11 +324,12 @@ export async function queryAIGateway(params: {
       actions,
       modelUsed: model,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Cloudflare AI request error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to communicate with Cloudflare Workers AI.";
     return {
       success: false,
-      error: error.message || "Failed to communicate with Cloudflare Workers AI.",
+      error: errorMessage,
     };
   }
 }

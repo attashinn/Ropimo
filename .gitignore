@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (secrets and local overrides)
 .env
+.env*
 .env*.local
 .env.local
 .env.development.local
@@ -54,6 +55,7 @@ next-env.d.ts
 
 # scratch directory
 scratch/
+dashboard-reference/
 
 # supabase cli temp
 supabase/.temp/

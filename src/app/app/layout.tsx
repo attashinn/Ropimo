@@ -56,6 +56,31 @@ export default async function ProtectedAppLayout({
     getUserWorkspaces(),
   ]);
 
+  if (userCtx?.isDeactivated) {
+    return (
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-6 text-ink">
+        <div className="w-full max-w-md bg-surface border border-hairline rounded-[12px] p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#D93025]" />
+            <h1 className="text-[14px] font-semibold text-ink">Access suspended</h1>
+          </div>
+          <p className="text-[13px] text-secondary leading-relaxed">
+            Your access to <strong className="font-medium text-ink">{workspace.name}</strong> has been deactivated by a workspace administrator. You cannot access workspaces or content while deactivated.
+          </p>
+          <div className="pt-2 flex items-center justify-between border-t border-hairline">
+            <a
+              href="/login"
+              className="inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium text-white bg-[#111] rounded-[8px] hover:bg-[#222] transition-colors"
+            >
+              Sign out
+            </a>
+            <span className="text-[12px] text-tertiary">Contact workspace owner for support</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const userData = {
     email: user.email,
     fullName: (user.user_metadata?.full_name as string) || null,

@@ -74,8 +74,8 @@ export function CustomSelect({
 
   React.useEffect(() => {
     if (isOpen && searchable) {
-      setSearchQuery("");
       setTimeout(() => {
+        setSearchQuery("");
         searchInputRef.current?.focus();
       }, 50);
     }

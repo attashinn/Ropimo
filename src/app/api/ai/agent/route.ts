@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { queryAIGateway, WorkspaceContextData, AgentAction } from "@/lib/ai/gateway";
+import { queryAIGateway, WorkspaceContextData } from "@/lib/ai/gateway";
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { createProjectAction } from "@/lib/project/actions";
 import { createTaskAction } from "@/lib/task/actions";
+import { WorkspacePerson } from "@/types/people";
+import { TaskPriority } from "@/types/task";
+import { can } from "@/lib/permissions";
+import { getUserPermissionContext } from "@/lib/permissions-server";
+
+const AgentRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string(),
+      })
+    )
+    .min(1, "Messages array is required."),
+  model: z.string().optional(),
+  workspaceId: z.string().uuid().optional(),
+  autoExecute: z.boolean().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -18,13 +37,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { messages, model, workspaceId, autoExecute } = body;
+    const rawBody = await request.json();
+    const parseResult = AgentRequestSchema.safeParse(rawBody);
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: "Messages array is required." },
+        { error: "Validation failed", details: parseResult.error.flatten() },
         { status: 400 }
+      );
+    }
+
+    const { messages, model, workspaceId, autoExecute } = parseResult.data;
+
+    // Verify acting user permission context
+    const actingUser = workspaceId
+      ? await getUserPermissionContext(workspaceId, user.id)
+      : null;
+
+    if (workspaceId && (!actingUser || actingUser.isDeactivated)) {
+      return NextResponse.json(
+        { error: "Forbidden: You are not an active member of this workspace." },
+        { status: 403 }
       );
     }
 
@@ -35,7 +68,7 @@ export async function POST(request: Request) {
         (user.email ? user.email.split("@")[0] : "Team Member"),
     };
 
-    let people: any[] = [];
+    let people: WorkspacePerson[] = [];
 
     if (workspaceId) {
       const [wsRes, projRes, taskRes, deptRes, peopleRes] = await Promise.all([
@@ -114,6 +147,12 @@ export async function POST(request: Request) {
       for (const action of gatewayResult.actions) {
         try {
           if (action.type === "create_project") {
+            if (!can(actingUser, "projects:manage", { workspaceId, departmentId: action.payload.departmentId })) {
+              action.executed = false;
+              action.error = `Permission denied: As a ${actingUser?.role || "member"}, you cannot create projects in this department.`;
+              continue;
+            }
+
             const projName = action.payload.title || action.payload.name || action.title;
             const projDesc = action.payload.description || action.description;
             const pRes = await createProjectAction({
@@ -129,6 +168,13 @@ export async function POST(request: Request) {
               action.result = pRes.project;
             }
           } else if (action.type === "create_task") {
+            const targetProjId = createdProjectId || action.payload.projectId;
+            if (!can(actingUser, "tasks:create", { workspaceId, projectId: targetProjId })) {
+              action.executed = false;
+              action.error = `Permission denied: As a ${actingUser?.role || "member"}, you cannot create tasks in this project.`;
+              continue;
+            }
+
             const taskTitle = action.payload.title || action.title;
             const taskDesc = action.payload.description || action.description;
             const taskPriority = action.payload.priority || "medium";
@@ -165,10 +211,10 @@ export async function POST(request: Request) {
 
             const tRes = await createTaskAction({
               workspaceId,
-              projectId: createdProjectId || action.payload.projectId,
+              projectId: targetProjId,
               title: taskTitle,
               description: taskDesc,
-              priority: (taskPriority as any) || "medium",
+              priority: (taskPriority as TaskPriority) || "medium",
               status: "todo",
               assigneeIds,
             });
@@ -208,10 +254,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(gatewayResult);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error.";
     console.error("Agent API error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error." },
+      { success: false, error: message },
       { status: 500 }
     );
   }

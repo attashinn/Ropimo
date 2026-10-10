@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -7,6 +8,9 @@ import {
   InvitePersonInput,
   AssignDepartmentInput,
   WorkspaceRole,
+  WorkspaceInvitation,
+  EmployeeOnboarding,
+  OnboardingChecklistItem,
 } from "@/types/people";
 import { revalidatePath } from "next/cache";
 import { getAppUrl } from "@/lib/utils";
@@ -14,15 +18,110 @@ import { getAppUrl } from "@/lib/utils";
 export interface PeopleActionResult {
   success: boolean;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
+
+const UpdatePersonSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  targetUserId: z.string().min(1, "Target user ID is required."),
+  fullName: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  jobTitle: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  employeeId: z.string().optional().nullable(),
+  employmentType: z.string().optional(),
+  employmentStatus: z.string().optional(),
+  onboardingStatus: z.string().optional(),
+  hireDate: z.string().optional().nullable(),
+  managerId: z.string().optional().nullable(),
+  bio: z.string().optional().nullable(),
+  skills: z.array(z.string()).optional(),
+  linkedinUrl: z.string().optional().nullable(),
+  websiteUrl: z.string().optional().nullable(),
+  emergencyContactName: z.string().optional().nullable(),
+  emergencyContactPhone: z.string().optional().nullable(),
+  interests: z.array(z.string()).optional(),
+  role: z.enum(["owner", "admin", "hr", "manager", "member", "guest"]).optional(),
+  departmentIds: z.array(z.string()).optional(),
+});
+
+const InvitePersonSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  email: z.string().email("A valid email address is required."),
+  fullName: z.string().min(1, "Full name is required."),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  departmentId: z.string().optional(),
+  employmentType: z.string().optional(),
+  employmentStatus: z.string().optional(),
+  managerId: z.string().optional(),
+  startDate: z.string().optional(),
+  role: z.enum(["owner", "admin", "hr", "manager", "member", "guest"]).optional(),
+});
+
+const RemovePersonFromDeptSchema = z.object({
+  departmentId: z.string().min(1, "Department ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+});
+
+const AssignDepartmentSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  departmentId: z.string().optional().nullable(),
+  jobTitle: z.string().optional().nullable(),
+});
+
+const UpdateMemberRoleSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  targetUserId: z.string().min(1, "Target user ID is required."),
+  newRole: z.enum(["owner", "admin", "hr", "manager", "member", "guest"]),
+});
+
+const RemoveMemberSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  targetUserId: z.string().min(1, "Target user ID is required."),
+});
+
+const CompleteOnboardingSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  token: z.string().min(1, "Token is required."),
+  fullName: z.string().min(1, "Full name is required."),
+  password: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  bio: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  cvUrl: z.string().optional(),
+  cvFileName: z.string().optional(),
+});
+
+const ApproveOnboardingSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  departmentId: z.string().optional(),
+  role: z.enum(["owner", "admin", "hr", "manager", "member", "guest"]).optional(),
+  jobTitle: z.string().optional(),
+});
+
+const RejectOnboardingSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  reason: z.string().optional(),
+});
 
 /**
  * Edit an employee's profile and sync departments and user metadata
  */
 export async function updatePersonDetailsAction(
-  input: UpdatePersonInput
+  rawInput: UpdatePersonInput
 ): Promise<PeopleActionResult> {
+  const parsed = UpdatePersonSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const {
     workspaceId,
     targetUserId,
@@ -266,18 +365,20 @@ export async function toggleMemberStatusAction(
  * Invite a person to the workspace with full employee metadata
  */
 export async function invitePersonAction(
-  input: InvitePersonInput
+  rawInput: InvitePersonInput
 ): Promise<PeopleActionResult> {
+  const parsed = InvitePersonSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const {
     workspaceId,
     email,
     fullName,
-    phone,
     jobTitle,
     departmentId,
     employmentType = "Full-time",
-    employmentStatus = "Active",
-    startDate,
     role = "member",
   } = input;
 
@@ -326,8 +427,7 @@ export async function invitePersonAction(
     fullName: trimmedName,
     role,
     jobTitle: jobTitle?.trim() || undefined,
-    departmentId: departmentId || undefined,
-    employmentType,
+    employmentType: (employmentType as any) || undefined,
   });
 
   if (!inviteResult.success && inviteResult.error) {
@@ -353,6 +453,11 @@ export async function removePersonFromDepartmentAction(
   workspaceId: string,
   userId: string
 ): Promise<PeopleActionResult> {
+  const parsed = RemovePersonFromDeptSchema.safeParse({ departmentId, workspaceId, userId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+
   const authClient = await createClient();
   const {
     data: { user },
@@ -403,8 +508,13 @@ export async function removePersonFromDepartmentAction(
  * Assign a person to a department
  */
 export async function assignPersonToDepartmentAction(
-  input: AssignDepartmentInput
+  rawInput: AssignDepartmentInput
 ): Promise<PeopleActionResult> {
+  const parsed = AssignDepartmentSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { workspaceId, departmentId, userId, jobTitle } = input;
 
   const authClient = await createClient();
@@ -425,6 +535,13 @@ export async function assignPersonToDepartmentAction(
     .eq("workspace_id", workspaceId)
     .eq("user_id", user.id)
     .maybeSingle();
+
+  if (!callerMember || !["owner", "admin"].includes(callerMember.role)) {
+    return {
+      success: false,
+      error: "Only workspace owners and admins can manage department memberships.",
+    };
+  }
 
   await adminClient
     .from("department_members")
@@ -458,7 +575,7 @@ export async function assignPersonToDepartmentAction(
 /**
  * Submit employee onboarding application with profile, photo, CV, and password
  */
-export async function submitEmployeeOnboardingAction(input: {
+export async function submitEmployeeOnboardingAction(rawInput: {
   workspaceId: string;
   token: string;
   fullName: string;
@@ -470,6 +587,11 @@ export async function submitEmployeeOnboardingAction(input: {
   cvFileName?: string;
   password?: string;
 }): Promise<PeopleActionResult> {
+  const parsed = CompleteOnboardingSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { workspaceId, token, fullName, phone, address, bio, avatarUrl, cvUrl, cvFileName, password } = input;
 
   const { getInvitationByToken } = await import("@/lib/invitations/queries");
@@ -599,61 +721,61 @@ export async function submitEmployeeOnboardingAction(input: {
     }
   } catch {}
 
-  const updatedInv = {
+  const updatedInv: WorkspaceInvitation = {
     ...invitation,
-    status: "Accepted" as any,
+    status: "accepted",
     accepted_at: new Date().toISOString(),
   };
-  (recruitmentStore as any).saveInvitation?.(updatedInv);
+  recruitmentStore.saveInvitation(updatedInv);
 
   // 5. Complete recruitment onboarding record
-  const completedChecklist = [
+  const completedChecklist: OnboardingChecklistItem[] = [
     {
       id: `chk-1-${authUser.id}`,
       title: "Accept Workspace Invitation",
       description: "Invitation confirmed and account profile created.",
-      category: "profile",
+      section: "profile",
       required: true,
-      status: "completed",
+      completed: true,
       completed_at: new Date().toISOString(),
     },
     {
       id: `chk-2-${authUser.id}`,
       title: "Complete Profile & Contact Information",
       description: `Phone: ${phone || "Provided"}, Address: ${address || "Provided"}`,
-      category: "profile",
+      section: "profile",
       required: true,
-      status: "completed",
+      completed: true,
       completed_at: new Date().toISOString(),
     },
     {
       id: `chk-3-${authUser.id}`,
       title: "Upload Profile Photo",
       description: avatarUrl ? "Profile photo uploaded." : "Default avatar used.",
-      category: "profile",
+      section: "profile",
       required: false,
-      status: avatarUrl ? "completed" : "pending",
+      completed: Boolean(avatarUrl),
       completed_at: avatarUrl ? new Date().toISOString() : undefined,
     },
     {
       id: `chk-4-${authUser.id}`,
       title: "Upload Resume / CV Document",
       description: cvFileName ? `Uploaded file: ${cvFileName}` : "Profile setup complete.",
-      category: "documents",
+      section: "documents",
       required: false,
-      status: cvUrl ? "completed" : "pending",
+      completed: Boolean(cvUrl),
       completed_at: cvUrl ? new Date().toISOString() : undefined,
     },
   ];
 
-  const onboardingObj = {
+  const onboardingObj: EmployeeOnboarding = {
     id: `onb-${authUser.id}`,
     workspace_id: workspaceId,
     user_id: authUser.id,
     employee_id: employeeId,
-    status: "Completed" as const,
+    status: "Completed",
     progress_percentage: 100,
-    checklist: completedChecklist as any,
+    checklist: completedChecklist,
     started_at: new Date().toISOString(),
     completed_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
@@ -727,13 +849,18 @@ export async function submitEmployeeOnboardingAction(input: {
 /**
  * Approve employee onboarding and activate their workspace access
  */
-export async function approveEmployeeOnboardingAction(input: {
+export async function approveEmployeeOnboardingAction(rawInput: {
   workspaceId: string;
   userId: string;
   departmentId?: string;
   role?: WorkspaceRole;
   jobTitle?: string;
 }): Promise<PeopleActionResult> {
+  const parsed = ApproveOnboardingSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { workspaceId, userId, departmentId, role = "member", jobTitle } = input;
 
   const authClient = await createClient();
@@ -807,7 +934,7 @@ export async function approveEmployeeOnboardingAction(input: {
     onboarding.completed_at = new Date().toISOString();
     onboarding.checklist = (onboarding.checklist || []).map((c) => ({
       ...c,
-      status: "completed",
+      completed: true,
       completed_at: c.completed_at || new Date().toISOString(),
     }));
     recruitmentStore.saveOnboarding(onboarding);
@@ -849,11 +976,16 @@ export async function approveEmployeeOnboardingAction(input: {
 /**
  * Reject employee onboarding application
  */
-export async function rejectEmployeeOnboardingAction(input: {
+export async function rejectEmployeeOnboardingAction(rawInput: {
   workspaceId: string;
   userId: string;
   reason?: string;
 }): Promise<PeopleActionResult> {
+  const parsed = RejectOnboardingSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { workspaceId, userId } = input;
 
   const authClient = await createClient();
@@ -874,3 +1006,401 @@ export async function rejectEmployeeOnboardingAction(input: {
 
   return { success: true };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM ROW MENU ACTIONS: Role, Depts, Dept Lead, Deactivate, Remove (Req 6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get count of open tasks assigned to a member before deactivating/removing
+ */
+export async function getMemberOpenTasksAction(
+  workspaceId: string,
+  targetUserId: string
+): Promise<{ success: boolean; count: number; tasks: { id: string; title: string }[] }> {
+  try {
+    const adminClient = createAdminClient();
+    const { data: tasks, error } = await adminClient
+      .from("tasks")
+      .select("id, title")
+      .eq("workspace_id", workspaceId)
+      .eq("assignee_id", targetUserId)
+      .neq("status", "done")
+      .limit(50);
+
+    if (error) {
+      return { success: false, count: 0, tasks: [] };
+    }
+
+    return {
+      success: true,
+      count: tasks?.length || 0,
+      tasks: tasks || [],
+    };
+  } catch (err) {
+    return { success: false, count: 0, tasks: [] };
+  }
+}
+
+/**
+ * Change member role with safety validations & audit log
+ */
+export async function changeMemberRoleAction(rawInput: {
+  workspaceId: string;
+  targetUserId: string;
+  newRole: WorkspaceRole;
+}): Promise<PeopleActionResult> {
+  try {
+    const { requirePermission, validateRoleChangeSafety, logAuditEvent } = await import(
+      "@/lib/permissions-server"
+    );
+
+    const actor = await requirePermission("members:manage_roles", {
+      workspaceId: rawInput.workspaceId,
+      targetUserId: rawInput.targetUserId,
+      targetRole: rawInput.newRole as any,
+    });
+
+    const safety = await validateRoleChangeSafety(actor, rawInput.targetUserId, rawInput.newRole as any);
+    if (!safety.allowed) {
+      return { success: false, error: safety.error || "Cannot perform this role change." };
+    }
+
+    const adminClient = createAdminClient();
+    const { error: updateErr } = await adminClient
+      .from("workspace_members")
+      .update({ role: rawInput.newRole })
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    await logAuditEvent({
+      workspaceId: rawInput.workspaceId,
+      actorId: actor.userId,
+      action: "member_role_changed",
+      targetUserId: rawInput.targetUserId,
+      entityType: "workspace_member",
+      details: { newRole: rawInput.newRole },
+    });
+
+    try {
+      revalidatePath("/app/people");
+      revalidatePath(`/app/people/${rawInput.targetUserId}`);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to change member role.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Change member departments with audit log
+ */
+export async function changeMemberDepartmentsAction(rawInput: {
+  workspaceId: string;
+  targetUserId: string;
+  departmentIds: string[];
+}): Promise<PeopleActionResult> {
+  try {
+    const { requirePermission, logAuditEvent } = await import("@/lib/permissions-server");
+
+    const actor = await requirePermission("members:manage_roles", {
+      workspaceId: rawInput.workspaceId,
+      targetUserId: rawInput.targetUserId,
+    });
+
+    const adminClient = createAdminClient();
+
+    // Remove existing department memberships
+    await adminClient
+      .from("department_members")
+      .delete()
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    // Insert new department memberships
+    if (rawInput.departmentIds.length > 0) {
+      const rows = rawInput.departmentIds.map((deptId) => ({
+        workspace_id: rawInput.workspaceId,
+        department_id: deptId,
+        user_id: rawInput.targetUserId,
+        role: "member",
+        is_lead: false,
+      }));
+      await adminClient.from("department_members").insert(rows);
+    }
+
+    await logAuditEvent({
+      workspaceId: rawInput.workspaceId,
+      actorId: actor.userId,
+      action: "member_departments_changed",
+      targetUserId: rawInput.targetUserId,
+      entityType: "workspace_member",
+      details: { departmentIds: rawInput.departmentIds },
+    });
+
+    try {
+      revalidatePath("/app/people");
+      revalidatePath("/app/departments");
+      revalidatePath(`/app/people/${rawInput.targetUserId}`);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update member departments.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Set or unset a member as department lead with audit log
+ */
+export async function setDepartmentLeadAction(rawInput: {
+  workspaceId: string;
+  departmentId: string;
+  targetUserId: string;
+  isLead: boolean;
+}): Promise<PeopleActionResult> {
+  try {
+    const { requirePermission, logAuditEvent } = await import("@/lib/permissions-server");
+
+    const actor = await requirePermission("departments:edit", {
+      workspaceId: rawInput.workspaceId,
+      departmentId: rawInput.departmentId,
+    });
+
+    const adminClient = createAdminClient();
+
+    // Ensure user is in department_members
+    const { data: existing } = await adminClient
+      .from("department_members")
+      .select("id")
+      .eq("department_id", rawInput.departmentId)
+      .eq("user_id", rawInput.targetUserId)
+      .maybeSingle();
+
+    if (!existing) {
+      await adminClient.from("department_members").insert({
+        workspace_id: rawInput.workspaceId,
+        department_id: rawInput.departmentId,
+        user_id: rawInput.targetUserId,
+        role: rawInput.isLead ? "lead" : "member",
+        is_lead: rawInput.isLead,
+      });
+    } else {
+      await adminClient
+        .from("department_members")
+        .update({
+          is_lead: rawInput.isLead,
+          role: rawInput.isLead ? "lead" : "member",
+        })
+        .eq("department_id", rawInput.departmentId)
+        .eq("user_id", rawInput.targetUserId);
+    }
+
+    // Update departments lead_id column
+    if (rawInput.isLead) {
+      await adminClient
+        .from("departments")
+        .update({ lead_id: rawInput.targetUserId })
+        .eq("id", rawInput.departmentId);
+    } else {
+      await adminClient
+        .from("departments")
+        .update({ lead_id: null })
+        .eq("id", rawInput.departmentId)
+        .eq("lead_id", rawInput.targetUserId);
+    }
+
+    await logAuditEvent({
+      workspaceId: rawInput.workspaceId,
+      actorId: actor.userId,
+      action: rawInput.isLead ? "department_lead_assigned" : "department_lead_removed",
+      targetUserId: rawInput.targetUserId,
+      entityType: "department",
+      entityId: rawInput.departmentId,
+      details: { isLead: rawInput.isLead },
+    });
+
+    try {
+      revalidatePath("/app/people");
+      revalidatePath(`/app/departments/${rawInput.departmentId}`);
+    } catch {}
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update department lead.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Deactivate a workspace member with task reassignment & audit log
+ */
+export async function deactivateMemberAction(rawInput: {
+  workspaceId: string;
+  targetUserId: string;
+  reassignToUserId?: string | null;
+}): Promise<PeopleActionResult> {
+  try {
+    const { requirePermission, validateMemberRemovalSafety, logAuditEvent } = await import(
+      "@/lib/permissions-server"
+    );
+
+    const actor = await requirePermission("members:manage_roles", {
+      workspaceId: rawInput.workspaceId,
+      targetUserId: rawInput.targetUserId,
+    });
+
+    const safety = await validateMemberRemovalSafety(actor, rawInput.targetUserId);
+    if (!safety.allowed) {
+      return { success: false, error: safety.error || "Cannot deactivate this member." };
+    }
+
+    const adminClient = createAdminClient();
+
+    // Mark as deactivated in workspace_members
+    const { error: updateErr } = await adminClient
+      .from("workspace_members")
+      .update({
+        is_deactivated: true,
+        employment_status: "Inactive",
+      })
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    // Reassign open tasks if replacement user is specified
+    let reassignedCount = 0;
+    if (rawInput.reassignToUserId) {
+      const { data: reassignedTasks } = await adminClient
+        .from("tasks")
+        .update({ assignee_id: rawInput.reassignToUserId })
+        .eq("workspace_id", rawInput.workspaceId)
+        .eq("assignee_id", rawInput.targetUserId)
+        .neq("status", "done")
+        .select("id");
+
+      reassignedCount = reassignedTasks?.length || 0;
+    }
+
+    await logAuditEvent({
+      workspaceId: rawInput.workspaceId,
+      actorId: actor.userId,
+      action: "member_deactivated",
+      targetUserId: rawInput.targetUserId,
+      entityType: "workspace_member",
+      details: {
+        reassignToUserId: rawInput.reassignToUserId,
+        reassignedTasksCount: reassignedCount,
+      },
+    });
+
+    try {
+      revalidatePath("/app/people");
+      revalidatePath("/app/tasks");
+      revalidatePath(`/app/people/${rawInput.targetUserId}`);
+    } catch {}
+
+    return { success: true, data: { reassignedCount } };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to deactivate member.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Remove a member completely from workspace with task reassignment & audit log
+ */
+export async function removeMemberAction(rawInput: {
+  workspaceId: string;
+  targetUserId: string;
+  reassignToUserId?: string | null;
+}): Promise<PeopleActionResult> {
+  try {
+    const { requirePermission, validateMemberRemovalSafety, logAuditEvent } = await import(
+      "@/lib/permissions-server"
+    );
+
+    const actor = await requirePermission("members:manage_roles", {
+      workspaceId: rawInput.workspaceId,
+      targetUserId: rawInput.targetUserId,
+    });
+
+    const safety = await validateMemberRemovalSafety(actor, rawInput.targetUserId);
+    if (!safety.allowed) {
+      return { success: false, error: safety.error || "Cannot remove this member." };
+    }
+
+    const adminClient = createAdminClient();
+
+    // Reassign open tasks if specified
+    let reassignedCount = 0;
+    if (rawInput.reassignToUserId) {
+      const { data: reassignedTasks } = await adminClient
+        .from("tasks")
+        .update({ assignee_id: rawInput.reassignToUserId })
+        .eq("workspace_id", rawInput.workspaceId)
+        .eq("assignee_id", rawInput.targetUserId)
+        .neq("status", "done")
+        .select("id");
+
+      reassignedCount = reassignedTasks?.length || 0;
+    }
+
+    // Delete memberships
+    await adminClient
+      .from("department_members")
+      .delete()
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    await adminClient
+      .from("project_members")
+      .delete()
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    const { error: deleteErr } = await adminClient
+      .from("workspace_members")
+      .delete()
+      .eq("workspace_id", rawInput.workspaceId)
+      .eq("user_id", rawInput.targetUserId);
+
+    if (deleteErr) {
+      return { success: false, error: deleteErr.message };
+    }
+
+    await logAuditEvent({
+      workspaceId: rawInput.workspaceId,
+      actorId: actor.userId,
+      action: "member_removed",
+      targetUserId: rawInput.targetUserId,
+      entityType: "workspace_member",
+      details: {
+        reassignToUserId: rawInput.reassignToUserId,
+        reassignedTasksCount: reassignedCount,
+      },
+    });
+
+    try {
+      revalidatePath("/app/people");
+      revalidatePath("/app/tasks");
+      revalidatePath("/app/departments");
+    } catch {}
+
+    return { success: true, data: { reassignedCount } };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to remove member.";
+    return { success: false, error: msg };
+  }
+}
+

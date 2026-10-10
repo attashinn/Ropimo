@@ -196,9 +196,11 @@ export function ProjectDetailView({
   const [editModalOpen, setEditModalOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 
-  React.useEffect(() => {
+  const [prevTasks, setPrevTasks] = React.useState(tasks);
+  if (tasks !== prevTasks) {
+    setPrevTasks(tasks);
     setLocalTasks(tasks);
-  }, [tasks]);
+  }
 
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -218,7 +220,7 @@ export function ProjectDetailView({
   const activeLead = people.find((p) => p.user_id === leadId);
 
   const createdOnText = (() => {
-    const dateObj = new Date(project.created_at || Date.now());
+    const dateObj = new Date(project.created_at || "2026-01-01");
     return dateObj.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -686,7 +688,7 @@ export function ProjectDetailView({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as "tasks" | "details" | "attachments" | "activity")}
                 className={cn(
                   "pb-3 pt-1 relative transition-colors cursor-pointer text-[13px]",
                   isActive ? "text-[#0F172A] font-bold" : "hover:text-[#0F172A]"

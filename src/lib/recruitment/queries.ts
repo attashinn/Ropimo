@@ -1,16 +1,20 @@
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Tables } from "@/types/database";
 import {
   JobOpening,
   JobOpeningStatus,
   Candidate,
   CandidateStage,
   CandidateApplication,
-  ApplicationStageHistory,
   Interview,
+  InterviewStatus,
   InterviewFeedback,
   JobOffer,
   CandidateActivity,
+  CandidateEvent,
+  CandidateNote,
+  EmploymentType,
   RecruitmentStats,
 } from "@/types/recruitment";
 import { recruitmentStore } from "./store";
@@ -99,7 +103,8 @@ export const getWorkspaceJobOpenings = cache(
         }
       }
 
-      let results: JobOpening[] = data.map((row: any) => {
+      type JobOpeningWithDept = Tables<"job_openings"> & { departments?: { name?: string; color?: string; icon?: string } | null };
+      let results: JobOpening[] = (data as unknown as JobOpeningWithDept[]).map((row) => {
         const dept = row.departments;
         const counts = countsMap.get(row.id) || { applicants: 0, interviews: 0 };
 
@@ -116,12 +121,12 @@ export const getWorkspaceJobOpenings = cache(
           responsibilities: row.responsibilities || [],
           requirements: row.requirements || [],
           skills: row.skills || [],
-          employment_type: row.employment_type || "Full-time",
+          employment_type: (row.employment_type as EmploymentType) || "Full-time",
           location: row.location || "Remote",
           salary_range: row.salary_range,
           hiring_manager_id: row.hiring_manager_id,
           application_deadline: row.application_deadline,
-          status: row.status || "Open",
+          status: (row.status as JobOpeningStatus) || "Open",
           applicants_count: counts.applicants,
           interviews_count: counts.interviews,
           created_by: row.created_by,
@@ -196,7 +201,7 @@ export async function getJobOpeningById(
       return recruitmentStore.getJobOpeningById(jobId, workspaceId);
     }
 
-    const dept = (data as any).departments;
+    const dept = (data as unknown as { departments?: { name?: string; color?: string; icon?: string } | null }).departments;
 
     const [{ count: applicantsCount }, { count: interviewsCount }] = await Promise.all([
       adminClient
@@ -249,9 +254,37 @@ export const getWorkspaceCandidates = cache(
       stage?: CandidateStage | "all";
       search?: string;
       jobOpeningId?: string;
+      source?: string;
+      rating?: number | "all";
+      appliedDate?: string;
+      skills?: string;
+      page?: number;
+      pageSize?: number;
+      viewerUserId?: string;
+      viewerRole?: string;
+      leadDepartmentIds?: string[];
     }
   ): Promise<Candidate[]> => {
     if (!workspaceId) return [];
+
+    let viewerUserId = options?.viewerUserId;
+    let viewerRole = options?.viewerRole;
+    let leadDeptIds = options?.leadDepartmentIds || [];
+
+    // Attempt to resolve caller context if not provided
+    if (!viewerUserId || !viewerRole) {
+      try {
+        const { getUserPermissionContext } = await import("@/lib/permissions-server");
+        const ctx = await getUserPermissionContext(workspaceId, viewerUserId);
+        if (ctx) {
+          viewerUserId = ctx.userId;
+          viewerRole = ctx.role;
+          leadDeptIds = ctx.leadDepartmentIds || [];
+        }
+      } catch {
+        // Ignored in non-auth or test context
+      }
+    }
 
     const adminClient = createAdminClient();
 
@@ -262,80 +295,155 @@ export const getWorkspaceCandidates = cache(
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
+      let candidateList: Candidate[] = [];
+
       if (error || !candidates) {
-        let storeCands = recruitmentStore.getCandidates(workspaceId);
-        if (options?.stage && options.stage !== "all") {
-          storeCands = storeCands.filter((c) => c.latest_stage === options.stage);
+        candidateList = recruitmentStore.getCandidates(workspaceId);
+      } else {
+        const candidateIds = candidates.map((c) => c.id);
+        const applicationsMap = new Map<string, { stage: CandidateStage; jobTitle: string; jobId?: string; departmentId?: string; rating?: number; tags?: string[] }>();
+
+        if (candidateIds.length > 0) {
+          const { data: apps } = await adminClient
+            .from("candidate_applications")
+            .select(`
+              id,
+              candidate_id,
+              job_opening_id,
+              stage,
+              rating,
+              tags,
+              created_at,
+              job_openings:job_opening_id (
+                id,
+                title,
+                department_id
+              )
+            `)
+            .in("candidate_id", candidateIds)
+            .order("created_at", { ascending: false });
+
+          type AppWithJob = {
+            id: string;
+            candidate_id: string;
+            job_opening_id: string;
+            stage: string;
+            rating?: number | null;
+            tags?: string[] | null;
+            job_openings?: { id: string; title: string; department_id: string | null } | null;
+          };
+
+          ((apps as unknown as AppWithJob[]) || []).forEach((a) => {
+            if (!applicationsMap.has(a.candidate_id)) {
+              applicationsMap.set(a.candidate_id, {
+                stage: (a.stage?.toLowerCase() as CandidateStage) || "applied",
+                jobTitle: a.job_openings?.title || "Application",
+                jobId: a.job_opening_id,
+                departmentId: a.job_openings?.department_id || undefined,
+                rating: a.rating || undefined,
+                tags: a.tags || undefined,
+              });
+            }
+          });
         }
-        if (options?.search) {
-          const q = options.search.toLowerCase().trim();
-          storeCands = storeCands.filter(
-            (c) =>
-              c.full_name.toLowerCase().includes(q) ||
-              c.email.toLowerCase().includes(q) ||
-              (c.latest_job_title && c.latest_job_title.toLowerCase().includes(q))
-          );
-        }
-        return storeCands;
-      }
 
-      const candidateIds = candidates.map((c) => c.id);
-      const applicationsMap = new Map<string, { stage: CandidateStage; jobTitle: string }>();
-
-      if (candidateIds.length > 0) {
-        const { data: apps } = await adminClient
-          .from("candidate_applications")
-          .select(`
-            candidate_id,
-            stage,
-            created_at,
-            job_openings:job_opening_id (
-              title
-            )
-          `)
-          .in("candidate_id", candidateIds)
-          .order("created_at", { ascending: false });
-
-        (apps || []).forEach((a: any) => {
-          if (!applicationsMap.has(a.candidate_id)) {
-            applicationsMap.set(a.candidate_id, {
-              stage: a.stage as CandidateStage,
-              jobTitle: a.job_openings?.title || "Application",
-            });
-          }
+        candidateList = candidates.map((c) => {
+          const appInfo = applicationsMap.get(c.id);
+          return {
+            id: c.id,
+            workspace_id: c.workspace_id,
+            full_name: c.full_name,
+            email: c.email,
+            phone: c.phone || null,
+            avatar_url: c.avatar_url || null,
+            portfolio_url: c.portfolio_url || null,
+            linkedin_url: c.linkedin_url || null,
+            years_of_experience: c.years_of_experience || null,
+            skills: c.skills || [],
+            bio: c.bio || null,
+            notes: c.notes || null,
+            rating: c.rating || appInfo?.rating || null,
+            tags: c.tags && c.tags.length > 0 ? c.tags : (appInfo?.tags || []),
+            source: c.source || "Careers Portal",
+            rejection_reason: c.rejection_reason || null,
+            rejected_at: c.rejected_at || null,
+            converted_user_id: c.converted_user_id || null,
+            latest_stage: (c.latest_stage?.toLowerCase() as CandidateStage) || appInfo?.stage || "applied",
+            latest_job_title: appInfo?.jobTitle || "Open Role",
+            latest_job_id: appInfo?.jobId || undefined,
+            department_id: appInfo?.departmentId || undefined,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+          };
         });
       }
 
-      let results: Candidate[] = candidates.map((c) => {
-        const appInfo = applicationsMap.get(c.id);
-        return {
-          id: c.id,
-          workspace_id: c.workspace_id,
-          full_name: c.full_name,
-          email: c.email,
-          phone: c.phone || null,
-          avatar_url: c.avatar_url || null,
-          portfolio_url: c.portfolio_url || null,
-          linkedin_url: c.linkedin_url || null,
-          years_of_experience: c.years_of_experience || null,
-          skills: c.skills || [],
-          bio: c.bio || null,
-          notes: c.notes || null,
-          converted_user_id: c.converted_user_id || null,
-          latest_stage: appInfo?.stage || "Applied",
-          latest_job_title: appInfo?.jobTitle || "Open Role",
-          created_at: c.created_at,
-          updated_at: c.updated_at,
-        };
-      });
+      // ── ACCESS CONTROL FILTERING ──
+      // 1. Manager: sees ONLY candidates for their department's jobs (or where they are assigned interviewer)
+      if (viewerRole === "manager") {
+        const allowedJobs = recruitmentStore
+          .getJobOpenings(workspaceId)
+          .filter((j) => (j.department_id && leadDeptIds.includes(j.department_id)) || j.hiring_manager_id === viewerUserId)
+          .map((j) => j.id);
 
+        const allowedCandidateIdsFromInterviews = recruitmentStore
+          .getInterviews(workspaceId)
+          .filter((iv) => iv.interviewer_id === viewerUserId || iv.interviewer_ids?.includes(viewerUserId || ""))
+          .map((iv) => iv.candidate_id);
+
+        candidateList = candidateList.filter((c) => {
+          const apps = recruitmentStore.getCandidateApplications(c.id, workspaceId);
+          const hasDeptJob = apps.some((a) => allowedJobs.includes(a.job_opening_id) || (c.department_id && leadDeptIds.includes(c.department_id)));
+          const isAssigned = allowedCandidateIdsFromInterviews.includes(c.id);
+          return hasDeptJob || isAssigned;
+        });
+      }
+      // 2. Member / Assigned Interviewer: sees ONLY candidates they interview
+      else if (viewerRole && !["owner", "admin", "hr"].includes(viewerRole)) {
+        const interviewedCandidateIds = recruitmentStore
+          .getInterviews(workspaceId)
+          .filter((iv) => iv.interviewer_id === viewerUserId || iv.interviewer_ids?.includes(viewerUserId || ""))
+          .map((iv) => iv.candidate_id);
+
+        candidateList = candidateList.filter((c) => interviewedCandidateIds.includes(c.id));
+      }
+
+      // ── FILTERS ──
       if (options?.stage && options.stage !== "all") {
-        results = results.filter((c) => c.latest_stage === options.stage);
+        const targetStage = options.stage.toLowerCase();
+        candidateList = candidateList.filter((c) => (c.latest_stage || "applied").toLowerCase() === targetStage);
+      }
+
+      if (options?.jobOpeningId && options.jobOpeningId !== "all") {
+        candidateList = candidateList.filter((c) => {
+          const apps = recruitmentStore.getCandidateApplications(c.id, workspaceId);
+          return c.latest_job_id === options.jobOpeningId || apps.some((a) => a.job_opening_id === options.jobOpeningId);
+        });
+      }
+
+      if (options?.source && options.source !== "all") {
+        candidateList = candidateList.filter((c) => (c.source || "").toLowerCase() === options.source?.toLowerCase());
+      }
+
+      if (options?.rating && options.rating !== "all") {
+        candidateList = candidateList.filter((c) => c.rating === options.rating);
+      }
+
+      if (options?.appliedDate) {
+        const filterDate = options.appliedDate.slice(0, 10);
+        candidateList = candidateList.filter((c) => c.created_at?.slice(0, 10) === filterDate);
+      }
+
+      if (options?.skills) {
+        const skillQuery = options.skills.toLowerCase().trim();
+        candidateList = candidateList.filter((c) =>
+          c.skills.some((s) => s.toLowerCase().includes(skillQuery))
+        );
       }
 
       if (options?.search) {
         const q = options.search.toLowerCase().trim();
-        results = results.filter(
+        candidateList = candidateList.filter(
           (c) =>
             c.full_name.toLowerCase().includes(q) ||
             c.email.toLowerCase().includes(q) ||
@@ -344,7 +452,13 @@ export const getWorkspaceCandidates = cache(
         );
       }
 
-      return results;
+      // Pagination
+      if (options?.page && options?.pageSize) {
+        const start = (options.page - 1) * options.pageSize;
+        return candidateList.slice(start, start + options.pageSize);
+      }
+
+      return candidateList;
     } catch {
       return recruitmentStore.getCandidates(workspaceId);
     }
@@ -356,203 +470,382 @@ export const getWorkspaceCandidates = cache(
  */
 export async function getCandidateById(
   candidateId: string,
-  workspaceId: string
+  workspaceId: string,
+  options?: {
+    viewerUserId?: string;
+    viewerRole?: string;
+    leadDepartmentIds?: string[];
+  }
 ): Promise<{
   candidate: Candidate | null;
   applications: CandidateApplication[];
   interviews: Interview[];
   offers: JobOffer[];
   activities: CandidateActivity[];
+  events: CandidateEvent[];
+  notes: CandidateNote[];
+  feedbacks: InterviewFeedback[];
 }> {
   if (!candidateId || !workspaceId) {
-    return { candidate: null, applications: [], interviews: [], offers: [], activities: [] };
+    return {
+      candidate: null,
+      applications: [],
+      interviews: [],
+      offers: [],
+      activities: [],
+      events: [],
+      notes: [],
+      feedbacks: [],
+    };
+  }
+
+  let viewerUserId = options?.viewerUserId;
+  let viewerRole = options?.viewerRole;
+  let leadDeptIds = options?.leadDepartmentIds || [];
+
+  if (!viewerUserId || !viewerRole) {
+    try {
+      const { getUserPermissionContext } = await import("@/lib/permissions-server");
+      const ctx = await getUserPermissionContext(workspaceId, viewerUserId);
+      if (ctx) {
+        viewerUserId = ctx.userId;
+        viewerRole = ctx.role;
+        leadDeptIds = ctx.leadDepartmentIds || [];
+      }
+    } catch {
+      // Ignored
+    }
   }
 
   const adminClient = createAdminClient();
 
   try {
-    const [{ data: cData }, { data: aData }, { data: iData }, { data: oData }, { data: actData }] =
-      await Promise.all([
-        adminClient
-          .from("candidates")
-          .select("*")
-          .eq("id", candidateId)
-          .eq("workspace_id", workspaceId)
-          .single(),
-        adminClient
-          .from("candidate_applications")
-          .select(`
-            *,
-            job_openings:job_opening_id (
-              id,
-              title,
-              department_id,
-              location,
-              employment_type
-            )
-          `)
-          .eq("candidate_id", candidateId)
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false }),
-        adminClient
-          .from("interviews")
-          .select(`
-            *,
-            job_openings:job_opening_id (
-              title
-            )
-          `)
-          .eq("candidate_id", candidateId)
-          .eq("workspace_id", workspaceId)
-          .order("scheduled_at", { ascending: true }),
-        adminClient
-          .from("offers")
-          .select(`
-            *,
-            departments:department_id (
-              name
-            )
-          `)
-          .eq("candidate_id", candidateId)
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false }),
-        adminClient
-          .from("candidate_activities")
-          .select("*")
-          .eq("candidate_id", candidateId)
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: cData },
+      { data: aData },
+      { data: iData },
+      { data: oData },
+      { data: actData },
+      { data: evData },
+      { data: noteData },
+    ] = await Promise.all([
+      adminClient
+        .from("candidates")
+        .select("*")
+        .eq("id", candidateId)
+        .eq("workspace_id", workspaceId)
+        .single(),
+      adminClient
+        .from("candidate_applications")
+        .select(`
+          *,
+          job_openings:job_opening_id (
+            id,
+            title,
+            department_id,
+            location,
+            employment_type
+          )
+        `)
+        .eq("candidate_id", candidateId)
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false }),
+      adminClient
+        .from("interviews")
+        .select(`
+          *,
+          job_openings:job_opening_id (
+            title
+          )
+        `)
+        .eq("candidate_id", candidateId)
+        .eq("workspace_id", workspaceId)
+        .order("scheduled_at", { ascending: true }),
+      adminClient
+        .from("offers")
+        .select(`
+          *,
+          departments:department_id (
+            name
+          )
+        `)
+        .eq("candidate_id", candidateId)
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false }),
+      adminClient
+        .from("candidate_activities")
+        .select("*")
+        .eq("candidate_id", candidateId)
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false }),
+      adminClient
+        .from("candidate_events")
+        .select("*")
+        .eq("candidate_id", candidateId)
+        .order("created_at", { ascending: false }),
+      adminClient
+        .from("candidate_notes")
+        .select("*")
+        .eq("candidate_id", candidateId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    let candidate: Candidate | null = null;
+    let applications: CandidateApplication[] = [];
+    let interviews: Interview[] = [];
+    let offers: JobOffer[] = [];
+    let activities: CandidateActivity[] = [];
+    let events: CandidateEvent[] = [];
+    let notes: CandidateNote[] = [];
+    let feedbacks: InterviewFeedback[] = [];
 
     if (!cData) {
-      const storedCand = recruitmentStore.getCandidateById(candidateId, workspaceId);
-      const storedApps = recruitmentStore.getCandidateApplications(candidateId, workspaceId);
-      const storedIvs = recruitmentStore.getInterviews(workspaceId).filter((i) => i.candidate_id === candidateId);
-      const storedOffers = recruitmentStore.getOffers(workspaceId).filter((o) => o.candidate_id === candidateId);
-      const storedActs = recruitmentStore.getActivities(candidateId, workspaceId);
+      candidate = recruitmentStore.getCandidateById(candidateId, workspaceId);
+      applications = recruitmentStore.getCandidateApplications(candidateId, workspaceId);
+      interviews = recruitmentStore.getInterviews(workspaceId).filter((i) => i.candidate_id === candidateId);
+      offers = recruitmentStore.getOffers(workspaceId).filter((o) => o.candidate_id === candidateId);
+      activities = recruitmentStore.getActivities(candidateId, workspaceId);
+      events = recruitmentStore.getCandidateEvents(candidateId, workspaceId);
+      notes = recruitmentStore.getCandidateNotes(candidateId, workspaceId);
+      interviews.forEach((iv) => {
+        feedbacks.push(...recruitmentStore.getFeedback(iv.id, workspaceId));
+      });
+    } else {
+      type AppJoined = Tables<"candidate_applications"> & {
+        job_openings?: { id: string; title: string; department_id: string | null; location: string; employment_type: string } | null;
+      };
+      applications = ((aData as unknown as AppJoined[]) || []).map((row) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        candidate_id: row.candidate_id,
+        job_opening_id: row.job_opening_id,
+        stage: (row.stage?.toLowerCase() as CandidateStage) || "applied",
+        cover_letter: row.cover_letter,
+        cv_storage_key: row.cv_storage_key,
+        cv_file_name: row.cv_file_name,
+        cv_file_size: row.cv_file_size,
+        cv_file_type: row.cv_file_type,
+        cv_uploaded_at: row.cv_uploaded_at,
+        rejection_reason: row.rejection_reason,
+        rejected_at: row.rejected_at,
+        hired_at: row.hired_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        job_opening: row.job_openings
+          ? {
+              id: row.job_openings.id,
+              workspace_id: row.workspace_id,
+              title: row.job_openings.title,
+              department_id: row.job_openings.department_id,
+              location: row.job_openings.location,
+              employment_type: "Full-time" as EmploymentType,
+              responsibilities: [],
+              requirements: [],
+              skills: [],
+              status: "Open",
+              created_at: "",
+              updated_at: "",
+            }
+          : undefined,
+      }));
 
-      return {
-        candidate: storedCand,
-        applications: storedApps,
-        interviews: storedIvs,
-        offers: storedOffers,
-        activities: storedActs,
+      interviews = ((iData as unknown as Tables<"interviews">[]) || []).map((row) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        application_id: row.application_id,
+        candidate_id: row.candidate_id,
+        job_opening_id: row.job_opening_id,
+        round_name: row.round_name,
+        interviewer_id: row.interviewer_id,
+        scheduled_at: row.scheduled_at,
+        duration_minutes: row.duration_minutes || 45,
+        location_or_link: row.location_or_link,
+        status: (row.status?.toLowerCase() as any) || "scheduled",
+        notes: row.notes,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+
+      type OfferJoined = Tables<"offers"> & { departments?: { name?: string } | null };
+      offers = ((oData as unknown as OfferJoined[]) || []).map((row) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        application_id: row.application_id,
+        candidate_id: row.candidate_id,
+        job_title: row.job_title,
+        department_id: row.department_id,
+        department_name: row.departments?.name || null,
+        employment_type: (row.employment_type as EmploymentType) || "Full-time",
+        salary: row.salary,
+        start_date: row.start_date,
+        reporting_manager_id: row.reporting_manager_id,
+        offer_notes: row.offer_notes,
+        expiration_date: row.expiration_date,
+        status: row.status || "Draft",
+        created_by: row.created_by,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+
+      activities = ((actData as unknown as Tables<"candidate_activities">[]) || []).map((row) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        candidate_id: row.candidate_id,
+        application_id: row.application_id,
+        actor_id: row.actor_id,
+        action_type: row.action_type,
+        title: row.title,
+        description: row.description,
+        metadata: (row.metadata as Record<string, unknown>) || {},
+        created_at: row.created_at,
+      }));
+
+      events = (evData || []).map((row: any) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        candidate_id: row.candidate_id,
+        job_opening_id: row.job_opening_id,
+        event_type: row.event_type,
+        actor_id: row.actor_id,
+        actor_name: row.actor_name,
+        notes: row.notes,
+        metadata: row.metadata || {},
+        created_at: row.created_at,
+      }));
+
+      notes = (noteData || []).map((row: any) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        candidate_id: row.candidate_id,
+        application_id: row.application_id,
+        author_id: row.author_id,
+        author_name: row.author_name || "Team Member",
+        content: row.content,
+        mentions: row.mentions || [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+
+      // Fetch feedback
+      if (interviews.length > 0) {
+        const ivIds = interviews.map((i) => i.id);
+        const { data: fbData } = await adminClient
+          .from("interview_feedback")
+          .select("*")
+          .in("interview_id", ivIds);
+
+        feedbacks = (fbData || []).map((f: any) => ({
+          id: f.id,
+          workspace_id: cData.workspace_id,
+          interview_id: f.interview_id,
+          application_id: f.application_id || application?.id || "",
+          candidate_id: cData.id,
+          interviewer_id: f.interviewer_id,
+          rating: f.rating || f.overall_rating || 3,
+          skills_rating: f.skills_rating || 3,
+          communication_rating: f.communication_rating || 3,
+          culture_rating: f.culture_rating || 3,
+          recommendation: f.recommendation || "yes",
+          comments: f.comments || f.notes || "",
+          submitted_at: f.submitted_at || f.created_at,
+          created_at: f.created_at || new Date().toISOString(),
+          updated_at: f.updated_at || new Date().toISOString(),
+        }));
+      }
+
+      candidate = {
+        id: cData.id,
+        workspace_id: cData.workspace_id,
+        full_name: cData.full_name,
+        email: cData.email,
+        phone: cData.phone || null,
+        avatar_url: cData.avatar_url || null,
+        portfolio_url: cData.portfolio_url || null,
+        linkedin_url: cData.linkedin_url || null,
+        years_of_experience: cData.years_of_experience || null,
+        skills: cData.skills || [],
+        bio: cData.bio || null,
+        notes: cData.notes || null,
+        rating: cData.rating || null,
+        tags: cData.tags || [],
+        source: cData.source || "Careers Portal",
+        rejection_reason: cData.rejection_reason || null,
+        rejected_at: cData.rejected_at || null,
+        converted_user_id: cData.converted_user_id || null,
+        latest_stage: (applications[0]?.stage?.toLowerCase() as CandidateStage) || "applied",
+        latest_job_title: applications[0]?.job_opening?.title || "Open Role",
+        created_at: cData.created_at,
+        updated_at: cData.updated_at,
       };
     }
 
-    const applications: CandidateApplication[] = (aData || []).map((row: any) => ({
-      id: row.id,
-      workspace_id: row.workspace_id,
-      candidate_id: row.candidate_id,
-      job_opening_id: row.job_opening_id,
-      stage: row.stage as CandidateStage,
-      cover_letter: row.cover_letter,
-      cv_storage_key: row.cv_storage_key,
-      cv_file_name: row.cv_file_name,
-      cv_file_size: row.cv_file_size,
-      cv_file_type: row.cv_file_type,
-      cv_uploaded_at: row.cv_uploaded_at,
-      rejection_reason: row.rejection_reason,
-      rejected_at: row.rejected_at,
-      hired_at: row.hired_at,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      job_opening: row.job_openings
-        ? {
-            id: row.job_openings.id,
-            workspace_id: row.workspace_id,
-            title: row.job_openings.title,
-            department_id: row.job_openings.department_id,
-            location: row.job_openings.location,
-            employment_type: row.job_openings.employment_type,
-            responsibilities: [],
-            requirements: [],
-            skills: [],
-            status: "Open",
-            created_at: "",
-            updated_at: "",
-          }
-        : undefined,
-    }));
+    if (!candidate) {
+      return { candidate: null, applications: [], interviews: [], offers: [], activities: [], events: [], notes: [], feedbacks: [] };
+    }
 
-    const interviews: Interview[] = (iData || []).map((row: any) => ({
-      id: row.id,
-      workspace_id: row.workspace_id,
-      application_id: row.application_id,
-      candidate_id: row.candidate_id,
-      job_opening_id: row.job_opening_id,
-      round_name: row.round_name,
-      interviewer_id: row.interviewer_id,
-      scheduled_at: row.scheduled_at,
-      duration_minutes: row.duration_minutes || 45,
-      location_or_link: row.location_or_link,
-      status: row.status || "Scheduled",
-      notes: row.notes,
-      created_by: row.created_by,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    // Merge store events & notes if DB was empty
+    if (events.length === 0) {
+      events = recruitmentStore.getCandidateEvents(candidateId, workspaceId);
+    }
+    if (notes.length === 0) {
+      notes = recruitmentStore.getCandidateNotes(candidateId, workspaceId);
+    }
 
-    const offers: JobOffer[] = (oData || []).map((row: any) => ({
-      id: row.id,
-      workspace_id: row.workspace_id,
-      application_id: row.application_id,
-      candidate_id: row.candidate_id,
-      job_title: row.job_title,
-      department_id: row.department_id,
-      department_name: row.departments?.name || null,
-      employment_type: row.employment_type || "Full-time",
-      salary: row.salary,
-      start_date: row.start_date,
-      reporting_manager_id: row.reporting_manager_id,
-      offer_notes: row.offer_notes,
-      expiration_date: row.expiration_date,
-      status: row.status || "Draft",
-      created_by: row.created_by,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    // ── ACCESS CONTROL RULES ──
+    const isInterviewer = interviews.some(
+      (iv) => iv.interviewer_id === viewerUserId || iv.interviewer_ids?.includes(viewerUserId || "")
+    );
 
-    const activities: CandidateActivity[] = (actData || []).map((row: any) => ({
-      id: row.id,
-      workspace_id: row.workspace_id,
-      candidate_id: row.candidate_id,
-      application_id: row.application_id,
-      actor_id: row.actor_id,
-      action_type: row.action_type,
-      title: row.title,
-      description: row.description,
-      metadata: row.metadata || {},
-      created_at: row.created_at,
-    }));
+    // 1. Manager Access Check
+    if (viewerRole === "manager") {
+      const allowedJobs = recruitmentStore
+        .getJobOpenings(workspaceId)
+        .filter((j) => (j.department_id && leadDeptIds.includes(j.department_id)) || j.hiring_manager_id === viewerUserId)
+        .map((j) => j.id);
 
-    const candidate: Candidate = {
-      id: cData.id,
-      workspace_id: cData.workspace_id,
-      full_name: cData.full_name,
-      email: cData.email,
-      phone: cData.phone || null,
-      avatar_url: cData.avatar_url || null,
-      portfolio_url: cData.portfolio_url || null,
-      linkedin_url: cData.linkedin_url || null,
-      years_of_experience: cData.years_of_experience || null,
-      skills: cData.skills || [],
-      bio: cData.bio || null,
-      notes: cData.notes || null,
-      converted_user_id: cData.converted_user_id || null,
-      latest_stage: applications[0]?.stage || "Applied",
-      latest_job_title: applications[0]?.job_opening?.title || "Open Role",
-      created_at: cData.created_at,
-      updated_at: cData.updated_at,
-    };
+      const hasDeptJob = applications.some((a) => allowedJobs.includes(a.job_opening_id));
+      if (!hasDeptJob && !isInterviewer) {
+        return { candidate: null, applications: [], interviews: [], offers: [], activities: [], events: [], notes: [], feedbacks: [] };
+      }
+    }
+    // 2. Member / Assigned Interviewer Access Check
+    else if (viewerRole && !["owner", "admin", "hr"].includes(viewerRole)) {
+      if (!isInterviewer) {
+        return { candidate: null, applications: [], interviews: [], offers: [], activities: [], events: [], notes: [], feedbacks: [] };
+      }
 
-    return { candidate, applications, interviews, offers, activities };
+      // "never compensation, offers"
+      offers = [];
+
+      // "hiring team only" for notes
+      notes = [];
+
+      // "or other interviewers' scores until they submit their own"
+      feedbacks = feedbacks.filter((fb) => {
+        // Can always see own feedback
+        if (fb.interviewer_id === viewerUserId) return true;
+        // Can only see others' feedback if viewer has submitted feedback for that interview
+        const viewerSubmitted = feedbacks.some(
+          (myFb) => myFb.interview_id === fb.interview_id && myFb.interviewer_id === viewerUserId
+        );
+        return viewerSubmitted;
+      });
+    }
+
+    return { candidate, applications, interviews, offers, activities, events, notes, feedbacks };
   } catch {
     const storedCand = recruitmentStore.getCandidateById(candidateId, workspaceId);
     const storedApps = recruitmentStore.getCandidateApplications(candidateId, workspaceId);
     const storedIvs = recruitmentStore.getInterviews(workspaceId).filter((i) => i.candidate_id === candidateId);
     const storedOffers = recruitmentStore.getOffers(workspaceId).filter((o) => o.candidate_id === candidateId);
     const storedActs = recruitmentStore.getActivities(candidateId, workspaceId);
+    const storedEvents = recruitmentStore.getCandidateEvents(candidateId, workspaceId);
+    const storedNotes = recruitmentStore.getCandidateNotes(candidateId, workspaceId);
+    const storedFeedbacks: InterviewFeedback[] = [];
+    storedIvs.forEach((iv) => {
+      storedFeedbacks.push(...recruitmentStore.getFeedback(iv.id, workspaceId));
+    });
 
     return {
       candidate: storedCand,
@@ -560,6 +853,9 @@ export async function getCandidateById(
       interviews: storedIvs,
       offers: storedOffers,
       activities: storedActs,
+      events: storedEvents,
+      notes: storedNotes,
+      feedbacks: storedFeedbacks,
     };
   }
 }
@@ -596,7 +892,11 @@ export const getWorkspaceInterviews = cache(
         return recruitmentStore.getInterviews(workspaceId);
       }
 
-      return data.map((row: any) => ({
+      type InterviewJoined = Tables<"interviews"> & {
+        candidates?: { id: string; full_name?: string; email?: string; avatar_url?: string | null } | null;
+        job_openings?: { id: string; title?: string } | null;
+      };
+      return (data as unknown as InterviewJoined[]).map((row) => ({
         id: row.id,
         workspace_id: row.workspace_id,
         application_id: row.application_id,
@@ -607,7 +907,7 @@ export const getWorkspaceInterviews = cache(
         scheduled_at: row.scheduled_at,
         duration_minutes: row.duration_minutes || 45,
         location_or_link: row.location_or_link,
-        status: row.status || "Scheduled",
+        status: (row.status?.toLowerCase() as InterviewStatus) || "scheduled",
         notes: row.notes,
         created_by: row.created_by,
         created_at: row.created_at,
@@ -616,8 +916,8 @@ export const getWorkspaceInterviews = cache(
           ? {
               id: row.candidates.id,
               workspace_id: row.workspace_id,
-              full_name: row.candidates.full_name,
-              email: row.candidates.email,
+              full_name: row.candidates.full_name || "Unknown Candidate",
+              email: row.candidates.email || "",
               avatar_url: row.candidates.avatar_url,
               skills: [],
               created_at: "",

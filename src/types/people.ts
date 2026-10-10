@@ -1,4 +1,4 @@
-export type WorkspaceRole = "owner" | "admin" | "manager" | "member" | "guest";
+export type WorkspaceRole = "owner" | "admin" | "hr" | "manager" | "member" | "guest";
 export type EmploymentType = "Full-time" | "Part-time" | "Contractor" | "Intern";
 export type EmploymentStatus = "Active" | "On Leave" | "Probation" | "Inactive" | "Pending";
 
@@ -88,6 +88,7 @@ export interface DepartmentMember {
 }
 
 export type InvitationStatus = "Pending" | "Accepted" | "Expired" | "Revoked" | "pending" | "accepted" | "expired" | "revoked";
+export type EmailDeliveryStatus = "queued" | "sent" | "delivered" | "bounced" | "complained" | "failed" | "outbox";
 
 export interface WorkspaceInvitation {
   id: string;
@@ -98,14 +99,23 @@ export interface WorkspaceInvitation {
   full_name?: string | null;
   job_title?: string | null;
   department_id?: string | null;
+  department_ids?: string[];
   department_name?: string | null;
+  is_lead?: boolean;
+  message?: string | null;
   role: WorkspaceRole;
   employment_type?: EmploymentType;
   employment_status?: EmploymentStatus;
   token?: string | null;
+  token_hash?: string | null;
   status: InvitationStatus;
   invited_by?: string | null;
   invited_by_name?: string | null;
+  accepted_by?: string | null;
+  email_status?: EmailDeliveryStatus;
+  last_sent_at?: string | null;
+  resend_count?: number;
+  resend_message_id?: string | null;
   expires_at?: string | null;
   accepted_at?: string | null;
   created_at: string;

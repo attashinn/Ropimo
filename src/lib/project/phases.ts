@@ -1,4 +1,3 @@
-import { Task } from "@/types/task";
 import { Department } from "@/types/department";
 
 export interface ProjectPhase {
@@ -33,7 +32,11 @@ export function getTaskPhase(task: { deliverable_type?: string | null; section?:
 }
 
 export function getTaskCollaborativeDepartments(
-  task: { department_id?: string | null; expected_outcome?: string | null; department?: any },
+  task: {
+    department_id?: string | null;
+    expected_outcome?: string | null;
+    department?: Department | { id: string; name: string; color?: string; icon?: string } | null;
+  },
   allDepartments: Department[]
 ): Department[] {
   const result: Department[] = [];

@@ -75,14 +75,16 @@ export function CandidateProfileDrawer({
   const [tags, setTags] = React.useState<string[]>(candidate?.tags || []);
   const [customTagInput, setCustomTagInput] = React.useState("");
 
-  React.useEffect(() => {
+  const [prevCandidate, setPrevCandidate] = React.useState(candidate);
+  if (candidate !== prevCandidate) {
+    setPrevCandidate(candidate);
     if (candidate?.latest_stage) {
       setCurrentStage(candidate.latest_stage);
     }
     if (candidate?.tags) {
       setTags(candidate.tags);
     }
-  }, [candidate]);
+  }
 
   // Handle escape key
   React.useEffect(() => {
@@ -244,9 +246,9 @@ export function CandidateProfileDrawer({
         className="fixed inset-0 z-40 bg-black/30 backdrop-blur-2xs transition-opacity duration-300"
       />
 
-      {/* Slide-over Drawer Panel */}
+      {/* Slide-over Drawer Panel (480px width) */}
       <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[540px] flex-col border-l border-[#D8DDD4] bg-white shadow-2xl transition-transform duration-300 ease-out"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[480px] flex-col border-l border-[#D8DDD4] bg-white shadow-2xl transition-transform duration-300 ease-out"
         role="dialog"
         aria-modal="true"
       >
@@ -415,7 +417,7 @@ export function CandidateProfileDrawer({
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => setActiveTab(tab.key as "overview" | "notes" | "history")}
               className={`py-3 px-3 transition-colors ${
                 activeTab === tab.key
                   ? "border-b-2 border-[#10251F] text-[#18221E] -mb-px font-bold"

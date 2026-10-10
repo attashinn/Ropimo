@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Tables } from "@/types/database";
 import {
   AttendanceRecord,
   AttendanceSettings,
@@ -405,7 +406,7 @@ export const getEmployeeLeaveBalances = cache(
       .eq("year", currentYear);
 
     if (data && data.length > 0) {
-      return data.map((d: any) => ({
+      return (data as unknown as Tables<"leave_balances">[]).map((d) => ({
         leave_type: d.leave_type,
         allocated: d.total_allocated || 0,
         used: d.used_days || 0,
@@ -432,7 +433,7 @@ export const getWorkspaceLeaveRequests = cache(
     options?: {
       status?: LeaveStatus | "all";
       userId?: string;
-      leaveType?: any;
+      leaveType?: LeaveType;
     }
   ): Promise<LeaveRequest[]> => {
     if (!workspaceId) return [];

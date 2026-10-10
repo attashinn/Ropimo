@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Tables } from "@/types/database";
 import { FileItem, StorageStats, FileType, FileActivity, FileShare } from "@/types/files";
 import { getWorkspacePeople } from "@/lib/people/queries";
 import { getWorkspaceProjects } from "@/lib/project/queries";
@@ -70,7 +71,7 @@ export const getWorkspaceFiles = cache(
     // Map activities by file_id / folder_id
     const activitiesMap = new Map<string, FileActivity[]>();
     if (dbActivities) {
-      dbActivities.forEach((act: any) => {
+      dbActivities.forEach((act: Tables<"workspace_file_activities">) => {
         const targetId = act.file_id || act.folder_id;
         if (targetId) {
           const list = activitiesMap.get(targetId) || [];
@@ -88,7 +89,7 @@ export const getWorkspaceFiles = cache(
     // Map shares by file_id / folder_id
     const sharesMap = new Map<string, FileShare[]>();
     if (dbShares) {
-      dbShares.forEach((s: any) => {
+      dbShares.forEach((s: Tables<"workspace_file_shares">) => {
         const targetId = s.file_id || s.folder_id;
         if (targetId) {
           const list = sharesMap.get(targetId) || [];
@@ -108,14 +109,14 @@ export const getWorkspaceFiles = cache(
     // Count items inside folders
     const folderItemCountMap = new Map<string, number>();
     if (dbFiles) {
-      dbFiles.forEach((f: any) => {
+      dbFiles.forEach((f: Tables<"workspace_files">) => {
         if (f.folder_id && !f.is_trash) {
           folderItemCountMap.set(f.folder_id, (folderItemCountMap.get(f.folder_id) || 0) + 1);
         }
       });
     }
     if (dbFolders) {
-      dbFolders.forEach((f: any) => {
+      dbFolders.forEach((f: Tables<"workspace_folders">) => {
         if (f.parent_id && !f.is_trash) {
           folderItemCountMap.set(f.parent_id, (folderItemCountMap.get(f.parent_id) || 0) + 1);
         }
@@ -126,7 +127,7 @@ export const getWorkspaceFiles = cache(
 
     // Parse DB Folders
     if (dbFolders && dbFolders.length > 0) {
-      dbFolders.forEach((f: any) => {
+      dbFolders.forEach((f: Tables<"workspace_folders">) => {
         const uploader = f.created_by ? peopleMap.get(f.created_by) || null : null;
         const project = f.project_id ? projectMap.get(f.project_id) || null : null;
         const dept = f.department_id ? deptMap.get(f.department_id) || null : null;
@@ -165,7 +166,7 @@ export const getWorkspaceFiles = cache(
 
     // Parse DB Files
     if (dbFiles && dbFiles.length > 0) {
-      dbFiles.forEach((f: any) => {
+      dbFiles.forEach((f: Tables<"workspace_files">) => {
         const uploader = f.uploaded_by ? peopleMap.get(f.uploaded_by) || null : null;
         const project = f.project_id ? projectMap.get(f.project_id) || null : null;
         const dept = f.department_id ? deptMap.get(f.department_id) || null : null;

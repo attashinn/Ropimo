@@ -10,7 +10,7 @@ import {
 } from "@/types/people";
 
 import { recruitmentStore } from "@/lib/recruitment/store";
-import { EmployeeOnboarding, OnboardingStatus } from "@/types/people";
+import { EmployeeOnboarding, OnboardingStatus, OnboardingChecklistItem } from "@/types/people";
 
 /**
  * Fetch all people in a workspace, including their assigned departments and job titles (deduplicated per request)
@@ -157,7 +157,7 @@ export const getWorkspacePeople = cache(
         null;
 
       // Derive employment status: prioritize explicit workspace_member status, then candidate/profile
-      let rawStatus: string = (m.employment_status as string) || (profile?.employmentStatus as string) || (linkedCandidate?.employment_status as string) || "Active";
+      const rawStatus: string = (m.employment_status as string) || (profile?.employmentStatus as string) || (linkedCandidate?.employment_status as string) || "Active";
       let employmentStatus: EmploymentStatus = "Active";
       const s = rawStatus.toLowerCase();
       if (s === "active") {
@@ -572,67 +572,67 @@ export async function getEmployeeOnboarding(
   if (!onboarding) {
     if (person) {
       const isPending = person.employment_status === "Pending";
-      const defaultChecklist = [
+      const defaultChecklist: OnboardingChecklistItem[] = [
         {
           id: `chk-1-${person.user_id}`,
           title: "Accept Workspace Invitation",
           description: "Invitation confirmed and account activated.",
-          category: "profile",
+          section: "profile",
           required: true,
-          status: isPending ? "pending" : "completed",
-          completed_at: isPending ? undefined : person.created_at,
+          completed: !isPending,
+          completed_at: isPending ? null : person.created_at,
         },
         {
           id: `chk-2-${person.user_id}`,
           title: "Complete Profile & Contact Information",
           description: "Verify phone number, emergency contacts, and personal details.",
-          category: "profile",
+          section: "profile",
           required: true,
-          status: "pending",
+          completed: false,
         },
         {
           id: `chk-3-${person.user_id}`,
           title: "Upload Profile Photo",
           description: "Add team directory avatar for workspace visibility.",
-          category: "profile",
+          section: "profile",
           required: false,
-          status: "pending",
+          completed: false,
         },
         {
           id: `chk-4-${person.user_id}`,
           title: "Verify Employment Details & Role",
           description: `Confirm job title (${person.job_title || "Team Member"}) and employment tier.`,
-          category: "employment",
+          section: "profile",
           required: true,
-          status: isPending ? "pending" : "completed",
+          completed: !isPending,
         },
         {
           id: `chk-5-${person.user_id}`,
           title: "Sign Offer Letter & NDA",
           description: "Review and e-sign standard employment agreements.",
-          category: "documents",
+          section: "documents",
           required: true,
-          status: isPending ? "pending" : "completed",
+          completed: !isPending,
         },
         {
           id: `chk-6-${person.user_id}`,
           title: "Workspace & Department Access Setup",
           description: "Configure role permissions and department task boards.",
-          category: "workspace",
+          section: "profile",
           required: true,
-          status: isPending ? "pending" : "completed",
+          completed: !isPending,
         },
         {
           id: `chk-7-${person.user_id}`,
           title: "First Day Team Intro & Orientation",
           description: "Complete intro meeting with workspace administrator.",
-          category: "profile",
+          section: "team",
           required: false,
-          status: "pending",
+          completed: false,
         },
       ];
 
-      const completedCount = defaultChecklist.filter((c) => c.status === "completed").length;
+      const completedCount = defaultChecklist.filter((c) => c.completed).length;
       const progress = Math.round((completedCount / defaultChecklist.length) * 100);
 
       return {
@@ -642,7 +642,7 @@ export async function getEmployeeOnboarding(
         employee_id: person.employee_id || "EMP-001",
         status: isPending ? "In Progress" : "Completed",
         progress_percentage: progress,
-        checklist: defaultChecklist as any,
+        checklist: defaultChecklist,
         started_at: person.created_at,
         completed_at: isPending ? null : person.created_at,
         created_at: person.created_at,

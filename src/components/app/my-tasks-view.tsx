@@ -171,11 +171,12 @@ export function MyTasksView({
   }, [initialTasks, categorized, currentUserId]);
 
   // Tasks list
+  const [prevMappedTasks, setPrevMappedTasks] = React.useState(mappedTasks);
   const [localTasks, setLocalTasks] = React.useState<DisplayTaskItem[]>(mappedTasks);
-
-  React.useEffect(() => {
+  if (mappedTasks !== prevMappedTasks) {
+    setPrevMappedTasks(mappedTasks);
     setLocalTasks(mappedTasks);
-  }, [mappedTasks]);
+  }
 
   React.useEffect(() => {
     function handleClickOutside() {
@@ -193,7 +194,7 @@ export function MyTasksView({
   };
 
   // Toggle single task completion
-  const handleToggleTask = async (task: DisplayTaskItem, e?: React.MouseEvent) => {
+  const handleToggleTask = async (task: DisplayTaskItem, e?: React.MouseEvent | React.ChangeEvent<HTMLInputElement>) => {
     if (e) e.stopPropagation();
     const prevCompleted = task.completed;
     const prevStatus = task.status;
@@ -273,9 +274,9 @@ export function MyTasksView({
         )
       );
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to upload attachment:", err);
-      alert(err.message || "Failed to upload file");
+      alert(err instanceof Error ? err.message : "Failed to upload file");
     } finally {
       setUploadingAttachment(false);
       if (modalFileInputRef.current) modalFileInputRef.current.value = "";
@@ -372,8 +373,7 @@ export function MyTasksView({
   };
 
   // Filtering — use debouncedSearch (200ms) so table only re-renders after user stops typing
-  const filteredTasks = React.useMemo(() => {
-    return localTasks.filter((task) => {
+  const filteredTasks = localTasks.filter((task) => {
       const q = debouncedSearch.toLowerCase();
       const matchesSearch =
         !q ||
@@ -395,8 +395,7 @@ export function MyTasksView({
         selectedPriority === "all" || task.priority === selectedPriority;
 
       return matchesSearch && matchesProject && matchesStatus && matchesPriority;
-    });
-  }, [localTasks, debouncedSearch, selectedProject, selectedStatus, selectedPriority]);
+  });
 
   const todayScheduleTasks = React.useMemo(() => {
     return localTasks.filter((t) => t.dueCategory === "today" && !t.completed);
@@ -734,7 +733,7 @@ export function MyTasksView({
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab.key as any)}
+                  onClick={() => setActiveTab(tab.key as "my" | "created" | "watching")}
                   className={`rounded-[8px] px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                     activeTab === tab.key
                       ? "bg-[#10251F] text-white shadow-2xs"
@@ -895,7 +894,7 @@ export function MyTasksView({
                               <input
                                 type="checkbox"
                                 checked={task.completed}
-                                onChange={(e) => handleToggleTask(task, e as any)}
+                                onChange={(e) => handleToggleTask(task, e)}
                                 className="h-4 w-4 rounded border-[#D8DDD4] text-[#10251F] focus:ring-0 cursor-pointer"
                               />
                             </td>
@@ -1014,7 +1013,7 @@ export function MyTasksView({
           {/* PANEL 1: TODAY'S SCHEDULE */}
           <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#D8DDD4]/80">
-              <h3 className="text-sm font-bold text-[#18221E]">Today's Schedule</h3>
+              <h3 className="text-sm font-bold text-[#18221E]">Today&apos;s Schedule</h3>
               <Link href="/app/calendar" className="text-xs font-semibold text-[#18221E] hover:underline">
                 View Calendar →
               </Link>
@@ -1552,7 +1551,7 @@ export function MyTasksView({
                     <button
                       key={tab.key}
                       type="button"
-                      onClick={() => setTaskDetailTab(tab.key as any)}
+                      onClick={() => setTaskDetailTab(tab.key as "overview" | "attachments" | "activity")}
                       className={`h-full relative flex items-center gap-2 transition-colors ${
                         isActive ? "text-[#18221E]" : "text-[#65706A] hover:text-[#18221E]"
                       }`}

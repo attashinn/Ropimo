@@ -79,7 +79,7 @@ export function RopimoAreaChart({
   }
 
   // Calculate scales
-  let allValues: number[] = [];
+  const allValues: number[] = [];
   data.forEach((d) => {
     parsedCategories.forEach((c) => {
       const val = Number(d[c.key]) || 0;
@@ -342,17 +342,24 @@ export function RopimoDonutChart({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  let cumulativeAngle = 0;
+  const slices = data.map((item, idx) => {
+    const prevRatio = data.slice(0, idx).reduce((sum, d) => sum + d.value / total, 0);
+    const ratio = item.value / total;
+    return {
+      item,
+      idx,
+      ratio,
+      offset: -prevRatio * circumference,
+    };
+  });
 
   return (
     <div className={cn("flex flex-col items-center gap-4", className)}>
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="rotate-[-90deg] overflow-visible">
-          {data.map((item, idx) => {
-            const ratio = item.value / total;
+          {slices.map(({ item, idx, ratio, offset }) => {
             const strokeDasharray = `${ratio * circumference} ${circumference}`;
-            const strokeDashoffset = -cumulativeAngle * circumference;
-            cumulativeAngle += ratio;
+            const strokeDashoffset = offset;
             const itemColor = item.color || CHART_COLOR_PALETTE[idx % CHART_COLOR_PALETTE.length];
             const isHovered = hoverIndex === idx;
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateProjectInput, Project, ProjectStatus } from "@/types/project";
@@ -22,6 +23,53 @@ export interface UpdateProjectInput {
   icon?: string;
 }
 
+const CreateProjectSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  departmentId: z.string().optional().nullable(),
+  name: z.string().min(1, "Project name is required."),
+  description: z.string().optional().nullable(),
+  status: z.enum(["planned", "in_progress", "completed", "on_hold", "cancelled"]).optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+  leadId: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  memberIds: z.array(z.string()).optional(),
+});
+
+const UpdateProjectSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  name: z.string().optional(),
+  description: z.string().optional().nullable(),
+  status: z.enum(["planned", "in_progress", "completed", "on_hold", "cancelled"]).optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+});
+
+const AddProjectMemberSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  projectId: z.string().min(1, "Project ID is required."),
+  userId: z.string().min(1, "User ID is required."),
+  role: z.enum(["lead", "member", "viewer"]).optional(),
+});
+
+const DeleteProjectSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
+
+const DuplicateProjectSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
+
+const ArchiveProjectSchema = z.object({
+  projectId: z.string().min(1, "Project ID is required."),
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
+
 function generateSlug(name: string): string {
   const base = name
     .toLowerCase()
@@ -32,8 +80,13 @@ function generateSlug(name: string): string {
 }
 
 export async function createProjectAction(
-  input: CreateProjectInput
+  rawInput: CreateProjectInput
 ): Promise<CreateProjectResult> {
+  const parsed = CreateProjectSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const {
     workspaceId,
     departmentId,
@@ -197,6 +250,8 @@ export async function createProjectAction(
         role: "member",
         added_by: user.id,
       }));
+      await adminClient.from("project_members").insert(memberRows);
+
       // Dispatch unified event notifications for project members
       for (const uId of input.memberIds) {
         dispatchProjectMemberAddedEvent({
@@ -230,12 +285,18 @@ export async function createProjectAction(
   };
 }
 
-export async function addProjectMemberAction(params: {
+export async function addProjectMemberAction(rawParams: {
   workspaceId: string;
   projectId: string;
   userId: string;
   role?: string;
 }): Promise<{ success: boolean; error?: string }> {
+  const parsed = AddProjectMemberSchema.safeParse(rawParams);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const params = parsed.data;
+
   try {
     const authClient = await createClient();
     const {
@@ -299,14 +360,20 @@ export async function addProjectMemberAction(params: {
     revalidatePath(`/app/projects/${params.projectId}`);
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Failed to add project member." };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to add project member.";
+    return { success: false, error: msg };
   }
 }
 
 export async function updateProjectAction(
-  input: UpdateProjectInput
+  rawInput: UpdateProjectInput
 ): Promise<CreateProjectResult> {
+  const parsed = UpdateProjectSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const input = parsed.data;
   const { projectId, workspaceId, name, description, status, color, icon } = input;
 
   const authClient = await createClient();
@@ -353,13 +420,18 @@ export async function deleteProjectAction(
   projectId: string,
   workspaceId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const parsed = DeleteProjectSchema.safeParse({ projectId, workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+
   const adminClient = createAdminClient();
 
   const { error } = await adminClient
     .from("projects")
     .delete()
-    .eq("id", projectId)
-    .eq("workspace_id", workspaceId);
+    .eq("id", parsed.data.projectId)
+    .eq("workspace_id", parsed.data.workspaceId);
 
   if (error) {
     return { success: false, error: error.message };
@@ -375,13 +447,18 @@ export async function duplicateProjectAction(
   projectId: string,
   workspaceId: string
 ): Promise<CreateProjectResult> {
+  const parsed = DuplicateProjectSchema.safeParse({ projectId, workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+
   const adminClient = createAdminClient();
 
   const { data: original } = await adminClient
     .from("projects")
     .select("*")
-    .eq("id", projectId)
-    .eq("workspace_id", workspaceId)
+    .eq("id", parsed.data.projectId)
+    .eq("workspace_id", parsed.data.workspaceId)
     .maybeSingle();
 
   if (!original) {
@@ -394,7 +471,7 @@ export async function duplicateProjectAction(
   const { data: duplicated, error } = await adminClient
     .from("projects")
     .insert({
-      workspace_id: workspaceId,
+      workspace_id: parsed.data.workspaceId,
       department_id: original.department_id,
       name: newName,
       slug: newSlug,
@@ -423,6 +500,11 @@ export async function archiveProjectAction(
   projectId: string,
   workspaceId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const parsed = ArchiveProjectSchema.safeParse({ projectId, workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+
   const adminClient = createAdminClient();
 
   const { error } = await adminClient
@@ -431,8 +513,8 @@ export async function archiveProjectAction(
       status: "on_hold",
       updated_at: new Date().toISOString(),
     })
-    .eq("id", projectId)
-    .eq("workspace_id", workspaceId);
+    .eq("id", parsed.data.projectId)
+    .eq("workspace_id", parsed.data.workspaceId);
 
   if (error) {
     return { success: false, error: error.message };

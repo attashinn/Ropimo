@@ -17,10 +17,24 @@ export default async function ProfilePage() {
   ]);
 
   const user = authData?.user;
+
+  // Fetch profile record from public.profiles
+  let dbProfile = null;
+  if (user?.id) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    dbProfile = prof;
+  }
+
   const fullName =
+    dbProfile?.full_name ||
     (user?.user_metadata?.full_name as string) ||
-    (user?.email ? user.email.split("@")[0] : "Tashin Khan");
-  const email = user?.email || "tashinkan360@gmail.com";
+    (user?.email ? user.email.split("@")[0] : "User");
+  const email = user?.email || "";
+  const avatarUrl = dbProfile?.avatar_url || user?.user_metadata?.avatar_url || null;
 
   return (
     <UserProfileView
@@ -28,8 +42,10 @@ export default async function ProfilePage() {
         id: user?.id,
         email,
         fullName,
+        avatarUrl,
       }}
-      workspaceName={workspace?.name || "brnnd"}
+      workspaceId={workspace?.id || ""}
+      workspaceName={workspace?.name || "Workspace"}
     />
   );
 }

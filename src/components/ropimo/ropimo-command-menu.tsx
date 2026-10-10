@@ -88,13 +88,11 @@ export function RopimoCommandMenu({
   // Debounced database search
   React.useEffect(() => {
     if (!search.trim() || !workspaceId) {
-      setDbResults({ tasks: [], projects: [], people: [], files: [] });
-      setIsSearching(false);
       return;
     }
 
-    setIsSearching(true);
     const timeout = setTimeout(async () => {
+      setIsSearching(true);
       try {
         const res = await searchWorkspaceAction(workspaceId, search.trim());
         setDbResults(res);
@@ -107,6 +105,10 @@ export function RopimoCommandMenu({
 
     return () => clearTimeout(timeout);
   }, [search, workspaceId]);
+
+  const activeDbResults = (!search.trim() || !workspaceId)
+    ? { tasks: [], projects: [], people: [], files: [] }
+    : dbResults;
 
   // Global Keyboard Shortcuts:
   // - Cmd+K / Ctrl+K: open/close palette
@@ -352,12 +354,12 @@ export function RopimoCommandMenu({
             </Command.Group>
 
             {/* Database Search Results (Tasks) */}
-            {dbResults.tasks.length > 0 && (
+            {activeDbResults.tasks.length > 0 && (
               <Command.Group
                 heading="Tasks"
                 className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
               >
-                {dbResults.tasks.map((task) => (
+                {activeDbResults.tasks.map((task) => (
                   <Command.Item
                     key={task.id}
                     onSelect={() => navigateTo("/app/my-tasks")}
@@ -374,12 +376,12 @@ export function RopimoCommandMenu({
             )}
 
             {/* Database Search Results (Projects) */}
-            {dbResults.projects.length > 0 && (
+            {activeDbResults.projects.length > 0 && (
               <Command.Group
                 heading="Projects"
                 className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
               >
-                {dbResults.projects.map((proj) => (
+                {activeDbResults.projects.map((proj) => (
                   <Command.Item
                     key={proj.id}
                     onSelect={() => navigateTo(`/app/projects/${proj.id}`)}
@@ -396,12 +398,12 @@ export function RopimoCommandMenu({
             )}
 
             {/* Database Search Results (People) */}
-            {dbResults.people.length > 0 && (
+            {activeDbResults.people.length > 0 && (
               <Command.Group
                 heading="People"
                 className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"
               >
-                {dbResults.people.map((person) => (
+                {activeDbResults.people.map((person) => (
                   <Command.Item
                     key={person.id}
                     onSelect={() => navigateTo("/app/people")}
@@ -420,7 +422,7 @@ export function RopimoCommandMenu({
             )}
 
             {/* Database Search Results (Files) */}
-            {dbResults.files.length > 0 && (
+            {activeDbResults.files.length > 0 && (
               <Command.Group
                 heading="Files"
                 className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-3"

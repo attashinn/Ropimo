@@ -1,9 +1,27 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+
+const CreateWorkspaceSchema = z.object({
+  name: z.string().trim().min(2, "Workspace name must be at least 2 characters."),
+  icon: z.string().optional().default("W"),
+});
+
+const SwitchWorkspaceSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+});
+
+const UpdateWorkspaceSettingsSchema = z.object({
+  workspaceId: z.string().min(1, "Workspace ID is required."),
+  name: z.string().trim().min(2, "Workspace name must be at least 2 characters."),
+  slug: z.string().trim().min(2, "Workspace slug must be at least 2 characters."),
+  logoUrl: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
+});
 
 export interface CreateWorkspaceResult {
   success: boolean;
@@ -25,6 +43,12 @@ export async function createWorkspaceAction(
   name: string,
   icon: string = "W"
 ): Promise<CreateWorkspaceResult> {
+  const parsed = CreateWorkspaceSchema.safeParse({ name, icon });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid workspace name." };
+  }
+  const trimmedName = parsed.data.name;
+
   // 1. Verify Authentication using user session cookies
   const authClient = await createClient();
   const {
@@ -34,11 +58,6 @@ export async function createWorkspaceAction(
 
   if (authError || !user) {
     return { success: false, error: "You must be logged in to create a workspace." };
-  }
-
-  const trimmedName = name.trim();
-  if (!trimmedName || trimmedName.length < 2) {
-    return { success: false, error: "Workspace name must be at least 2 characters long." };
   }
 
   // 2. Generate unique slug
@@ -292,18 +311,129 @@ export async function completeSmartOnboardingAction(
 export async function switchActiveWorkspaceAction(
   workspaceId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const parsed = SwitchWorkspaceSchema.safeParse({ workspaceId });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid workspace ID." };
+  }
+
   try {
     const cookieStore = await cookies();
-    cookieStore.set("ropimo_active_workspace", workspaceId, {
+    cookieStore.set("ropimo_active_workspace", parsed.data.workspaceId, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
       sameSite: "lax",
     });
     revalidatePath("/app");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Failed to switch workspace." };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to switch workspace.";
+    return { success: false, error: msg };
   }
 }
+
+/**
+ * Update workspace name, slug, and logo/icon with owner/admin role verification
+ */
+export async function updateWorkspaceSettingsAction(rawParams: {
+  workspaceId: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  icon?: string | null;
+}): Promise<{
+  success: boolean;
+  workspace?: { id: string; name: string; slug: string; logoUrl?: string | null; icon?: string | null };
+  error?: string;
+}> {
+  const parsed = UpdateWorkspaceSettingsSchema.safeParse(rawParams);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
+  }
+  const params = parsed.data;
+
+  try {
+    const { requireWorkspaceRole } = await import("@/lib/auth/require-user");
+
+    // 1. Enforce strict role check: owner or admin only
+    await requireWorkspaceRole(params.workspaceId, ["owner", "admin"]);
+
+    const trimmedName = params.name.trim();
+
+    const normalizedSlug = params.slug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    if (!normalizedSlug || normalizedSlug.length < 3) {
+      return { success: false, error: "Workspace slug must be at least 3 characters." };
+    }
+    if (normalizedSlug.length > 50) {
+      return { success: false, error: "Workspace slug cannot exceed 50 characters." };
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+      return {
+        success: false,
+        error: "Slug may only contain lowercase letters, numbers, and hyphens (cannot start or end with a hyphen).",
+      };
+    }
+
+    const adminClient = createAdminClient();
+
+    // 2. Check slug uniqueness across workspaces
+    const { data: existingWorkspace } = await adminClient
+      .from("workspaces")
+      .select("id")
+      .eq("slug", normalizedSlug)
+      .neq("id", params.workspaceId)
+      .maybeSingle();
+
+    if (existingWorkspace) {
+      return { success: false, error: "This workspace slug is already taken. Please choose another." };
+    }
+
+    // 3. Update workspace details
+    const updateData: Record<string, unknown> = {
+      name: trimmedName,
+      slug: normalizedSlug,
+      updated_at: new Date().toISOString(),
+    };
+    if (params.logoUrl !== undefined) {
+      updateData.logo_url = params.logoUrl;
+    }
+    if (params.icon !== undefined) {
+      updateData.icon = params.icon;
+    }
+
+    const { data: updated, error } = await adminClient
+      .from("workspaces")
+      .update(updateData)
+      .eq("id", params.workspaceId)
+      .select("id, name, slug, logo_url, icon")
+      .single();
+
+    if (error || !updated) {
+      return { success: false, error: error?.message || "Failed to update workspace settings." };
+    }
+
+    revalidatePath("/app/settings");
+    revalidatePath("/app");
+
+    return {
+      success: true,
+      workspace: {
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        logoUrl: updated.logo_url,
+        icon: updated.icon,
+      },
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+    return { success: false, error: msg };
+  }
+}
+
 
 

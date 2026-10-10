@@ -19,6 +19,8 @@ export function LoginForm() {
   const nextParam = searchParams.get("next");
   const targetRedirect = getSafeRedirectPath(nextParam, "/dashboard");
   const urlMessage = searchParams.get("message");
+  const emailParam = searchParams.get("email");
+  const isEmailLocked = searchParams.get("locked") === "true";
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
@@ -26,11 +28,21 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     mode: "onBlur",
+    defaultValues: {
+      email: emailParam || "",
+    },
   });
+
+  React.useEffect(() => {
+    if (emailParam) {
+      setValue("email", emailParam);
+    }
+  }, [emailParam, setValue]);
 
   const onSubmit = async (data: LoginInput) => {
     setIsLoading(true);
@@ -74,12 +86,14 @@ export function LoginForm() {
           .limit(1);
 
         if (!memberships || memberships.length === 0) {
-          window.location.href = "/onboarding";
+          router.push("/onboarding");
+          router.refresh();
           return;
         }
       }
 
-      window.location.href = targetRedirect;
+      router.push(targetRedirect);
+      router.refresh();
     } catch {
       toast.error("An unexpected error occurred. Please try again.");
       setAuthError("Unable to log in at this moment. Please try again.");
@@ -115,11 +129,19 @@ export function LoginForm() {
             type="email"
             autoComplete="email"
             placeholder="name@company.com"
+            readOnly={isEmailLocked}
             {...register("email")}
-            className={`h-11 sm:h-12 w-full rounded-2xl border bg-white px-4 text-[14px] text-[#111] placeholder:text-[#999] focus:border-[#111] focus:ring-1 focus:ring-[#111] focus:outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
+            className={`h-11 sm:h-12 w-full rounded-2xl border px-4 text-[14px] text-[#111] placeholder:text-[#999] focus:border-[#111] focus:ring-1 focus:ring-[#111] focus:outline-none transition-all shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
+              isEmailLocked ? "bg-[#FAF9F5] border-[#E5E2D6] cursor-not-allowed text-[#6B6B6B]" : "bg-white"
+            } ${
               errors.email ? "border-[#D93025]" : "border-[#E5E2D6]"
             }`}
           />
+          {isEmailLocked && (
+            <p className="text-[12px] text-[#6B6B6B] mt-1 font-medium flex items-center gap-1">
+              <span>🔒</span> Email locked for this invitation
+            </p>
+          )}
           {errors.email && (
             <p className="text-[13px] text-[#D93025] mt-1 font-medium">
               {errors.email.message}

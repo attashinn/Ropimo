@@ -158,6 +158,11 @@ export function ProjectsDirectory({
   );
 
   // Statistics calculation (100% Real Database Data)
+  const [nowTimestamp] = React.useState(() => Date.now());
+  const [currentDateInfo] = React.useState(() => {
+    const d = new Date();
+    return { month: d.getMonth(), year: d.getFullYear() };
+  });
   const totalProjectsStat = localProjects.length;
   const inProgressStat = localProjects.filter(
     (p) => p.status === "in_progress" || p.status === "active"
@@ -165,12 +170,11 @@ export function ProjectsDirectory({
   const completedStat = localProjects.filter((p) => p.status === "completed").length;
   const overdueStat = localProjects.filter((p) => {
     const due = p.due_date || p.deadline;
-    return due && new Date(due).getTime() < Date.now() && p.status !== "completed";
+    return due && new Date(due).getTime() < nowTimestamp && p.status !== "completed";
   }).length;
   const thisMonthStat = localProjects.filter((p) => {
     const created = p.created_at ? new Date(p.created_at) : null;
-    const now = new Date();
-    return created && created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+    return created && created.getMonth() === currentDateInfo.month && created.getFullYear() === currentDateInfo.year;
   }).length;
 
   // Actions
@@ -893,7 +897,7 @@ export function ProjectsDirectory({
         isOpen={!!selectedProject}
         onClose={() => setSelectedProject(null)}
         project={selectedProject}
-        workspace={{ id: workspaceId, name: workspaceName, slug: workspaceName } as any}
+        workspace={{ id: workspaceId, name: workspaceName, slug: workspaceName, created_at: "" }}
         people={people}
         departments={departments}
         tasks={tasks}

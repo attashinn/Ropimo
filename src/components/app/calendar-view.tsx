@@ -84,12 +84,12 @@ export function CalendarView({
   // Calendar State - Anchor default to August 2026 (matching system context)
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date(2026, 7, 21));
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
+  const [prevInitialEvents, setPrevInitialEvents] = React.useState(initialEvents);
   const [events, setEvents] = React.useState<CalendarEvent[]>(initialEvents);
-
-  // Sync when initialEvents change
-  React.useEffect(() => {
+  if (initialEvents !== prevInitialEvents) {
+    setPrevInitialEvents(initialEvents);
     setEvents(initialEvents);
-  }, [initialEvents]);
+  }
 
   // Filters State
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -586,7 +586,7 @@ export function CalendarView({
                           <button
                             key={t.val}
                             type="button"
-                            onClick={() => setSelectedEventType(t.val as any)}
+                            onClick={() => setSelectedEventType(t.val as "all" | CalendarEventType)}
                             className={cn(
                               "rounded-[6px] px-2 py-1 text-left font-medium transition-colors",
                               selectedEventType === t.val
@@ -1188,7 +1188,7 @@ export function CalendarView({
                 { key: "events", label: "Company Events", color: "bg-[#B58500]" },
                 { key: "leave", label: "Leave & Out of Office", color: "bg-[#65706A]" },
               ].map((item) => {
-                const isChecked = (categoryToggles as any)[item.key];
+                const isChecked = categoryToggles[item.key as keyof typeof categoryToggles];
                 return (
                   <label
                     key={item.key}
@@ -1431,10 +1431,12 @@ function CreateEventModal({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
+  const [prevInitialDate, setPrevInitialDate] = React.useState(initialDate);
+  if (initialDate !== prevInitialDate) {
+    setPrevInitialDate(initialDate);
     setStartDate(initialDate);
     setEndDate(initialDate);
-  }, [initialDate]);
+  }
 
   // Handle ESC close
   React.useEffect(() => {
@@ -1539,7 +1541,7 @@ function CreateEventModal({
       });
 
       onSuccess(syntheticEvent);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       onSuccess(syntheticEvent);
     } finally {
@@ -2659,7 +2661,7 @@ function DeleteConfirmDialog({
       >
         <h4 className="text-sm font-bold text-[#18221E]">Delete Event</h4>
         <p className="text-xs text-[#65706A] leading-relaxed">
-          Are you sure you want to delete <span className="font-bold text-[#18221E]">"{event.title}"</span>? This action cannot be undone.
+          Are you sure you want to delete <span className="font-bold text-[#18221E]">&quot;{event.title}&quot;</span>? This action cannot be undone.
         </p>
 
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#D8DDD4]">

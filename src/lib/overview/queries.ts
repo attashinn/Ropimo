@@ -181,7 +181,7 @@ export const getOverviewData = cache(
         leave.person?.full_name || peopleMap.get(leave.user_id)?.full_name || "Team Member";
       enrichedActivities.push({
         id: `leave-${leave.id}`,
-        type: "leave_requested" as any,
+        type: "leave_requested",
         targetName: `${leave.leave_type} (${leave.duration_days} ${leave.duration_days === 1 ? "day" : "days"})`,
         createdAt: leave.created_at || leave.start_date,
         actorName: applicantName,

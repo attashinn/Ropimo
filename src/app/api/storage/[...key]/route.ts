@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getFromR2 } from "@/lib/storage/r2";
 import { requireUser, requireWorkspaceRole } from "@/lib/auth/require-user";
+
+const StorageKeySchema = z.array(z.string().min(1)).min(1, "Key not specified");
 
 export async function GET(
   request: NextRequest,
@@ -8,19 +11,22 @@ export async function GET(
 ) {
   try {
     // 1. Require authenticated user login
-    let user;
     try {
-      user = await requireUser();
+      await requireUser();
     } catch {
       return new NextResponse("Unauthorized: Login required to access workspace storage.", {
         status: 401,
       });
     }
 
-    const { key: keyParts } = await context.params;
-    if (!keyParts || keyParts.length === 0) {
-      return new NextResponse("Key not specified", { status: 400 });
+    const resolvedParams = await context.params;
+    const parseResult = StorageKeySchema.safeParse(resolvedParams?.key);
+
+    if (!parseResult.success) {
+      return new NextResponse("Bad Request: Invalid storage key structure.", { status: 400 });
     }
+
+    const keyParts = parseResult.data;
 
     // 2. Validate key format: must be prefixed by workspaceId
     const workspaceId = keyParts[0];
@@ -33,7 +39,7 @@ export async function GET(
     // 3. Verify that the authenticated user belongs to the requested workspace
     try {
       await requireWorkspaceRole(workspaceId);
-    } catch (err: any) {
+    } catch {
       return new NextResponse(
         `Forbidden: You do not have permission to access files from workspace ${workspaceId}.`,
         { status: 403 }
@@ -46,13 +52,17 @@ export async function GET(
     let result;
     try {
       result = await getFromR2(key);
-    } catch (fetchErr: any) {
-      if (
-        fetchErr?.name === "NoSuchKey" ||
-        fetchErr?.$metadata?.httpStatusCode === 404 ||
-        fetchErr?.message?.includes("not found") ||
-        fetchErr?.message?.includes("ENOENT")
-      ) {
+    } catch (fetchErr: unknown) {
+      const isNotFound =
+        fetchErr &&
+        typeof fetchErr === "object" &&
+        ("name" in fetchErr && (fetchErr as { name: string }).name === "NoSuchKey" ||
+          "$metadata" in fetchErr && (fetchErr as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404 ||
+          "message" in fetchErr && typeof (fetchErr as { message: string }).message === "string" &&
+            ((fetchErr as { message: string }).message.includes("not found") ||
+              (fetchErr as { message: string }).message.includes("ENOENT")));
+
+      if (isNotFound) {
         return new NextResponse("File not found", { status: 404 });
       }
       console.error("[Storage API] Error fetching from R2:", fetchErr);
@@ -65,9 +75,9 @@ export async function GET(
 
     // Convert to web stream
     const responseStream =
-      typeof result.Body.transformToWebStream === "function"
-        ? result.Body.transformToWebStream()
-        : result.Body;
+      typeof (result.Body as { transformToWebStream?: () => ReadableStream }).transformToWebStream === "function"
+        ? (result.Body as { transformToWebStream: () => ReadableStream }).transformToWebStream()
+        : (result.Body as unknown as BodyInit);
 
     const headers = new Headers();
     if (result.ContentType) {
@@ -84,11 +94,11 @@ export async function GET(
     headers.set("Cache-Control", "private, no-transform, max-age=3600");
     headers.set("X-Content-Type-Options", "nosniff");
 
-    return new NextResponse(responseStream as any, {
+    return new NextResponse(responseStream as BodyInit, {
       status: 200,
       headers,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Storage API] Unexpected handler error:", error);
     return new NextResponse("File not found", { status: 404 });
   }

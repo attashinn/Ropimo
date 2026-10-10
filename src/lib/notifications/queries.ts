@@ -1,6 +1,5 @@
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { AppNotification, NotificationCategory } from "@/types/notification";
 import { notificationStore } from "./store";
 
