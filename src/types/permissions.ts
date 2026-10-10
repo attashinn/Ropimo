@@ -7,6 +7,32 @@ export type WorkspaceRole = "owner" | "admin" | "hr" | "manager" | "member" | "g
 export type DepartmentRole = "lead" | "member" | "guest" | "none";
 export type PermissionScope = "workspace" | "department" | "own";
 
+/** Capability strings used in the OWNER_ADMIN_CAPS / DEPT_LEAD_CAPS / MEMBER_CAPS arrays */
+export type WorkspaceCapability =
+  | "manage_workspace"
+  | "invite_people"
+  | "remove_people"
+  | "change_roles"
+  | "view_all_people"
+  | "create_department"
+  | "delete_department"
+  | "manage_any_department"
+  | "create_project"
+  | "delete_any_project"
+  | "manage_any_project"
+  | "view_all_projects"
+  | "create_any_task"
+  | "delete_any_task"
+  | "manage_any_task"
+  | "view_all_tasks"
+  | "view_recruitment"
+  | "manage_recruitment"
+  | "approve_leave"
+  | "view_all_attendance"
+  | "view_all_leave"
+  | "manage_workspace_files"
+  | "view_workspace_activities";
+
 export type PermissionKey =
   | "workspace:settings"
   | "workspace:billing"

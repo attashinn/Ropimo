@@ -101,6 +101,8 @@ export function PeopleDirectory({
       : "team"
   );
 
+  const router = useRouter();
+
   const handleTabSwitch = (tabId: MainSectionTab) => {
     setActiveSection(tabId);
     if (typeof window !== "undefined") {

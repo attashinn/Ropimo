@@ -42,7 +42,7 @@ export function PublicJobBoard({ initialJobs }: PublicJobBoardProps) {
         (job.department_name && job.department_name.toLowerCase().includes(q)) ||
         job.location.toLowerCase().includes(q) ||
         (job.description && job.description.toLowerCase().includes(q)) ||
-        job.skills.some((s) => s.toLowerCase().includes(q));
+        Boolean(job.skills?.some((s) => s.toLowerCase().includes(q)));
 
       const matchesDept = selectedDept === "all" || job.department_name === selectedDept;
       const matchesLocation = selectedLocation === "all" || job.location === selectedLocation;

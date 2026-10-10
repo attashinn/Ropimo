@@ -4,7 +4,7 @@ export type MeetingStatus = "Upcoming" | "Live" | "Completed" | "Cancelled";
 
 export type MeetingLocationType = "Video" | "Physical" | "Custom";
 
-export type RecurrenceFrequency = "None" | "Daily" | "Weekly" | "Biweekly" | "Monthly";
+export type RecurrenceFrequency = "None" | "Daily" | "Weekly" | "Biweekly" | "Bi-weekly" | "Monthly" | "Custom";
 
 export interface MeetingAttendee {
   id: string;
@@ -60,12 +60,15 @@ export interface MeetingItem {
   location_type: MeetingLocationType;
   location_value?: string;
   meeting_link?: string;
+  meeting_url?: string;
   meeting_id_code?: string;
+  meeting_code?: string;
   is_recurring: boolean;
   recurrence?: RecurrenceFrequency;
   reminders?: number[];
   notify_attendees: boolean;
   notes?: string;
+  tags?: string[];
   recording_url?: string;
   cancelled_at?: string;
   cancellation_reason?: string;

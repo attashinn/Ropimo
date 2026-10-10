@@ -128,11 +128,11 @@ export default async function JobDetailPage(props: {
           </div>
         )}
 
-        {job.requirements && job.requirements.length > 0 && (
+        {job.requirements && (Array.isArray(job.requirements) ? job.requirements.length > 0 : Boolean(job.requirements)) && (
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-[#18221E]">Requirements & Qualifications</h3>
             <ul className="list-disc list-inside space-y-1 text-[#65706A]">
-              {job.requirements.map((req, i) => (
+              {(Array.isArray(job.requirements) ? job.requirements : [job.requirements]).map((req: string, i: number) => (
                 <li key={i}>{req}</li>
               ))}
             </ul>

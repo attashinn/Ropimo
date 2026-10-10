@@ -238,7 +238,7 @@ export function AgentChatView({
     setActionLoading((prev) => ({ ...prev, [action.id]: true }));
     try {
       if (action.type === "create_task") {
-        const taskPriority = typeof action.payload.priority === "string" ? (action.payload.priority as "urgent" | "high" | "normal" | "low" | "medium") : "medium";
+        const taskPriority = typeof action.payload.priority === "string" && action.payload.priority !== "normal" ? (action.payload.priority as "urgent" | "high" | "low" | "medium") : "medium";
         const res = await createTaskAction({
           workspaceId,
           title: (typeof action.payload.title === "string" && action.payload.title) || action.title,
@@ -293,7 +293,7 @@ export function AgentChatView({
             setExecutedActions((prev) => ({ ...prev, [act.id]: true }));
           }
         } else if (act.type === "create_task") {
-          const actPriority = typeof act.payload.priority === "string" ? (act.payload.priority as "urgent" | "high" | "normal" | "low" | "medium") : "medium";
+          const actPriority = typeof act.payload.priority === "string" && act.payload.priority !== "normal" ? (act.payload.priority as "urgent" | "high" | "low" | "medium") : "medium";
           const res = await createTaskAction({
             workspaceId,
             projectId: createdProjectId || (typeof act.payload.projectId === "string" ? act.payload.projectId : undefined),

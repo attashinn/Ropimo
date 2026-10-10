@@ -13,6 +13,7 @@ import {
   LeaveBalance,
   LeaveRequest,
   LeaveStatus,
+  LeaveType,
 } from "@/types/leave";
 import { getWorkspacePeople } from "@/lib/people/queries";
 
@@ -406,11 +407,11 @@ export const getEmployeeLeaveBalances = cache(
       .eq("year", currentYear);
 
     if (data && data.length > 0) {
-      return (data as unknown as Tables<"leave_balances">[]).map((d) => ({
-        leave_type: d.leave_type,
-        allocated: d.total_allocated || 0,
-        used: d.used_days || 0,
-        remaining: Math.max(0, (d.total_allocated || 0) - (d.used_days || 0)),
+      return data.map((d) => ({
+        leave_type: d.leave_type as LeaveType,
+        allocated: d.allocated || 0,
+        used: d.used || 0,
+        remaining: Math.max(0, (d.allocated || 0) - (d.used || 0)),
       }));
     }
 
@@ -454,7 +455,7 @@ export const getWorkspaceLeaveRequests = cache(
     if (options?.status && options.status !== "all") {
       query = query.eq("status", options.status);
     }
-    if (options?.leaveType && options.leaveType !== "all") {
+    if (options?.leaveType && (options.leaveType as string) !== "all") {
       query = query.eq("leave_type", options.leaveType);
     }
 

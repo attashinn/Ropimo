@@ -173,7 +173,16 @@ export function DepartmentDetailView({
     leadName,
     leadRole: leadTitle,
     leadId: leadMember?.user_id || department.lead_id || null,
-    members,
+    members: members.map((m) => {
+      const name = m.person?.full_name || "Member";
+      return {
+        id: m.user_id,
+        name,
+        avatarUrl: m.person?.avatar_url || null,
+        initial: (name[0] || "M").toUpperCase(),
+        role: (m.role as DepartmentRole) || "member",
+      };
+    }),
     member_count: members.length,
     project_count: localProjects.length,
     memberCount: members.length,

@@ -237,6 +237,29 @@ export async function bulkUpdateCandidatesStageAction(params: {
   }
 }
 
+export async function bulkRejectCandidatesAction(params: {
+  workspaceId: string;
+  candidateIds: string[];
+  reason?: string;
+}): Promise<ActionResult<{ rejectedCount: number; errors: string[] }>> {
+  const res = await bulkUpdateCandidatesStageAction({
+    workspaceId: params.workspaceId,
+    candidateIds: params.candidateIds,
+    toStage: "rejected",
+    reason: params.reason || "Bulk rejection",
+  });
+  if (!res.success) {
+    return { success: false, error: res.error };
+  }
+  return {
+    success: true,
+    data: {
+      rejectedCount: res.data?.updatedCount ?? 0,
+      errors: res.data?.errors ?? [],
+    },
+  };
+}
+
 // ─── 2. CANDIDATE RATINGS & TAGS ─────────────────────────────────────────────
 
 export async function updateCandidateRatingAction(params: {
@@ -651,7 +674,7 @@ export async function scheduleInterviewAction(params: {
       workspace_id: params.workspaceId,
       candidate_id: params.candidateId,
       event_type: "interview_scheduled",
-      created_by: user.id,
+      actor_id: user.id,
       notes: `Scheduled interview: ${interview.round_name}`,
       created_at: nowIso,
       metadata: {

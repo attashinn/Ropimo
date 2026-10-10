@@ -36,19 +36,23 @@ export interface RecruitmentOfferItem {
   status?: string;
   job_title?: string;
   salary?: string;
-  start_date?: string;
+  start_date?: string | null;
+  [key: string]: any;
 }
 
 export interface RecruitmentActivityItem {
   id: string;
   title?: string;
   description?: string;
+  [key: string]: any;
 }
 
 export interface PersonRecruitmentHistory {
-  interviews?: RecruitmentInterviewItem[];
+  candidate?: any;
+  applications?: any[];
+  interviews?: any[];
   offers?: RecruitmentOfferItem[];
-  activities?: RecruitmentActivityItem[];
+  activities?: any[];
 }
 
 export interface PersonDetailViewProps {
@@ -135,7 +139,7 @@ export function PersonDetailView({
         role: (person.role as "owner" | "admin" | "member" | "guest") || "member",
         jobTitle: person.job_title || undefined,
         departmentId: person.departments[0]?.id || undefined,
-        employmentType: person.employment_type ? (person.employment_type as "Full-time" | "Part-time" | "Contract" | "Internship") : undefined,
+        employmentType: person.employment_type || undefined,
       });
 
       if (!res.success) {
@@ -178,13 +182,14 @@ export function PersonDetailView({
       } else {
         setInvitationMsg({ text: "Invitation resent with a fresh secure link." });
         if (res.data?.token) {
+          const resData = res.data;
           setInvitationState((prev) =>
             prev
               ? {
                   ...prev,
-                  token: res.data.token,
+                  token: resData.token,
                   status: "Pending",
-                  expires_at: res.data.expiresAt,
+                  expires_at: resData.expiresAt,
                 }
               : null
           );

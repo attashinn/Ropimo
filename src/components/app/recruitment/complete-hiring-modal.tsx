@@ -96,8 +96,8 @@ export function CompleteHiringModal({
       setLoading(false);
       onClose();
       router.refresh();
-      if (res.data?.userId) {
-        router.push(`/app/people/onboarding/${res.data.userId}`);
+      if ((res.data as any)?.userId) {
+        router.push(`/app/people/onboarding/${(res.data as any).userId}`);
       }
       if (onSuccess) onSuccess();
     } catch {

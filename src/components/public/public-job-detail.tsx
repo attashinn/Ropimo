@@ -131,13 +131,13 @@ export function PublicJobDetail({ job }: PublicJobDetailProps) {
               )}
 
               {/* Requirements */}
-              {job.requirements && job.requirements.length > 0 && (
+              {job.requirements && (Array.isArray(job.requirements) ? job.requirements.length > 0 : Boolean(job.requirements)) && (
                 <div className="rounded-[16px] border border-[#D8DDD4] bg-white p-6 sm:p-7 shadow-2xs space-y-3.5 text-xs text-[#18221E]">
                   <h2 className="text-sm font-bold uppercase tracking-wider text-[#65706A]">
                     What We&apos;re Looking For
                   </h2>
                   <ul className="list-disc list-inside space-y-2 text-[#18221E] leading-relaxed">
-                    {job.requirements.map((req, i) => (
+                    {(Array.isArray(job.requirements) ? job.requirements : [job.requirements]).map((req: string, i: number) => (
                       <li key={i}>{req}</li>
                     ))}
                   </ul>

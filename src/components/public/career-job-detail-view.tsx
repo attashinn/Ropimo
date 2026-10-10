@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { PublicWorkspace, PublicJobOpening } from "@/lib/recruitment/public-queries";
-import { submitJobApplicationAction } from "@/lib/recruitment/actions";
+import { submitCandidateApplicationAction } from "@/lib/recruitment/actions";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { TurnstileWidget } from "@/components/security/turnstile-widget";
 
@@ -113,7 +113,7 @@ export function CareerJobDetailView({ workspace, job, isOpen }: CareerJobDetailV
     setErrorMsg(null);
 
     try {
-      const res = await submitJobApplicationAction({
+      const res = await submitCandidateApplicationAction({
         workspaceId: workspace.id,
         jobOpeningId: job.id,
         fullName: fullName.trim(),

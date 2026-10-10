@@ -330,7 +330,7 @@ export async function recordAbsenceAction(params: {
     return { success: true, data: savedRecord as unknown as AttendanceRecord };
   } catch (error: unknown) {
     const errMessage = error instanceof Error ? error.message : undefined;
-    return { success: false, error: error.message };
+    return { success: false, error: errMessage };
   }
 }
 
@@ -515,6 +515,10 @@ export async function reviewLeaveRequestAction(params: {
       user.id
     );
 
+    const finalDecision: "Approved" | "Rejected" =
+      params.decision ?? (params.action === "approve" ? "Approved" : "Rejected");
+    const isApproved = finalDecision === "Approved";
+
     if (request.status !== "Pending") {
       return { success: false, error: `This leave request is already ${request.status}.` };
     }
@@ -680,7 +684,7 @@ export async function cancelLeaveRequestAction(params: {
     return { success: true, data: updatedRequest as unknown as LeaveRequest };
   } catch (error: unknown) {
     const errMessage = error instanceof Error ? error.message : undefined;
-    return { success: false, error: error.message };
+    return { success: false, error: errMessage };
   }
 }
 
@@ -728,6 +732,6 @@ export async function updateAttendanceSettingsAction(params: {
     return { success: true, data: savedSettings as unknown as AttendanceSettings };
   } catch (error: unknown) {
     const errMessage = error instanceof Error ? error.message : undefined;
-    return { success: false, error: error.message };
+    return { success: false, error: errMessage };
   }
 }

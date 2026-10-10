@@ -128,7 +128,8 @@ export function ScheduleInterviewModal({
       const res = await scheduleInterviewAction({
         workspaceId,
         candidateId: activeCandidate.id,
-        applicationId: application?.id,
+        applicationId: application?.id || "",
+        jobOpeningId: application?.job_opening_id || (activeCandidate as any).latest_job_opening_id || "",
         roundName: roundName.trim(),
         interviewType,
         interviewerIds: selectedInterviewerIds,

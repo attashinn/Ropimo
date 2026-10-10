@@ -261,7 +261,7 @@ export function CandidateDetailView({
       : null;
   const avgOverall =
     totalScorecards > 0
-      ? (feedbacks.reduce((acc, f) => acc + (f.overall_rating || f.rating || 3), 0) / totalScorecards).toFixed(1)
+      ? (feedbacks.reduce((acc, f) => acc + (f.overall_rating || (f as any).rating || 3), 0) / totalScorecards).toFixed(1)
       : null;
 
   return (
@@ -473,7 +473,7 @@ export function CandidateDetailView({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#246244] hover:underline"
                   >
-                    <Linkedin className="h-3.5 w-3.5" />
+                    <ExternalLink className="h-3.5 w-3.5" />
                     <span>LinkedIn</span>
                   </a>
                 )}

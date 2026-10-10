@@ -1028,7 +1028,21 @@ export async function submitCandidateApplicationAction(params: {
 }
 
 export async function submitJobApplicationAction(formData: FormData) {
-  return await submitCandidateApplicationAction(formData);
+  return await submitCandidateApplicationAction({
+    workspaceId: formData.get("workspaceId") as string,
+    jobOpeningId: formData.get("jobOpeningId") as string,
+    fullName: formData.get("fullName") as string,
+    email: formData.get("email") as string,
+    phone: formData.get("phone") as string | null,
+    portfolioUrl: formData.get("portfolioUrl") as string | null,
+    linkedinUrl: formData.get("linkedinUrl") as string | null,
+    githubUrl: formData.get("githubUrl") as string | null,
+    cvStorageKey: formData.get("cvStorageKey") as string,
+    cvFileName: formData.get("cvFileName") as string,
+    coverLetter: formData.get("coverLetter") as string | null,
+    turnstileToken: formData.get("turnstileToken") as string | null,
+    consent: formData.get("consent") === "true",
+  });
 }
 
 // ─── 3. PIPELINE STAGE TRANSITION ───────────────────────────────────────────
@@ -1544,7 +1558,7 @@ export async function sendOfferAction(params: {
   }
 }
 
-export async function viewPublicOfferAction(tokenOrOfferId: string): Promise<ActionResult> {
+export async function viewPublicOfferAction(tokenOrOfferId: string): Promise<ActionResult<import("@/components/public/candidate-offer-view").CandidateOfferViewProps["offer"]>> {
   try {
     const store = recruitmentStore.getStore();
     const offer = store.offers.find(

@@ -78,7 +78,7 @@ export const getUserContext = cache(
         .select("department_id, role")
         .eq("workspace_id", workspaceId)
         .eq("user_id", user.id);
-      deptRows = (fallbackDept.data || []) as typeof deptRows;
+      deptRows = (fallbackDept.data || []) as unknown as typeof deptRows;
     }
 
     const workspaceRole = wsMember.role as WorkspaceRole;

@@ -626,7 +626,7 @@ export async function getEmployeeOnboarding(
           id: `chk-7-${person.user_id}`,
           title: "First Day Team Intro & Orientation",
           description: "Complete intro meeting with workspace administrator.",
-          section: "team",
+          section: "access",
           required: false,
           completed: false,
         },

@@ -378,7 +378,7 @@ export async function resendEmployeeInvitationAction(params: {
   workspaceId: string;
   invitationId?: string;
   email?: string;
-}): Promise<{ success: boolean; error?: string; data?: { inviteUrl: string; cooldownRemaining?: number } }> {
+}): Promise<{ success: boolean; error?: string; data?: { inviteUrl: string; cooldownRemaining?: number; token?: string; expiresAt?: string } }> {
   const { workspaceId, invitationId, email } = params;
   if (!workspaceId) return { success: false, error: "Workspace ID is required." };
 
@@ -566,7 +566,7 @@ export async function resendEmployeeInvitationAction(params: {
 
   return {
     success: true,
-    data: { inviteUrl },
+    data: { inviteUrl, token: rawToken, expiresAt: newExpiresAt },
   };
 }
 
@@ -945,7 +945,7 @@ export async function inviteEmployeeAction(params: {
   employmentType?: EmploymentType;
   employeeId?: string;
   userId?: string;
-}): Promise<{ success: boolean; error?: string; data?: { token?: string; inviteUrl?: string } }> {
+}): Promise<{ success: boolean; error?: string; data?: { token?: string; inviteUrl?: string; expiresAt?: string } }> {
   try {
     const role = (params.role || "member") as "admin" | "hr" | "manager" | "member";
     const safeRole: "admin" | "hr" | "manager" | "member" = ["admin", "hr", "manager", "member"].includes(role)
@@ -975,6 +975,7 @@ export async function inviteEmployeeAction(params: {
       data: {
         token: firstResult.token,
         inviteUrl: firstResult.inviteUrl,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       },
     };
   } catch (err: unknown) {

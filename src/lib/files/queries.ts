@@ -99,7 +99,7 @@ export const getWorkspaceFiles = cache(
             user: s.user_id ? peopleMap.get(s.user_id) || null : null,
             department_id: s.department_id,
             department: s.department_id ? deptMap.get(s.department_id) || null : null,
-            permission: s.permission || "view",
+            permission: (s.permission || "view") as import("@/types/files").FilePermission,
           });
           sharesMap.set(targetId, list);
         }
@@ -150,7 +150,7 @@ export const getWorkspaceFiles = cache(
           project_id: f.project_id,
           project_name: project?.name || null,
           project: project ? { id: project.id, name: project.name, color: project.color, icon: project.icon } : null,
-          access_level: f.access_level || "company",
+          access_level: (f.access_level || "company") as import("@/types/files").FileAccessLevel,
           shares: itemShares,
           is_starred: f.is_starred || false,
           is_trash: f.is_trash || false,
@@ -192,7 +192,7 @@ export const getWorkspaceFiles = cache(
           project_name: project?.name || null,
           project: project ? { id: project.id, name: project.name, color: project.color, icon: project.icon } : null,
           task_id: f.task_id,
-          access_level: f.access_level || "company",
+          access_level: (f.access_level || "company") as import("@/types/files").FileAccessLevel,
           shares: itemShares,
           is_starred: f.is_starred || false,
           is_trash: f.is_trash || false,

@@ -343,7 +343,7 @@ export function CreateProjectModal({
                 onSuccess={(createdItem) => {
                   onClose();
                   router.refresh();
-                  if (onProjectCreated && createdItem.project) onProjectCreated(createdItem.project);
+                  if (onProjectCreated && (createdItem as any)?.project) onProjectCreated((createdItem as any).project);
                   if (onSuccess) onSuccess();
                 }}
                 onCancel={onClose}

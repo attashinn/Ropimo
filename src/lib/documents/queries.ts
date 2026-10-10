@@ -151,7 +151,7 @@ export const getWorkspaceDocuments = cache(
           author,
           author_name: author?.full_name || "Tashin Khan",
           author_avatar: author?.avatar_url || null,
-          access_level: d.access_level || "company",
+          access_level: (d.access_level || "company") as import("@/types/documents").DocumentAccessLevel,
           is_starred: d.is_starred || false,
           is_trash: d.is_trash || false,
           word_count: d.word_count || 100,

@@ -249,7 +249,7 @@ export function UserProfileView({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as "overview" | "security" | "notifications" | "workspace")}
+                  onClick={() => setActiveTab(tab.id as "general" | "work" | "notifications" | "security")}
                   className={cn(
                     "relative flex items-center gap-2 pb-3 transition-colors cursor-pointer",
                     isActive

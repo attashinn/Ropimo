@@ -279,22 +279,7 @@ export const recruitmentStore = {
     return store.interviews.length < prevLen;
   },
 
-  // Candidate Events
-  getCandidateEvents(candidateId: string, workspaceId: string): CandidateEvent[] {
-    const store = ensureStore();
-    return (store.candidate_events || [])
-      .filter((e) => e.candidate_id === candidateId && e.workspace_id === workspaceId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  },
-
   addCandidateEvent(event: CandidateEvent) {
-    const store = ensureStore();
-    if (!store.candidate_events) store.candidate_events = [];
-    store.candidate_events.unshift(event);
-    saveStore(store);
-  },
-
-  saveCandidateEvent(event: CandidateEvent) {
     const store = ensureStore();
     if (!store.candidate_events) store.candidate_events = [];
     store.candidate_events.unshift(event);

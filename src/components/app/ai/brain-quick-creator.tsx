@@ -31,7 +31,7 @@ export function BrainQuickCreator({
   const [attachedFiles, setAttachedFiles] = React.useState<AttachedFileItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [result, setResult] = React.useState<Record<string, unknown> | null>(null);
+  const [result, setResult] = React.useState<Record<string, any> | null>(null);
 
   const isProject = type === "project";
 

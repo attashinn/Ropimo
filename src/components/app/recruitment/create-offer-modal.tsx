@@ -8,13 +8,16 @@ import { Department } from "@/types/department";
 import { createOfferAction, sendOfferAction } from "@/lib/recruitment/actions";
 import { PrimaryButton } from "@/components/ui/primary-button";
 
+import { WorkspacePerson } from "@/types/people";
+
 export interface CreateOfferModalProps {
   isOpen: boolean;
   onClose: () => void;
   workspaceId: string;
   candidate: Candidate;
-  application: CandidateApplication;
+  application?: CandidateApplication | null;
   departments: Department[];
+  teamMembers?: WorkspacePerson[];
   onSuccess?: () => void;
 }
 
@@ -27,16 +30,17 @@ export function CreateOfferModal({
   candidate,
   application,
   departments,
+  teamMembers,
   onSuccess,
 }: CreateOfferModalProps) {
   const router = useRouter();
 
   const [step, setStep] = React.useState<"form" | "preview">("form");
   const [jobTitle, setJobTitle] = React.useState(
-    application.job_opening?.title || candidate.latest_job_title || "Software Engineer"
+    application?.job_opening?.title || candidate.latest_job_title || "Software Engineer"
   );
   const [departmentId, setDepartmentId] = React.useState(
-    application.job_opening?.department_id || departments[0]?.id || ""
+    application?.job_opening?.department_id || departments[0]?.id || ""
   );
   const [employmentType, setEmploymentType] = React.useState<EmploymentType>("Full-time");
   const [salary, setSalary] = React.useState("$150,000");
@@ -63,9 +67,9 @@ export function CreateOfferModal({
     try {
       const res = await createOfferAction({
         workspaceId,
-        applicationId: application.id,
+        applicationId: application?.id || "",
         candidateId: candidate.id,
-        jobOpeningId: application.job_opening_id,
+        jobOpeningId: application?.job_opening_id || (candidate as any).latest_job_opening_id || "",
         jobTitle: jobTitle.trim(),
         departmentId: departmentId || undefined,
         employmentType,
@@ -83,10 +87,10 @@ export function CreateOfferModal({
         return;
       }
 
-      if (actionType === "send" && res.data?.id) {
+      if (actionType === "send" && (res.data as any)?.id) {
         await sendOfferAction({
           workspaceId,
-          offerId: res.data.id,
+          offerId: (res.data as any).id,
         });
       }
 

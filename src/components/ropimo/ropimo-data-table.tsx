@@ -87,7 +87,7 @@ export function RopimoDataTable<TData>({
   // Sort
   const sortedData = React.useMemo(() => {
     if (!sortKey) return filteredData;
-    return [...filteredData].sort((a: T, b: T) => {
+    return [...filteredData].sort((a, b) => {
       const aVal = (a as Record<string, unknown>)[sortKey];
       const bVal = (b as Record<string, unknown>)[sortKey];
       if (aVal === bVal) return 0;

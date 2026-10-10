@@ -51,7 +51,7 @@ export const getWorkspaceMeetings = cache(
           workspace_id: r.workspace_id,
           title: r.title,
           description: r.description || "",
-          type: (r.type || "Internal") as MeetingType,
+          type: ((r as unknown as Record<string, unknown>).type || "Internal") as MeetingType,
           status,
           date: rawDate,
           start_time: rawStartTime,

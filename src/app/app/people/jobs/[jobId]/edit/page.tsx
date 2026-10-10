@@ -42,7 +42,7 @@ export default async function EditJobOpeningPage(props: PageProps) {
     <JobOpeningEditor
       workspaceId={workspace.id}
       workspaceSlug={workspace.slug || workspace.id}
-      userRole={workspace.userRole || "admin"}
+      userRole={(workspace as any).userRole || "admin"}
       departments={departments || []}
       members={memberOptions}
       initialJob={job}

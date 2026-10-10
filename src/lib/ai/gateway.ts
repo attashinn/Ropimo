@@ -33,8 +33,9 @@ export interface AgentAction {
   type: "create_task" | "create_project" | "draft_job" | "draft_policy";
   title: string;
   description: string;
-  payload: Record<string, unknown>;
+  payload: Record<string, any>;
   executed?: boolean;
+  error?: string;
   result?: unknown;
 }
 

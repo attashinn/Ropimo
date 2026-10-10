@@ -5,7 +5,9 @@ import {
   CalendarEventType,
   CalendarEventStatus,
   CalendarAttachment,
-  CalendarComment,
+  CalendarEventComment,
+  CalendarDepartmentRef,
+  CalendarProjectRef,
 } from "@/types/calendar";
 import { Tables } from "@/types/database";
 import { getWorkspacePeople } from "@/lib/people/queries";
@@ -610,7 +612,7 @@ export const getWorkspaceCalendarEvents = cache(
         attachmentsMap.set(row.event_id, list);
       });
 
-      const commentsMap = new Map<string, CalendarComment[]>();
+      const commentsMap = new Map<string, CalendarEventComment[]>();
       (commentsRes.data || []).forEach((row) => {
         const list = commentsMap.get(row.event_id) || [];
         list.push({
@@ -641,13 +643,11 @@ export const getWorkspaceCalendarEvents = cache(
           start_time: row.start_time,
           end_time: row.end_time,
           department_id: row.department_id,
-          department_name: row.departments?.name || null,
-          department_color: row.departments?.color || null,
-          department: row.departments || null,
+          department: ((row as any).departments as CalendarDepartmentRef) || null,
           project_id: row.project_id,
-          project_name: row.projects?.name || null,
-          project_color: row.projects?.color || null,
-          project: row.projects || null,
+          project_name: (row as any).projects?.name || null,
+          project_color: (row as any).projects?.color || null,
+          project: ((row as any).projects as CalendarProjectRef) || null,
           location: row.location,
           meeting_link: row.meeting_link,
           status: (row.status || "scheduled") as CalendarEventStatus,

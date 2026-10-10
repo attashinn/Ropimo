@@ -37,7 +37,7 @@ const CreateDocumentSchema = z.object({
     "Procurement",
     "Other",
   ]),
-  status: z.enum(["Draft", "Review", "Published", "Archived"]).optional().default("Published"),
+  status: z.enum(["Draft", "In Review", "Published", "Archived", "Approved", "Expiring Soon"]).optional().default("Published"),
   departmentId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   accessLevel: z.enum(["private", "department", "company"]).optional().default("company"),
@@ -47,7 +47,7 @@ const UpdateDocumentContentSchema = z.object({
   documentId: z.string().min(1, "Document ID is required."),
   content: z.string(),
   title: z.string().optional(),
-  status: z.enum(["Draft", "Review", "Published", "Archived"]).optional(),
+  status: z.enum(["Draft", "In Review", "Published", "Archived", "Approved", "Expiring Soon"]).optional(),
   workspaceId: z.string().optional().default("ws-default"),
   versionNote: z.string().optional(),
 });
@@ -160,6 +160,7 @@ export async function createDocumentAction(
         department_id: departmentId || null,
         project_id: projectId || null,
         author_id: user?.id || null,
+        author_name: (user?.user_metadata?.full_name as string) || "Current User",
         author: {
           id: user?.id || "u-current",
           user_id: user?.id || "u-current",
@@ -208,6 +209,7 @@ export async function createDocumentAction(
       department_id: newDoc.department_id,
       project_id: newDoc.project_id,
       author_id: newDoc.author_id,
+      author_name: (user?.user_metadata?.full_name as string) || "Current User",
       word_count: newDoc.word_count || 0,
       read_time_minutes: newDoc.read_time_minutes || 1,
       is_starred: newDoc.is_starred || false,

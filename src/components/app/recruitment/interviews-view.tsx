@@ -249,7 +249,7 @@ export function InterviewsView({
                 { value: "all", label: "All Interviewers" },
                 ...teamMembers.map((m) => ({
                   value: m.user_id,
-                  label: m.full_name,
+                  label: m.full_name || m.email || "Team Member",
                 })),
               ]}
             />
