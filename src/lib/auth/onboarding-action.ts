@@ -96,15 +96,18 @@ export async function saveOnboardingAction(rawInput: SaveOnboardingInput) {
     return { success: false, error: wsError?.message || "Failed to create workspace." };
   }
 
+  const userFullName = (user.user_metadata?.full_name as string) || null;
+
   // 2. Insert into workspace_members
   const { error: memberError } = await adminClient.from("workspace_members").insert({
     workspace_id: workspaceId,
     user_id: user.id,
     role: dbRole,
+    full_name: userFullName,
   });
 
   if (memberError) {
-    // If check constraint on role rejected 'hr' or 'manager', fallback to 'owner'
+    // Fallback if check constraint rejected custom role or extra column
     await adminClient.from("workspace_members").insert({
       workspace_id: workspaceId,
       user_id: user.id,
@@ -134,6 +137,7 @@ export async function saveOnboardingAction(rawInput: SaveOnboardingInput) {
 
   revalidatePath("/dashboard");
   revalidatePath("/onboarding");
+  revalidatePath("/app");
 
   return { success: true, workspaceId };
 }

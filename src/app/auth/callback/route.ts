@@ -37,9 +37,12 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/reset-password`);
     }
 
+    // If user was heading to an invitation, preserve their target
+    const isInvitationTarget = Boolean(nextParam && nextParam.startsWith("/invite"));
+
     // Check if the user already has a workspace
     const user = data.user;
-    if (user) {
+    if (user && !isInvitationTarget) {
       const { data: memberships } = await supabase
         .from("workspace_members")
         .select("workspace_id")

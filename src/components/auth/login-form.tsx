@@ -50,10 +50,30 @@ export function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      let { error } = await supabase.auth.signInWithPassword({
         email: data.email.trim().toLowerCase(),
         password: data.password,
       });
+
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("email not confirmed")) {
+          // Self-heal account confirmation for unconfirmed accounts
+          try {
+            const { autoConfirmUserAction } = await import("@/lib/auth/actions");
+            const healed = await autoConfirmUserAction({ email: data.email.trim().toLowerCase() });
+            if (healed.success) {
+              const retry = await supabase.auth.signInWithPassword({
+                email: data.email.trim().toLowerCase(),
+                password: data.password,
+              });
+              if (!retry.error) {
+                error = null;
+              }
+            }
+          } catch {}
+        }
+      }
 
       if (error) {
         const msg = error.message.toLowerCase();
@@ -76,6 +96,12 @@ export function LoginForm() {
         return;
       }
 
+      // If user was directed to a specific destination (e.g. an invite link), honor it
+      if (nextParam) {
+        window.location.href = targetRedirect;
+        return;
+      }
+
       // Check if user has an existing workspace
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
@@ -86,14 +112,12 @@ export function LoginForm() {
           .limit(1);
 
         if (!memberships || memberships.length === 0) {
-          router.push("/onboarding");
-          router.refresh();
+          window.location.href = "/onboarding";
           return;
         }
       }
 
-      router.push(targetRedirect);
-      router.refresh();
+      window.location.href = targetRedirect;
     } catch {
       toast.error("An unexpected error occurred. Please try again.");
       setAuthError("Unable to log in at this moment. Please try again.");

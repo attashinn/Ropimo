@@ -7,6 +7,7 @@ import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
 import { LogoIcon } from "@/components/landing/icons";
 import Link from "next/link";
+import { saveOnboardingAction } from "@/lib/auth/onboarding-action";
 
 const INDUSTRIES = [
   "Software & Technology",
@@ -85,8 +86,6 @@ export function OnboardingFlow() {
     setErrorMessage(null);
 
     try {
-      const { saveOnboardingAction } = await import("@/lib/auth/onboarding-action");
-
       const res = await saveOnboardingAction({
         companyName: companyName.trim(),
         teamSize,

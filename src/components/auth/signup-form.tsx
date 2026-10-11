@@ -74,43 +74,38 @@ export function SignupForm() {
     setAuthError(null);
 
     try {
-      const supabase = createClient();
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-
-      const { data: authData, error } = await supabase.auth.signUp({
-        email: data.email.trim().toLowerCase(),
+      const { signUpAction } = await import("@/lib/auth/actions");
+      const result = await signUpAction({
+        fullName: data.fullName,
+        email: data.email,
         password: data.password,
-        options: {
-          data: {
-            full_name: data.fullName.trim(),
-          },
-          emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
-        },
       });
 
-      if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("already registered") || msg.includes("user already exists")) {
-          setAuthError("An account with this email may already exist. Try logging in.");
-        } else if (msg.includes("rate limit") || msg.includes("too many requests")) {
-          setAuthError("Too many attempts. Please wait a few minutes before trying again.");
-        } else {
-          setAuthError("Could not create account. Please check your details and try again.");
-        }
+      if (!result.success) {
+        setAuthError(result.error || "Could not create account. Please check your details and try again.");
         setIsLoading(false);
         return;
       }
 
-      if (authData.session) {
-        if (nextParam) {
-          router.push(nextParam);
-        } else {
-          router.push("/onboarding");
-        }
+      // Establish client session directly
+      const supabase = createClient();
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+      });
+
+      if (signInErr) {
+        window.location.href = `/login?email=${encodeURIComponent(
+          data.email.trim()
+        )}&message=${encodeURIComponent("Account created! Please sign in.")}${
+          nextParam ? `&next=${encodeURIComponent(nextParam)}` : ""
+        }`;
         return;
       }
 
-      router.push(`/verify-email?email=${encodeURIComponent(data.email.trim())}`);
+      toast.success("Account created successfully!");
+      const target = nextParam || "/onboarding";
+      window.location.href = target;
     } catch {
       toast.error("An unexpected error occurred. Please try again.");
       setAuthError("Unable to create account right now. Please try again later.");
