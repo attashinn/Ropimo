@@ -251,7 +251,60 @@ export function extractAgentActions(text: string): { cleanedText: string; action
 }
 
 /**
- * Send chat completion request to Cloudflare Workers AI
+ * Map Cloudflare or shorthand model names to OpenRouter model slugs
+ */
+export function resolveOpenRouterModel(model?: string): string {
+  if (!model) return "meta-llama/llama-3.3-70b-instruct";
+  if (model.includes("@cf/meta/llama-3.3-70b")) return "meta-llama/llama-3.3-70b-instruct";
+  if (model.includes("@cf/deepseek-ai/deepseek-r1")) return "deepseek/deepseek-r1-distill-qwen-32b";
+  if (model.includes("@cf/meta/llama-3.1-8b")) return "meta-llama/llama-3.1-8b-instruct";
+  if (model.includes("@cf/meta/llama-3.2-3b")) return "meta-llama/llama-3.2-3b-instruct";
+  return model.replace(/^@cf\//, "");
+}
+
+/**
+ * Send chat completion request to OpenRouter
+ */
+export async function queryOpenRouterDirect(params: {
+  apiKey: string;
+  messages: ChatMessage[];
+  model?: string;
+  temperature?: number;
+}): Promise<{ success: boolean; content?: string; error?: string; modelUsed?: string }> {
+  const model = resolveOpenRouterModel(params.model);
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${params.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://zambic.com",
+        "X-Title": "Zambic Operations Copilot",
+      },
+      body: JSON.stringify({
+        model,
+        messages: params.messages,
+        temperature: params.temperature ?? 0.6,
+        max_tokens: 3000,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      const errMsg = data?.error?.message || `OpenRouter returned HTTP ${response.status}`;
+      return { success: false, error: errMsg };
+    }
+
+    const content = data?.choices?.[0]?.message?.content || "";
+    return { success: true, content, modelUsed: model };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "OpenRouter network request failed.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Send chat completion request through OpenRouter (primary) or Cloudflare Workers AI (fallback)
  */
 export async function queryAIGateway(params: {
   messages: ChatMessage[];
@@ -259,80 +312,101 @@ export async function queryAIGateway(params: {
   temperature?: number;
   workspaceContext?: WorkspaceContextData;
 }): Promise<GatewayResponse> {
-  const token = process.env.CLOUDFLARE_AI_TOKEN || "";
-  const accountId =
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const cfToken = process.env.CLOUDFLARE_AI_TOKEN;
+  const cfAccountId =
     process.env.CLOUDFLARE_ACCOUNT_ID ||
     process.env.CLOUDFLARE_R2_ACCOUNT_ID ||
     "";
-  const model = params.model || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
-  if (!token) {
+  if (!openRouterKey && !cfToken) {
     return {
       success: false,
-      error: "Cloudflare AI token is missing. Please set CLOUDFLARE_AI_TOKEN in your environment.",
+      error: "No AI provider configured. Please set OPENROUTER_API_KEY or CLOUDFLARE_AI_TOKEN in .env.local.",
     };
   }
 
   const systemPrompt = buildWorkspaceSystemPrompt(params.workspaceContext);
-
   const fullMessages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...params.messages,
   ];
 
-  try {
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: fullMessages,
-        temperature: params.temperature ?? 0.6,
-        max_tokens: 3000,
-      }),
+  let rawContent = "";
+  let modelUsed = params.model || "meta-llama/llama-3.3-70b-instruct";
+
+  // 1. Prioritize OpenRouter if key is present
+  if (openRouterKey) {
+    const openRouterResult = await queryOpenRouterDirect({
+      apiKey: openRouterKey,
+      messages: fullMessages,
+      model: params.model,
+      temperature: params.temperature,
     });
 
-    const data = await response.json();
-
-    if (!response.ok || data.success === false || data.errors?.length > 0) {
-      const errMsg =
-        data?.errors?.[0]?.message ||
-        data?.error?.message ||
-        `Cloudflare Workers AI returned status ${response.status}`;
+    if (openRouterResult.success && openRouterResult.content) {
+      rawContent = openRouterResult.content;
+      modelUsed = openRouterResult.modelUsed || modelUsed;
+    } else if (!cfToken) {
       return {
         success: false,
-        error: errMsg,
+        error: openRouterResult.error || "OpenRouter inference failed.",
       };
+    } else {
+      console.warn("OpenRouter failed, attempting fallback to Cloudflare Workers AI:", openRouterResult.error);
     }
-
-    let rawContent = data?.choices?.[0]?.message?.content || "";
-
-    // Clean up DeepSeek reasoning think tags if present
-    if (rawContent.includes("</think>")) {
-      const parts = rawContent.split("</think>");
-      rawContent = parts[parts.length - 1].trim();
-    }
-
-    const { cleanedText, actions } = extractAgentActions(rawContent);
-
-    return {
-      success: true,
-      content: cleanedText,
-      actions,
-      modelUsed: model,
-    };
-  } catch (error: unknown) {
-    console.error("Cloudflare AI request error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to communicate with Cloudflare Workers AI.";
-    return {
-      success: false,
-      error: errorMessage,
-    };
   }
+
+  // 2. Fallback to Cloudflare Workers AI if OpenRouter was not used or failed
+  if (!rawContent && cfToken) {
+    const cfModel = params.model || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+    try {
+      const endpoint = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/v1/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cfToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: cfModel,
+          messages: fullMessages,
+          temperature: params.temperature ?? 0.6,
+          max_tokens: 3000,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.success === false || data.errors?.length > 0) {
+        const errMsg =
+          data?.errors?.[0]?.message ||
+          data?.error?.message ||
+          `Cloudflare Workers AI returned status ${response.status}`;
+        return { success: false, error: errMsg };
+      }
+
+      rawContent = data?.choices?.[0]?.message?.content || "";
+      modelUsed = cfModel;
+    } catch (cfErr: unknown) {
+      const msg = cfErr instanceof Error ? cfErr.message : "Cloudflare Workers AI request failed.";
+      return { success: false, error: msg };
+    }
+  }
+
+  // Clean up DeepSeek reasoning think tags if present
+  if (rawContent.includes("</think>")) {
+    const parts = rawContent.split("</think>");
+    rawContent = parts[parts.length - 1].trim();
+  }
+
+  const { cleanedText, actions } = extractAgentActions(rawContent);
+
+  return {
+    success: true,
+    content: cleanedText,
+    actions,
+    modelUsed,
+  };
 }
 
 

@@ -17,16 +17,18 @@ export function GoogleButton({ redirectPath = "/dashboard" }: GoogleButtonProps)
       setLoading(true);
       const supabase = createClient();
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const { error } = await supabase.auth.signInWithOAuth({
+      const res = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
         },
       });
 
-      if (error) {
+      if (res.error) {
         toast.error("Could not sign in with Google. Please try again.");
         setLoading(false);
+      } else if (res.data?.url && typeof window !== "undefined") {
+        window.location.href = res.data.url;
       }
     } catch {
       toast.error("An unexpected error occurred during Google sign in.");

@@ -837,8 +837,8 @@ USING (public.is_workspace_member(workspace_id));
 
 CREATE POLICY "workspace_documents_manage" ON public.workspace_documents
 FOR ALL TO authenticated
-USING (public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR created_by = auth.uid())
-WITH CHECK (public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR created_by = auth.uid());
+USING (public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR author_id = auth.uid())
+WITH CHECK (public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR author_id = auth.uid());
 
 -- WORKSPACE DOCUMENT VERSIONS (Parent: workspace_documents)
 DROP POLICY IF EXISTS "Members can view document versions" ON public.workspace_document_versions;
@@ -857,14 +857,14 @@ USING (
   EXISTS (
     SELECT 1 FROM public.workspace_documents d
     WHERE d.id = workspace_document_versions.document_id
-      AND (public.has_workspace_role(d.workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR d.created_by = auth.uid())
+      AND (public.has_workspace_role(d.workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR d.author_id = auth.uid())
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.workspace_documents d
     WHERE d.id = workspace_document_versions.document_id
-      AND (public.has_workspace_role(d.workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR d.created_by = auth.uid())
+      AND (public.has_workspace_role(d.workspace_id, ARRAY['owner', 'admin', 'hr', 'manager']) OR d.author_id = auth.uid())
   )
 );
 
@@ -1053,9 +1053,9 @@ CREATE POLICY "workspace_meetings_manage" ON public.workspace_meetings
 FOR ALL TO authenticated
 USING (
   public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'manager'])
-  OR created_by = auth.uid()
+  OR organizer_id = auth.uid()
 )
 WITH CHECK (
   public.has_workspace_role(workspace_id, ARRAY['owner', 'admin', 'manager'])
-  OR created_by = auth.uid()
+  OR organizer_id = auth.uid()
 );

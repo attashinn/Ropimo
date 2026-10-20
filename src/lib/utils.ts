@@ -71,7 +71,7 @@ export function getAppUrl(requestHeaders?: Headers | null): string {
 
   // Production or Vercel preview fallback
   if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    return "https://ropimo.vercel.app";
+    return "https://app.zambic.com";
   }
 
   // Local development fallback

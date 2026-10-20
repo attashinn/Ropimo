@@ -68,12 +68,6 @@ export async function POST(request: Request) {
       email: p.email,
     }));
 
-    // Call Cloudflare Workers AI to parse prompt
-    const token = process.env.CLOUDFLARE_AI_TOKEN || "";
-    const accountId =
-      process.env.CLOUDFLARE_ACCOUNT_ID ||
-      process.env.CLOUDFLARE_R2_ACCOUNT_ID ||
-      "";
 
     const isProject = type === "project";
 
@@ -109,25 +103,52 @@ ${
 }`
 }`;
 
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
-    const cfResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    // Call AI provider (OpenRouter or Cloudflare Workers AI)
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    const token = process.env.CLOUDFLARE_AI_TOKEN || "";
+    const accountId =
+      process.env.CLOUDFLARE_ACCOUNT_ID ||
+      process.env.CLOUDFLARE_R2_ACCOUNT_ID ||
+      "";
+
+    let content = "";
+
+    if (openRouterKey) {
+      const { queryOpenRouterDirect } = await import("@/lib/ai/gateway");
+      const result = await queryOpenRouterDirect({
+        apiKey: openRouterKey,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
         temperature: 0.2,
-      }),
-    });
+      });
+      if (result.success && result.content) {
+        content = result.content;
+      }
+    }
 
-    const cfData = await cfResponse.json();
-    let content = cfData?.choices?.[0]?.message?.content || "";
+    if (!content && token) {
+      const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`;
+      const cfResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.2,
+        }),
+      });
+
+      const cfData = await cfResponse.json();
+      content = cfData?.choices?.[0]?.message?.content || "";
+    }
 
     // Clean JSON output
     content = content.replace(/```json/g, "").replace(/```/g, "").trim();

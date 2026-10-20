@@ -2,8 +2,11 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co"),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder-anon-key"),
+  DATABASE_URL: z.string().optional(),
+  NEON_DATABASE_URL: z.string().optional(),
+  SESSION_SECRET: z.string().optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000"),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "neon-anon-key"),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   
@@ -32,6 +35,15 @@ const envSchema = z.object({
   // Cloudflare AI
   CLOUDFLARE_AI_TOKEN: z.string().optional(),
   CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+
+  // OpenRouter & ElevenLabs
+  OPENROUTER_API_KEY: z.string().optional(),
+  ELEVENLABS_API_KEY: z.string().optional(),
+
+  // Neon Auth (Hosted Better Auth on Neon)
+  NEON_AUTH_URL: z.string().optional(),
+  NEXT_PUBLIC_NEON_AUTH_URL: z.string().optional(),
+  NEON_AUTH_JWKS_URL: z.string().optional(),
 });
 
 function parseEnv() {

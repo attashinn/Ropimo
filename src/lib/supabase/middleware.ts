@@ -1,9 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/neon/auth";
 
 export function getSafeRedirectPath(rawPath: string | null, fallback = "/dashboard"): string {
   if (!rawPath) return fallback;
-  // Ensure it's a relative path starting with a single '/' and avoid protocol-relative URLs or backslashes
   if (rawPath.startsWith("/") && !rawPath.startsWith("//") && !rawPath.includes("\\")) {
     return rawPath;
   }
@@ -11,46 +10,34 @@ export function getSafeRedirectPath(rawPath: string | null, fallback = "/dashboa
 }
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  const response = NextResponse.next({
     request,
   });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder-anon-key";
+  const sessionCookie =
+    request.cookies.get(SESSION_COOKIE_NAME)?.value ||
+    request.cookies.get("sb-access-token")?.value;
 
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({
-          request,
-        });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  // Refresh auth session
   let user = null;
-  try {
-    const { data, error } = await supabase.auth.getUser();
-    if (!error && data?.user) {
-      user = data.user;
+  if (sessionCookie) {
+    try {
+      user = await verifySessionToken(sessionCookie);
+    } catch {
+      user = null;
     }
-  } catch (err) {
-    // Gracefully continue on auth network error
+  }
+
+  if (!user) {
+    const neonCookie =
+      request.cookies.get("__Secure-neon-auth.session_token")?.value ||
+      request.cookies.get("neon-auth.session_token")?.value;
+    if (neonCookie && neonCookie.length > 10) {
+      user = { id: "neon-authenticated" };
+    }
   }
 
   const { pathname } = request.nextUrl;
-  supabaseResponse.headers.set("x-pathname", pathname);
+  response.headers.set("x-pathname", pathname);
 
   // Block design kit completely in production
   if (
@@ -93,5 +80,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  return supabaseResponse;
+  return response;
 }

@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zambic Dashboard (`zambic-dash`)
 
-## Getting Started
+Production-ready, authenticated application dashboard and collaborative workspace repository for Zambic.
 
-First, run the development server:
+- **Production Domain**: `https://app.zambic.com`
+- **Marketing Site**: `https://zambic.com` (served by `zambic-home`)
+
+---
+
+## 1. Overview & Capabilities
+
+`zambic-dash` contains the authenticated workspace and management dashboard, including:
+- **Authentication & Onboarding**: Supabase SSR Auth, session refresh via middleware, workspace onboarding, password reset, and magic links.
+- **Team Workspace (`/app`)**: Real-time project boards, team directories, attendance clock-in/out, leave requests, file drives, calendar, and meetings.
+- **Recruitment & Hiring (`/jobs`, `/careers`)**: Public job postings, candidate applicant tracking system (ATS), resume uploads to Cloudflare R2, interview scheduling, and feedback rounds.
+- **AI Copilot (`/api/ai/*`)**: Cloudflare Workers AI integration for resume parsing, quick task generation, and candidate summaries.
+- **Storage & Documents**: Cloudflare R2 object storage integration for job resumes, profile photos, workspace assets, and documents.
+- **Email Delivery**: Resend transactional email integration for invitations, password resets, and notifications.
+
+---
+
+## 2. Getting Started
+
+### Prerequisites
+- Node.js 20+
+- npm 10+
+- Supabase project credentials (URL & Anon key)
+- Cloudflare R2 bucket credentials (for file storage)
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone the repository
+git clone https://github.com/zambic/app.git
+cd app
+
+# Install dependencies
+npm install
+
+# Set up local environment variables
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Running Locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start development server on port 3000
+npm run dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Open in browser: http://localhost:3000
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 3. Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Create `.env.local` using `.env.example` as a template:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variable | Description | Scope |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | Public marketing site URL (`https://zambic.com`) | Client & Server |
+| `NEXT_PUBLIC_APP_URL` | Application dashboard URL (`https://app.zambic.com`) | Client & Server |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL | Client & Server |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous public key | Client & Server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (admin tasks) | Server-Only |
+| `CLOUDFLARE_R2_ACCOUNT_ID` | Cloudflare account ID | Server-Only |
+| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket name | Server-Only |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | R2 S3 access key ID | Server-Only |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY`| R2 S3 secret access key | Server-Only |
+| `CLOUDFLARE_AI_TOKEN` | Cloudflare Workers AI API token | Server-Only |
+| `RESEND_API_KEY` | Resend API key for transactional emails | Server-Only |
+| `RESEND_FROM_EMAIL` | Sender address (e.g. `Zambic <notifications@app.zambic.com>`) | Server-Only |
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 4. Production Build & Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# Type check and build optimized bundle
+npm run build
+
+# Start production server
+npm start
+```
+
+### Deploying to Vercel
+1. Create a new Vercel project pointing to the `zambic-dash` (or `zambic/app`) repository.
+2. Set Framework Preset: `Next.js`.
+3. Configure the environment variables listed in `.env.example`.
+4. Under Project Settings -> Domains, assign `app.zambic.com`.
+5. Ensure Supabase Auth redirect URLs in your Supabase dashboard include:
+   - `https://app.zambic.com/auth/callback`
+   - `https://app.zambic.com/reset-password`

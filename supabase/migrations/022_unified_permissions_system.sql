@@ -53,12 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON public.audit_logs(created_a
 
 -- 4. SECURITY DEFINER HELPER FUNCTIONS
 
--- Clean up any prior function signatures
-DROP FUNCTION IF EXISTS public.is_department_manager(UUID, UUID, UUID);
-DROP FUNCTION IF EXISTS public.is_department_manager(UUID, UUID);
-DROP FUNCTION IF EXISTS public.is_department_manager(UUID);
-DROP FUNCTION IF EXISTS public.has_workspace_role(UUID, text[], UUID);
-DROP FUNCTION IF EXISTS public.has_workspace_role(UUID, text[]);
+-- Prior function signatures replaced in-place via CREATE OR REPLACE FUNCTION below
 
 -- Helper: has_workspace_role
 CREATE OR REPLACE FUNCTION public.has_workspace_role(ws_id UUID, roles text[], u_id UUID DEFAULT auth.uid())

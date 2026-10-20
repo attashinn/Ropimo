@@ -20,8 +20,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?${params.toString()}`);
   }
 
+  const supabase = await createClient();
+  let user = null;
+
   if (code) {
-    const supabase = await createClient();
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
@@ -31,7 +33,14 @@ export async function GET(request: Request) {
         )}`
       );
     }
+    user = data?.user;
+  } else {
+    // Check if user is already authenticated via session cookie (e.g. Neon Auth OAuth redirect)
+    const { data } = await supabase.auth.getUser();
+    user = data?.user;
+  }
 
+  if (user) {
     // If this was a password recovery callback, redirect to reset-password
     if (type === "recovery" || (nextParam && nextParam.includes("reset-password"))) {
       return NextResponse.redirect(`${origin}/reset-password`);
@@ -41,8 +50,7 @@ export async function GET(request: Request) {
     const isInvitationTarget = Boolean(nextParam && nextParam.startsWith("/invite"));
 
     // Check if the user already has a workspace
-    const user = data.user;
-    if (user && !isInvitationTarget) {
+    if (!isInvitationTarget) {
       const { data: memberships } = await supabase
         .from("workspace_members")
         .select("workspace_id")
