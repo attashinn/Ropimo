@@ -21,12 +21,13 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ropimo | Everything your team needs to get work done",
+  title: "Zambic | Everything your team needs to get work done",
   description:
-    "Ropimo brings projects, tasks, files, documents, planning, and teamwork into one simple, unified workspace.",
+    "Zambic brings projects, tasks, files, documents, planning, and teamwork into one simple, unified workspace.",
   icons: {
     icon: [
       { url: "/logo/favicon.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
       { url: "/favicon.ico" },
     ],
     apple: "/logo/favicon.png",

@@ -255,7 +255,7 @@ export function CareersPortalView({ workspace, jobs }: CareersPortalViewProps) {
             <span className="font-semibold text-[#111111]">{workspace.name}</span>
             <span>— Careers Portal</span>
           </div>
-          <p className="text-[11px] text-[#888888]">Powered by Ropimo</p>
+          <p className="text-[11px] text-[#888888]">Powered by Zambic</p>
         </div>
       </footer>
     </div>

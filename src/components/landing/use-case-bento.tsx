@@ -64,7 +64,7 @@ export function UseCaseBento() {
             The unified workspace for every team workflow
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#65706A] sm:text-lg">
-            Tailored for fast-moving product squads, trusted by agencies, and built to scale with growing companies. No matter how you work, Ropimo adapts to your flow.
+            Tailored for fast-moving product squads, trusted by agencies, and built to scale with growing companies. No matter how you work, Zambic adapts to your flow.
           </p>
 
           {/* Segmented Pill Switcher */}

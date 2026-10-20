@@ -1,5 +1,5 @@
 /**
- * Ropimo Email Templates
+ * Zambic Email Templates
  * Clean, branded HTML email templates.
  * No external dependencies — pure HTML/inline CSS for maximum email client compatibility.
  */
@@ -43,13 +43,13 @@ function layout(headerTitle: string, body: string, footerNote?: string): string 
   <div class="wrapper">
     <div class="card">
       <div class="header">
-        <span class="header-logo">ROPIMO</span>
+        <span class="header-logo">ZAMBIC</span>
       </div>
       <div class="body">
         ${body}
       </div>
       <div class="footer">
-        <p class="footer-text">${footerNote || "This email was sent by Ropimo. If you have questions, contact your workspace administrator."}</p>
+        <p class="footer-text">${footerNote || "This email was sent by Zambic. If you have questions, contact your workspace administrator."}</p>
       </div>
     </div>
   </div>
@@ -112,14 +112,14 @@ export function buildInvitationEmail(p: InvitationEmailParams): string {
 
   const body = `
     <h1 class="title">Join ${p.workspaceName}</h1>
-    <p class="subtitle">Hello ${p.recipientName},<br><br>${inviterPhrase} to join the <strong>${p.workspaceName}</strong> workspace on Ropimo — your team's all-in-one operating system.</p>
+    <p class="subtitle">Hello ${p.recipientName},<br><br>${inviterPhrase} to join the <strong>${p.workspaceName}</strong> workspace on Zambic — your team's all-in-one operating system.</p>
     <div class="info-box">${rows}</div>
     ${ctaButton(p.inviteUrl, "Accept Invitation & Join Workspace")}
     ${fallbackLink(p.inviteUrl)}
   `;
 
   return layout(
-    `Join ${p.workspaceName} on Ropimo`,
+    `Join ${p.workspaceName} on Zambic`,
     body,
     `This invitation was sent to ${p.recipientEmail}. If you weren't expecting this, you can safely ignore it.`
   );
@@ -139,7 +139,7 @@ export interface WelcomeEmailParams {
 export function buildWelcomeEmail(p: WelcomeEmailParams): string {
   const body = `
     <h1 class="title">Welcome to ${p.workspaceName} 👋</h1>
-    <p class="subtitle">Hi ${p.recipientName},<br><br>Your account is active and you now have access to the <strong>${p.workspaceName}</strong> workspace on Ropimo. You can manage tasks, track projects, log attendance, and collaborate with your team — all in one place.</p>
+    <p class="subtitle">Hi ${p.recipientName},<br><br>Your account is active and you now have access to the <strong>${p.workspaceName}</strong> workspace on Zambic. You can manage tasks, track projects, log attendance, and collaborate with your team — all in one place.</p>
     <div class="info-box">
       ${infoRow("Workspace", p.workspaceName)}
       ${infoRow("Your Email", p.recipientEmail)}
@@ -148,7 +148,7 @@ export function buildWelcomeEmail(p: WelcomeEmailParams): string {
     ${ctaButton(p.dashboardUrl, "Open My Workspace")}
   `;
 
-  return layout(`Welcome to ${p.workspaceName} — Ropimo`, body);
+  return layout(`Welcome to ${p.workspaceName} — Zambic`, body);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -229,7 +229,7 @@ export function buildProjectInvitationEmail(p: ProjectInvitationEmailParams): st
 
   const body = `
     <h1 class="title">You've been added to a project</h1>
-    <p class="subtitle">Hi ${p.recipientName},<br><br><strong>${p.addedByName}</strong> has added you to the <strong>${p.projectName}</strong> project on Ropimo.</p>
+    <p class="subtitle">Hi ${p.recipientName},<br><br><strong>${p.addedByName}</strong> has added you to the <strong>${p.projectName}</strong> project on Zambic.</p>
     <div class="info-box">${rows}</div>
     ${ctaButton(p.projectUrl, "Open Project")}
   `;
@@ -360,13 +360,13 @@ export interface PasswordResetEmailParams {
 export function buildPasswordResetEmail(p: PasswordResetEmailParams): string {
   const body = `
     <h1 class="title">Reset your password</h1>
-    <p class="subtitle">Hi ${p.recipientName},<br><br>We received a request to reset your password for your Ropimo account. Click the button below to set a new password. This link expires in 1 hour.</p>
+    <p class="subtitle">Hi ${p.recipientName},<br><br>We received a request to reset your password for your Zambic account. Click the button below to set a new password. This link expires in 1 hour.</p>
     ${ctaButton(p.resetUrl, "Reset My Password")}
     ${fallbackLink(p.resetUrl)}
   `;
 
   return layout(
-    "Reset your Ropimo password",
+    "Reset your Zambic password",
     body,
     `If you didn't request a password reset, you can safely ignore this email. Your password will not change.`
   );

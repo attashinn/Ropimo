@@ -19,7 +19,7 @@ import { PeopleDirectory } from "@/components/app/people-directory";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "People & Recruitment — Ropimo",
+  title: "People & Recruitment — Zambic",
   description: "Manage your team, employee information, recruitment pipeline, job openings, and interviews.",
 };
 

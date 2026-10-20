@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LogoIcon } from "@/components/landing/icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,10 +60,7 @@ function VerifyEmailContent() {
           href="/"
           className="inline-flex items-center gap-2.5 transition-transform duration-150 hover:scale-[1.02] focus:outline-none"
         >
-          <LogoIcon size={32} />
-          <span className="text-xl font-bold tracking-tight text-[#111]">
-            Ropimo
-          </span>
+          <ZambicLogo size={26} />
         </Link>
       </div>
 
@@ -121,7 +118,7 @@ function VerifyEmailContent() {
       {/* Footer */}
       <div className="w-full text-center">
         <p className="text-xs text-[#8A948E]">
-          &copy; {new Date().getFullYear()} Ropimo Inc. All rights reserved.
+          &copy; {new Date().getFullYear()} Zambic Inc. All rights reserved.
         </p>
       </div>
     </div>

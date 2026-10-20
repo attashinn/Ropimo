@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
     const isProject = type === "project";
 
-    const systemPrompt = `You are an expert project operations parser for Ropimo platform.
+    const systemPrompt = `You are an expert project operations parser for Zambic platform.
 Given a user instruction and workspace team members, extract or generate the structured ${isProject ? "project" : "task"} details.
 
 Available Team Members:

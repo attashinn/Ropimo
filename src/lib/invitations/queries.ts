@@ -49,7 +49,7 @@ export async function getInvitationByToken(
     recruitmentStore.getInvitationByToken?.(tokenHash) ||
     null;
 
-  let workspaceName = "Ropimo Workspace";
+  let workspaceName = "Zambic Workspace";
   let departmentNames: string[] = [];
   let inviterName: string | undefined;
   let inviterEmail: string | undefined;

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/auth/onboarding-flow";
 
 export const metadata: Metadata = {
-  title: "Set up your workspace | Ropimo",
+  title: "Set up your workspace | Zambic",
   description: "Complete your workspace setup.",
 };
 

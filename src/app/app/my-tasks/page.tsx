@@ -8,7 +8,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { MyTasksView } from "@/components/app/my-tasks-view";
 
 export const metadata = {
-  title: "My Tasks — Ropimo",
+  title: "My Tasks — Zambic",
   description: "Tasks and sprint deliverables assigned to you across your office",
 };
 

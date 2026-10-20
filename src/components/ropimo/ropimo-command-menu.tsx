@@ -579,8 +579,8 @@ export function RopimoCommandMenu({
                 <MessageSquare className="h-4 w-4 stroke-[1.5] text-ink-2 mr-2.5 shrink-0" />
                 <span className="truncate font-medium">
                   {search.trim()
-                    ? `Ask Ropimo AI: "${search.trim()}"`
-                    : "Ask Ropimo AI"}
+                    ? `Ask Zambic AI: "${search.trim()}"`
+                    : "Ask Zambic AI"}
                 </span>
                 <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">
                   ↵

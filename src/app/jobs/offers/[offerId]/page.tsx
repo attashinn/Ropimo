@@ -4,7 +4,7 @@ import { viewPublicOfferAction } from "@/lib/recruitment/actions";
 import { CandidateOfferView } from "@/components/public/candidate-offer-view";
 
 export const metadata = {
-  title: "Employment Offer — Ropimo",
+  title: "Employment Offer — Zambic",
 };
 
 export default async function PublicOfferPage(props: {

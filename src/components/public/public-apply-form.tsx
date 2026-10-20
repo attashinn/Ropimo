@@ -145,7 +145,7 @@ export function PublicApplyForm({ job }: PublicApplyFormProps) {
         <div className="mx-auto max-w-3xl px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/jobs" className="flex items-center gap-2.5">
             <LogoIcon size={26} />
-            <span className="text-lg font-bold tracking-tight text-[#18221E]">Ropimo</span>
+            <span className="text-lg font-bold tracking-tight text-[#18221E]">Zambic</span>
             <span className="rounded-full bg-[#FAF9F5] border border-[#D8DDD4] px-2 py-0.5 text-[11px] font-semibold text-[#65706A]">
               Careers
             </span>
@@ -437,10 +437,10 @@ export function PublicApplyForm({ job }: PublicApplyFormProps) {
         <div className="mx-auto max-w-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <LogoIcon size={20} />
-            <span className="font-bold text-[#18221E]">Ropimo</span>
+            <span className="font-bold text-[#18221E]">Zambic</span>
             <span>— Careers</span>
           </div>
-          <p>© {new Date().getFullYear()} Ropimo Inc.</p>
+          <p>© {new Date().getFullYear()} Zambic Inc.</p>
         </div>
       </footer>
     </div>

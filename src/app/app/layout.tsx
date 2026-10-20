@@ -9,11 +9,12 @@ import { getNavVisibility } from "@/lib/auth/permissions";
 import { UserContext } from "@/types/permissions";
 
 export const metadata = {
-  title: "Workspace | Ropimo",
-  description: "Ropimo unified team workspace",
+  title: "Workspace | Zambic",
+  description: "Zambic unified team workspace",
   icons: {
     icon: [
       { url: "/logo/favicon.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
       { url: "/favicon.ico" },
     ],
     apple: "/logo/favicon.png",

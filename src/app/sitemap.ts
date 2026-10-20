@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recruitmentStore } from "@/lib/recruitment/store";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ropimo.com";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://zambic.com";
   const now = new Date();
 
   const entries: MetadataRoute.Sitemap = [

@@ -8,7 +8,7 @@ import {
 import { MeetingsView } from "@/components/app/meetings-view";
 
 export const metadata = {
-  title: "Meetings — Ropimo",
+  title: "Meetings — Zambic",
   description: "Schedule, manage and track all company meetings in one place.",
 };
 

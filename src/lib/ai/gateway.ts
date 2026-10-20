@@ -73,10 +73,10 @@ export const SUPPORTED_MODELS = [
 export type SupportedModelId = (typeof SUPPORTED_MODELS)[number]["id"];
 
 /**
- * Builds standard system prompt injecting Ropimo workspace context
+ * Builds standard system prompt injecting Zambic workspace context
  */
 export function buildWorkspaceSystemPrompt(ctx?: WorkspaceContextData): string {
-  let prompt = `You are Ropimo AI Agent, the intelligent autonomous operations co-pilot for the Ropimo workspace management platform powered by Cloudflare Workers AI.
+  let prompt = `You are Zambic AI Agent, the intelligent autonomous operations co-pilot for the Zambic workspace management platform powered by Cloudflare Workers AI.
 Your job is to assist team leads, project managers, and team members with project planning, task breakdown, department coordination, meeting notes, HR job specs, and company velocity.
 
 Tone & Persona:

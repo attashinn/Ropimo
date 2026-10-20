@@ -92,7 +92,7 @@ export async function dispatchTaskAssignedEvent(params: {
   ]);
 
   const assignedByName = actorProfile?.full_name || "A team lead";
-  const workspaceName = wsData?.name || "Ropimo";
+  const workspaceName = wsData?.name || "Zambic";
 
   for (const profile of memberProfiles || []) {
     // Skip self-notification
@@ -169,7 +169,7 @@ export async function dispatchProjectMemberAddedEvent(params: {
   ]);
 
   const addedByName = actorProfile?.full_name || "A workspace admin";
-  const workspaceName = wsData?.name || "Ropimo";
+  const workspaceName = wsData?.name || "Zambic";
 
   // 1. In-App Notification
   await createInAppNotification({
@@ -236,7 +236,7 @@ export async function dispatchLeaveRequestedEvent(params: {
   ]);
 
   const employeeName = employeeMember?.full_name || "An employee";
-  const workspaceName = wsData?.name || "Ropimo";
+  const workspaceName = wsData?.name || "Zambic";
 
   for (const approver of approvers || []) {
     if (approver.user_id === employeeUserId) continue;
@@ -312,7 +312,7 @@ export async function dispatchLeaveReviewedEvent(params: {
   ]);
 
   const approvedByName = reviewerMember?.full_name || "Your manager";
-  const workspaceName = wsData?.name || "Ropimo";
+  const workspaceName = wsData?.name || "Zambic";
   const isApproved = action === "approve";
 
   // 1. In-App Notification
@@ -378,7 +378,7 @@ export async function dispatchInvitationAcceptedEvent(params: {
     adminClient.from("workspace_members").select("user_id").eq("workspace_id", workspaceId).in("role", ["owner", "admin"]),
   ]);
 
-  const workspaceName = wsData?.name || "Ropimo";
+  const workspaceName = wsData?.name || "Zambic";
 
   // 1. In-App Notification for admins
   for (const admin of admins || []) {

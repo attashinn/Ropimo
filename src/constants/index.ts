@@ -1,4 +1,4 @@
 export const APP_CONFIG = {
-  name: "Ropimo",
-  description: "Next.js SaaS Application",
+  name: "Zambic",
+  description: "Unified Team Workspace SaaS",
 } as const;

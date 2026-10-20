@@ -1,11 +1,11 @@
 import * as React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LogoIcon } from "@/components/landing/icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 import { ResetForm } from "@/components/auth/reset-form";
 
 export const metadata: Metadata = {
-  title: "Set new password | Ropimo",
+  title: "Set new password | Zambic",
   description: "Create a new password for your account.",
 };
 
@@ -18,10 +18,7 @@ export default function ResetPasswordPage() {
           href="/"
           className="inline-flex items-center gap-2.5 transition-transform duration-150 hover:scale-[1.02] focus:outline-none"
         >
-          <LogoIcon size={32} />
-          <span className="text-xl font-bold tracking-tight text-[#111]">
-            Ropimo
-          </span>
+          <ZambicLogo size={26} />
         </Link>
       </div>
 
@@ -50,7 +47,7 @@ export default function ResetPasswordPage() {
       {/* Footer */}
       <div className="w-full text-center">
         <p className="text-xs text-[#8A948E]">
-          &copy; {new Date().getFullYear()} Ropimo Inc. All rights reserved.
+          &copy; {new Date().getFullYear()} Zambic Inc. All rights reserved.
         </p>
       </div>
     </div>

@@ -21,10 +21,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   }
 
   return {
-    title: `${job.title} — Careers at ${job.company_name || "Ropimo"}`,
+    title: `${job.title} — Careers at ${job.company_name || "Zambic"}`,
     description:
       job.description?.substring(0, 160) ||
-      `Apply for the ${job.title} position at ${job.company_name || "Ropimo"}. ${job.location} • ${job.employment_type}`,
+      `Apply for the ${job.title} position at ${job.company_name || "Zambic"}. ${job.location} • ${job.employment_type}`,
   };
 }
 
@@ -38,7 +38,7 @@ export default async function PublicJobDetailPage(props: Props) {
         <header className="border-b border-[#D8DDD4] bg-white h-16 flex items-center px-6">
           <Link href="/jobs" className="flex items-center gap-2">
             <LogoIcon size={24} />
-            <span className="font-bold">Ropimo Careers</span>
+            <span className="font-bold">Zambic Careers</span>
           </Link>
         </header>
 
@@ -58,7 +58,7 @@ export default async function PublicJobDetailPage(props: Props) {
         </div>
 
         <footer className="py-6 text-center text-xs text-[#65706A]">
-          © {new Date().getFullYear()} Ropimo Inc.
+          © {new Date().getFullYear()} Zambic Inc.
         </footer>
       </div>
     );

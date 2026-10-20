@@ -4,7 +4,7 @@ import { getDefaultWorkspace } from "@/lib/workspace/queries";
 import { UserProfileView } from "@/components/app/user-profile-view";
 
 export const metadata = {
-  title: "Personal Profile — Ropimo",
+  title: "Personal Profile — Zambic",
   description: "Personal account profile, identity, and preferences",
 };
 

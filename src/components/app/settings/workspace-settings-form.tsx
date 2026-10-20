@@ -187,7 +187,7 @@ export function WorkspaceSettingsForm({ initialWorkspace }: WorkspaceSettingsFor
                 Workspace URL / Slug
               </label>
               <div className="flex items-center rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-3 py-2 text-sm text-[#65706A] focus-within:border-[#10251F] focus-within:bg-white">
-                <span className="shrink-0 select-none">ropimo.app/workspace/</span>
+                <span className="shrink-0 select-none">zambic.app/workspace/</span>
                 <input
                   id="ws-slug"
                   type="text"

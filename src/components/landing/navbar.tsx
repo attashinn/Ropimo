@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { LogoIcon, MenuIcon, XIcon } from "./icons";
+import { MenuIcon, XIcon } from "./icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 import { PrimaryButton } from "@/components/ui/primary-button";
 
 const NAV_LINKS = [
@@ -26,10 +27,7 @@ export function Navbar() {
             href="/"
             className="flex items-center gap-2.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10251F]"
           >
-            <LogoIcon size={30} />
-            <span className="text-xl font-bold tracking-tight text-[#18221E]">
-              Ropimo
-            </span>
+            <ZambicLogo size={24} />
           </Link>
 
           {/* Desktop Navigation */}

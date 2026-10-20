@@ -611,7 +611,7 @@ export async function submitEmployeeOnboardingAction(rawInput: {
   if (!authUser) {
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
-      password: password || "RopimoWelcome2026!",
+      password: password || "ZambicWelcome2026!",
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
@@ -822,7 +822,7 @@ export async function submitEmployeeOnboardingAction(rawInput: {
       .maybeSingle();
 
     await sendWelcomeEmail({
-      workspaceName: ws?.name || "Ropimo Workspace",
+      workspaceName: ws?.name || "Zambic Workspace",
       recipientEmail: email,
       recipientName: fullName,
       dashboardUrl: `${getAppUrl()}/app`,

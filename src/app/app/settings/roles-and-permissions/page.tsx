@@ -5,7 +5,7 @@ import { PERMISSION_MATRIX } from "@/lib/permissions";
 import { RolesPermissionsTable } from "@/components/app/settings/roles-permissions-table";
 
 export const metadata = {
-  title: "Roles & Permissions — Ropimo",
+  title: "Roles & Permissions — Zambic",
   description: "Read-only matrix of workspace capabilities across roles, generated from permissions.ts.",
 };
 

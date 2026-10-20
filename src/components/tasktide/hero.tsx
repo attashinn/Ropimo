@@ -9,7 +9,7 @@ import { ConnectorLines } from "./connector-lines";
 import { ScallopedEdge } from "./scalloped-edge";
 
 const ROTATING_WORDS = [
-  { text: "Ropimo", tag: "Workspace" },
+  { text: "Zambic", tag: "Workspace" },
   { text: "Your Team", tag: "Together" },
   { text: "Zero Chaos", tag: "Clarity" },
   { text: "Every Project", tag: "On Track" },
@@ -164,7 +164,7 @@ export function Hero() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1F9D55] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1F9D55]" />
               </span>
-              <span className="font-bold text-neutral-900">Ropimo 2.4</span>
+              <span className="font-bold text-neutral-900">Zambic 2.4</span>
               <span className="text-neutral-300">|</span>
               <span className="text-[#555555] font-medium group-hover:text-[#111111] transition-colors">
                 The Calm Workspace for Teams

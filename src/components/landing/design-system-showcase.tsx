@@ -15,7 +15,7 @@ export function DesignSystemShowcase() {
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EADF] px-3 py-1 text-xs font-semibold text-[#10251F] mb-3">
               <SparklesIcon size={12} className="text-[#10251F]" />
-              Ropimo Design System
+              Zambic Design System
             </span>
             <h2 className="text-2xl font-bold tracking-tight text-[#18221E] sm:text-3xl">
               Editorial Warm SaaS Foundations

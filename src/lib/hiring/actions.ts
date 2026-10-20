@@ -53,7 +53,7 @@ async function verifyUserAndRole(workspaceId: string, allowedRoles = ["owner", "
     if (process.env.NODE_ENV !== "production") {
       const devAdmin = {
         id: "00000000-0000-0000-0000-000000000001",
-        email: "admin@ropimo.dev",
+        email: "admin@zambic.dev",
       };
       return {
         user: devAdmin,
@@ -491,16 +491,16 @@ export async function rejectCandidateWithEmailAction(params: {
 
     // Send email if requested
     if (params.sendEmailNotification && cand.email) {
-      const subject = params.emailSubject || `Update on your application with Ropimo`;
+      const subject = params.emailSubject || `Update on your application with Zambic`;
       const body =
         params.emailBody ||
-        `Dear ${cand.full_name},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nRopimo Hiring Team`;
+        `Dear ${cand.full_name},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nZambic Hiring Team`;
 
       await sendEmail({
         to: cand.email,
         workspaceId: params.workspaceId,
-        fromName: "Ropimo Hiring Team",
-        replyTo: "hr@ropimo.com",
+        fromName: "Zambic Hiring Team",
+        replyTo: "hr@zambic.com",
         template: "candidate_rejection",
         subject,
         html: `
@@ -624,7 +624,7 @@ export async function scheduleInterviewAction(params: {
     const candTz = params.candidateTimezone || "Asia/Dhaka";
     const nowIso = new Date().toISOString();
     const interviewId = `iv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const icsUid = `ropimo-interview-${interviewId}@ropimo.com`;
+    const icsUid = `ropimo-interview-${interviewId}@zambic.com`;
 
     const interview: Interview = {
       id: interviewId,
@@ -727,8 +727,8 @@ export async function scheduleInterviewAction(params: {
       durationMinutes: duration,
       status: "CONFIRMED",
       method: "REQUEST",
-      organizerName: "Ropimo Recruitment Team",
-      organizerEmail: "hr@ropimo.com",
+      organizerName: "Zambic Recruitment Team",
+      organizerEmail: "hr@zambic.com",
       attendees: [
         { name: cand.full_name, email: cand.email, role: "REQ-PARTICIPANT" },
       ],
@@ -743,10 +743,10 @@ export async function scheduleInterviewAction(params: {
       await sendEmail({
         to: cand.email,
         workspaceId: params.workspaceId,
-        fromName: "Ropimo Recruitment Team",
-        replyTo: "hr@ropimo.com",
+        fromName: "Zambic Recruitment Team",
+        replyTo: "hr@zambic.com",
         template: "interview_invitation",
-        subject: `Interview Invitation: ${interview.round_name} with Ropimo`,
+        subject: `Interview Invitation: ${interview.round_name} with Zambic`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
             <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">Interview Scheduled</h2>
@@ -823,7 +823,7 @@ export async function rescheduleInterviewAction(params: {
 
     // Update .ics with higher sequence
     const icsContent = generateIcsContent({
-      uid: iv.ics_uid || `ropimo-interview-${iv.id}@ropimo.com`,
+      uid: iv.ics_uid || `ropimo-interview-${iv.id}@zambic.com`,
       sequence: newSeq,
       title: `[Updated] Interview: ${cand?.full_name || "Candidate"}`,
       description: `Rescheduled interview.\nNotes: ${params.notes || iv.notes || "None"}`,
@@ -839,8 +839,8 @@ export async function rescheduleInterviewAction(params: {
       await sendEmail({
         to: cand.email,
         workspaceId: params.workspaceId,
-        fromName: "Ropimo Recruitment Team",
-        replyTo: "hr@ropimo.com",
+        fromName: "Zambic Recruitment Team",
+        replyTo: "hr@zambic.com",
         template: "interview_rescheduled",
         subject: `Updated Time: Interview for ${iv.round_name}`,
         html: `<p>Your interview has been rescheduled to <strong>${dateStr}</strong>.</p>`,
@@ -902,7 +902,7 @@ export async function cancelInterviewAction(params: {
 
     // Cancel .ics with METHOD:CANCEL, STATUS:CANCELLED
     const icsContent = generateIcsContent({
-      uid: iv.ics_uid || `ropimo-interview-${iv.id}@ropimo.com`,
+      uid: iv.ics_uid || `ropimo-interview-${iv.id}@zambic.com`,
       sequence: newSeq,
       title: `[Cancelled] Interview: ${iv.round_name}`,
       startDate: new Date(iv.scheduled_at),
@@ -915,8 +915,8 @@ export async function cancelInterviewAction(params: {
       await sendEmail({
         to: cand.email,
         workspaceId: params.workspaceId,
-        fromName: "Ropimo Recruitment Team",
-        replyTo: "hr@ropimo.com",
+        fromName: "Zambic Recruitment Team",
+        replyTo: "hr@zambic.com",
         template: "interview_cancelled",
         subject: `Cancelled: Interview for ${iv.round_name}`,
         html: `<p>Your interview for ${iv.round_name} has been cancelled. Reason: ${params.reason || "Scheduling update"}</p>`,

@@ -981,13 +981,13 @@ export async function submitCandidateApplicationAction(params: {
         .eq("id", validatedData.workspaceId)
         .maybeSingle();
 
-      const companyName = ws?.name || "Ropimo Workspace";
+      const companyName = ws?.name || "Zambic Workspace";
 
       await sendEmail({
         to: normalizedEmail,
         workspaceId: validatedData.workspaceId,
         fromName: companyName,
-        replyTo: "hr@ropimo.com",
+        replyTo: "hr@zambic.com",
         template: "candidate_application_confirmation",
         subject: `Application received: ${job.title} at ${companyName}`,
         html: `
@@ -1448,7 +1448,7 @@ export async function createOfferAction(params: {
     const offer: JobOffer = {
       id: `offer-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       workspace_id: params.workspaceId,
-      workspace_name: member.full_name ? `${member.full_name}'s Workspace` : "Ropimo Workspace",
+      workspace_name: member.full_name ? `${member.full_name}'s Workspace` : "Zambic Workspace",
       application_id: params.applicationId,
       candidate_id: params.candidateId,
       job_opening_id: params.jobOpeningId || cand?.latest_job_id || null,
@@ -1598,7 +1598,7 @@ export async function viewPublicOfferAction(tokenOrOfferId: string): Promise<Act
         id: offer.id,
         token: offer.token,
         workspace_id: offer.workspace_id,
-        workspace_name: offer.workspace_name || "Ropimo",
+        workspace_name: offer.workspace_name || "Zambic",
         position_title: offer.job_title,
         department_name: offer.department_name || job?.department_name || "Engineering",
         employment_type: offer.employment_type,

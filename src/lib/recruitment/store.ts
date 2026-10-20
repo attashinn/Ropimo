@@ -602,7 +602,7 @@ export function createDefaultOnboardingChecklist(): OnboardingChecklistItem[] {
       id: "chk-acc-1",
       section: "access",
       title: "Workspace Account Provisioned",
-      description: "Active access to Ropimo workspace enabled.",
+      description: "Active access to Zambic workspace enabled.",
       required: true,
       completed: true,
       completed_at: new Date().toISOString(),

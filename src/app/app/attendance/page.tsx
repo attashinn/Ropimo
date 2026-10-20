@@ -13,7 +13,7 @@ import {
 import { AttendanceDashboardView } from "@/components/app/attendance/attendance-dashboard-view";
 
 export const metadata = {
-  title: "Attendance & Time Tracking — Ropimo",
+  title: "Attendance & Time Tracking — Zambic",
   description: "Monitor employee attendance, check-in schedules, working hours, and grace period policies.",
 };
 

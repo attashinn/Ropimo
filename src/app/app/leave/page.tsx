@@ -10,7 +10,7 @@ import {
 import { LeaveDashboardView } from "@/components/app/leave/leave-dashboard-view";
 
 export const metadata = {
-  title: "Leave & Absence Management — Ropimo",
+  title: "Leave & Absence Management — Zambic",
   description: "Request time off, monitor leave balances, and review workspace leave requests.",
 };
 

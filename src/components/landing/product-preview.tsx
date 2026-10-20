@@ -34,7 +34,7 @@ export function ProductPreview() {
               <span className="h-3 w-3 rounded-full bg-[#D8DDD4]" />
               <span className="h-3 w-3 rounded-full bg-[#D8DDD4]" />
               <span className="ml-3 text-xs font-medium text-[#65706A] hidden sm:inline">
-                ropimo.app / workspace / sprint-24
+                zambic.app / workspace / sprint-24
               </span>
             </div>
 

@@ -12,7 +12,7 @@ export const DEFAULT_PROJECTS_DATA: Project[] = [
   {
     id: "proj-ropimo",
     workspace_id: "ws-default",
-    name: "Ropimo Platform",
+    name: "Zambic Platform",
     slug: "ropimo-platform",
     description: "Internal company operating system",
     status: "in_progress",
@@ -128,7 +128,7 @@ export const DEFAULT_PROJECTS_DATA: Project[] = [
     department_color: "#B58500",
     manager_id: "u-fatema",
     manager_name: "Fatema Islam",
-    client_name: "Ropimo Inc",
+    client_name: "Zambic Inc",
     budget: "$12,000",
     start_date: "2026-07-15T00:00:00Z",
     due_date: "2026-08-12T00:00:00Z",

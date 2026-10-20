@@ -69,7 +69,7 @@ export function StatsRow() {
           <StatItem
             value={2400}
             suffix="+"
-            label="teams running on Ropimo"
+            label="teams running on Zambic"
             started={inView}
             delay={0}
           />

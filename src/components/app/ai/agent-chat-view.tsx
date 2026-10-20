@@ -67,7 +67,7 @@ const PRESET_PROMPTS = [
   {
     icon: FileText,
     title: "Generate Project Kickoff SOP",
-    prompt: "Write a step-by-step Standard Operating Procedure (SOP) for team leads onboarding a new client project into Ropimo.",
+    prompt: "Write a step-by-step Standard Operating Procedure (SOP) for team leads onboarding a new client project into Zambic.",
   },
 ];
 
@@ -82,7 +82,7 @@ export function AgentChatView({
     {
       id: "welcome",
       role: "assistant",
-      content: `Hello **${userName}**! I am your **Ropimo AI Agent** powered by Cloudflare Workers AI.\n\nI have real-time access to **${workspaceName}**'s projects, tasks, departments, and operations. Ask me to draft tasks, organize sprints, analyze deliverables, or execute workspace actions.`,
+      content: `Hello **${userName}**! I am your **Zambic AI Agent** powered by Cloudflare Workers AI.\n\nI have real-time access to **${workspaceName}**'s projects, tasks, departments, and operations. Ask me to draft tasks, organize sprints, analyze deliverables, or execute workspace actions.`,
       timestamp: "Just now",
       model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     },
@@ -342,7 +342,7 @@ export function AgentChatView({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-semibold tracking-tight text-[#10251F]">
-                Ropimo Copilot
+                Zambic Copilot
               </h2>
               <span className="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full uppercase tracking-wider flex items-center gap-1 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
@@ -421,7 +421,7 @@ export function AgentChatView({
                 {/* Header info */}
                 <div className="flex items-center justify-between gap-4 mb-1.5">
                   <span className={cn("text-[11px] font-medium", isUser ? "text-white/70" : "text-[#525B58]")}>
-                    {isUser ? "You" : "Ropimo Copilot"}
+                    {isUser ? "You" : "Zambic Copilot"}
                   </span>
                   <div className="flex items-center gap-2">
                     {msg.model && (
@@ -605,7 +605,7 @@ export function AgentChatView({
             </div>
             <div className="bg-white border border-[#E7E5E0] rounded-2xl rounded-bl-sm p-4 text-[#525B58] flex items-center gap-2.5 text-xs shadow-xs">
               <Loader2 className="w-4 h-4 animate-spin text-[#10251F]" />
-              Ropimo Copilot is thinking...
+              Zambic Copilot is thinking...
             </div>
           </motion.div>
         )}

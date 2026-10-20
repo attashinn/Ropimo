@@ -43,7 +43,7 @@ export function Workflow() {
             From idea to launch in four simple steps
           </p>
           <p className="mt-4 text-base text-[#65706A] sm:text-lg">
-            No complex setup scripts or month-long training. Ropimo gets your entire team working productively on day one.
+            No complex setup scripts or month-long training. Zambic gets your entire team working productively on day one.
           </p>
         </div>
 

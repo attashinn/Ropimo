@@ -26,7 +26,7 @@ import {
 //  ------------------------------ | CONSTANTS | ------------------------------  //
 
 const branding = {
-  brandName: "Ropimo",
+  brandName: "Zambic",
   title: "A Calm Office Workspace",
 };
 

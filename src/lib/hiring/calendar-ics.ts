@@ -61,15 +61,15 @@ export function generateIcsContent(options: IcsEventOptions): string {
       ? `Interview: ${options.roundName} — ${options.candidateName}`
       : options.roundName || "Interview");
 
-  const organizerName = options.organizerName || "Ropimo Recruitment Team";
-  const organizerEmail = options.organizerEmail || "hr@ropimo.com";
+  const organizerName = options.organizerName || "Zambic Recruitment Team";
+  const organizerEmail = options.organizerEmail || "hr@zambic.com";
   const meetingUrl = options.url || options.meetingUrl;
   const location = options.location || meetingUrl || "Online";
 
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Ropimo//Hiring Calendar//EN",
+    "PRODID:-//Zambic//Hiring Calendar//EN",
     `METHOD:${method}`,
     "CALSCALE:GREGORIAN",
     "BEGIN:VEVENT",

@@ -8,7 +8,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Ropimo",
+  title: "Dashboard | Zambic",
   description: "Ropimo workspace dashboard",
 };
 

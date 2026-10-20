@@ -375,10 +375,10 @@ export function AppChromeTabs({
             )}
             <div className="flex items-center gap-2 min-w-0">
               <span className="h-6 w-6 rounded-md bg-ink text-white flex items-center justify-center text-xs font-bold shrink-0">
-                {workspace?.name ? workspace.name[0].toUpperCase() : "R"}
+                {workspace?.name ? workspace.name[0].toUpperCase() : "Z"}
               </span>
               <span className="font-semibold text-ink text-sm truncate">
-                {activeTabObj?.label || workspace?.name || "Ropimo"}
+                {activeTabObj?.label || workspace?.name || "Zambic"}
               </span>
             </div>
           </div>

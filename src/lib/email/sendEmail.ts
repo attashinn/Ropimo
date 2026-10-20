@@ -68,7 +68,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
   const rawFrom =
     process.env.RESEND_FROM ||
     process.env.RESEND_FROM_EMAIL ||
-    "Ropimo <invite@testing.brnnd.com>";
+    "Zambic <invite@testing.brnnd.com>";
 
   let fromAddress = rawFrom;
   if (options.fromName) {

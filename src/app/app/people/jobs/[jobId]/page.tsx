@@ -7,7 +7,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { ShareJobButton } from "@/components/app/recruitment/share-job-button";
 
 export const metadata = {
-  title: "Job Opening Details — Ropimo",
+  title: "Job Opening Details — Zambic",
 };
 
 export default async function JobDetailPage(props: {

@@ -5,7 +5,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { PeopleDirectory } from "@/components/app/people-directory";
 
 export const metadata = {
-  title: "People — Ropimo",
+  title: "People — Zambic",
   description: "Everyone working across your office",
 };
 

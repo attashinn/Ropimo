@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export const metadata = {
-  title: "Edit Job Opening — Ropimo",
+  title: "Edit Job Opening — Zambic",
 };
 
 export default async function EditJobOpeningPage(props: PageProps) {

@@ -23,7 +23,7 @@ const envSchema = z.object({
 
   // Email
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM: z.string().default(process.env.RESEND_FROM_EMAIL || "Ropimo <invite@testing.brnnd.com>"),
+  RESEND_FROM: z.string().default(process.env.RESEND_FROM_EMAIL || "Zambic <invite@testing.brnnd.com>"),
   RESEND_FROM_EMAIL: z.string().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_MODE: z.enum(["resend", "outbox"]).default("resend"),

@@ -40,10 +40,10 @@ export function RejectCandidateModal({
   const [sendEmail, setSendEmail] = React.useState(true);
   const [showPreview, setShowPreview] = React.useState(false);
   const [emailSubject, setEmailSubject] = React.useState(
-    `Update on your application with Ropimo`
+    `Update on your application with Zambic`
   );
   const [emailBody, setEmailBody] = React.useState(
-    `Dear ${candidate?.full_name || "Applicant"},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nRopimo Hiring Team`
+    `Dear ${candidate?.full_name || "Applicant"},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nZambic Hiring Team`
   );
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
@@ -51,7 +51,7 @@ export function RejectCandidateModal({
   React.useEffect(() => {
     if (candidate) {
       setEmailBody(
-        `Dear ${candidate.full_name},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nRopimo Hiring Team`
+        `Dear ${candidate.full_name},\n\nThank you for taking the time to speak with us about the position. After careful review, we have decided to move forward with other candidates whose qualifications more closely align with our current needs.\n\nWe appreciate your interest in joining our team and wish you the best in your job search.\n\nSincerely,\nZambic Hiring Team`
       );
     }
   }, [candidate]);

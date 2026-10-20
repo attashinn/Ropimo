@@ -31,7 +31,7 @@ export function InvitationEmail({
   expiresInDays = 7,
   personalMessage,
 }: InvitationEmailProps) {
-  const previewText = `${inviterName} invited you to join ${workspaceName} on Ropimo`;
+  const previewText = `${inviterName} invited you to join ${workspaceName} on Zambic`;
   const departmentsStr =
     departmentNames.length > 0 ? ` (${departmentNames.join(", ")})` : "";
 
@@ -43,7 +43,7 @@ export function InvitationEmail({
         <Container style={containerStyle}>
           {/* Wordmark */}
           <Section style={headerStyle}>
-            <Text style={wordmarkStyle}>ROPIMO</Text>
+            <Text style={wordmarkStyle}>ZAMBIC</Text>
           </Section>
 
           <Section style={contentStyle}>
@@ -105,9 +105,9 @@ export function generateInvitationPlainText({
   const departmentsStr =
     departmentNames.length > 0 ? ` (${departmentNames.join(", ")})` : "";
   const lines: string[] = [
-    "ROPIMO",
+    "ZAMBIC",
     "",
-    `${inviterName} invited you to join ${workspaceName} on Ropimo as a ${roleName}${departmentsStr}.`,
+    `${inviterName} invited you to join ${workspaceName} on Zambic as a ${roleName}${departmentsStr}.`,
   ];
 
   if (personalMessage) {

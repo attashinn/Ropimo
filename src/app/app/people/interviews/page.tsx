@@ -7,7 +7,7 @@ import { getWorkspacePeople } from "@/lib/people/queries";
 import { InterviewsView } from "@/components/app/recruitment/interviews-view";
 
 export const metadata = {
-  title: "Interviews — Ropimo",
+  title: "Interviews — Zambic",
 };
 
 export default async function InterviewsPage() {

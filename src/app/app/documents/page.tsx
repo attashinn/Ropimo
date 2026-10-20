@@ -8,7 +8,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { DocumentsView } from "@/components/app/documents-view";
 
 export const metadata = {
-  title: "Documents — Ropimo",
+  title: "Documents — Zambic",
   description: "Create, manage and collaborate on company documents.",
 };
 

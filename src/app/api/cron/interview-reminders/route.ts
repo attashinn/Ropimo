@@ -66,8 +66,8 @@ async function handleReminders(request: NextRequest) {
             await sendEmail({
               to: cand.email,
               workspaceId: iv.workspace_id,
-              fromName: "Ropimo Recruitment Team",
-              replyTo: "hr@ropimo.com",
+              fromName: "Zambic Recruitment Team",
+              replyTo: "hr@zambic.com",
               template: "interview_reminder_24h",
               subject: `Reminder: Upcoming Interview tomorrow for ${job?.title || "Position"}`,
               html: `

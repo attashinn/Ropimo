@@ -62,7 +62,7 @@ export const getPublicWorkspaceCareers = cache(
         if (matchingJob) {
           workspace = {
             id: matchingJob.workspace_id,
-            name: "Ropimo Workspace",
+            name: "Zambic Workspace",
             slug: workspaceSlug,
             logo_url: null,
           };
@@ -158,7 +158,7 @@ export const getPublicJobBySlug = cache(
         if (matchingJob) {
           workspace = {
             id: matchingJob.workspace_id,
-            name: "Ropimo Workspace",
+            name: "Zambic Workspace",
             slug: workspaceSlug,
             logo_url: null,
           };
@@ -267,7 +267,7 @@ export const getPublicJobOpenings = cache(
         results = (data as unknown as JobOpeningJoinedRow[]).map((row) => ({
           id: row.id,
           workspace_id: row.workspace_id,
-          company_name: row.workspaces?.name || "Ropimo Workspace",
+          company_name: row.workspaces?.name || "Zambic Workspace",
           department_id: row.department_id,
           department_name: row.departments?.name || "General",
           department_color: row.departments?.color || "#10251F",
@@ -292,7 +292,7 @@ export const getPublicJobOpenings = cache(
           .filter((j) => j.status === "Open")
           .map((j) => ({
             ...j,
-            company_name: "Ropimo",
+            company_name: "Zambic",
           }));
       }
 
@@ -332,7 +332,7 @@ export const getPublicJobOpenings = cache(
       const allStore = recruitmentStore.getStore();
       return (allStore.job_openings || [])
         .filter((j) => j.status === "Open")
-        .map((j) => ({ ...j, company_name: "Ropimo" }));
+        .map((j) => ({ ...j, company_name: "Zambic" }));
     }
   }
 );
@@ -369,7 +369,7 @@ export async function getPublicJobById(jobId: string): Promise<PublicJobOpening 
       return {
         id: row.id,
         workspace_id: row.workspace_id,
-        company_name: row.workspaces?.name || "Ropimo Workspace",
+        company_name: row.workspaces?.name || "Zambic Workspace",
         department_id: row.department_id,
         department_name: row.departments?.name || "General",
         department_color: row.departments?.color || "#10251F",
@@ -395,7 +395,7 @@ export async function getPublicJobById(jobId: string): Promise<PublicJobOpening 
     if (storeJob) {
       return {
         ...storeJob,
-        company_name: "Ropimo",
+        company_name: "Zambic",
       };
     }
 
@@ -403,6 +403,6 @@ export async function getPublicJobById(jobId: string): Promise<PublicJobOpening 
   } catch {
     const store = recruitmentStore.getStore();
     const storeJob = (store.job_openings || []).find((j) => j.id === jobId && j.status === "Open");
-    return storeJob ? { ...storeJob, company_name: "Ropimo" } : null;
+    return storeJob ? { ...storeJob, company_name: "Zambic" } : null;
   }
 }

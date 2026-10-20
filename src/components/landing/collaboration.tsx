@@ -19,7 +19,7 @@ export function Collaboration() {
               Fewer status meetings. More focused execution.
             </p>
             <p className="mt-4 text-base leading-relaxed text-[#65706A] sm:text-lg">
-              Ropimo keeps your conversations, feedback, and decisions attached to the actual tasks and documents, so nobody has to dig through messy chat logs or email threads.
+              Zambic keeps your conversations, feedback, and decisions attached to the actual tasks and documents, so nobody has to dig through messy chat logs or email threads.
             </p>
 
             <div className="mt-8 space-y-4">

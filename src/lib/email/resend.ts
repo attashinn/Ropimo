@@ -1,5 +1,5 @@
 /**
- * Ropimo Email Service — Centralized Resend Integration
+ * Zambic Email Service — Centralized Resend Integration
  *
  * SECURITY:
  *  - Never import in client components or browser code.
@@ -34,7 +34,7 @@ function getResendClient(): Resend {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "[Ropimo Email] RESEND_API_KEY is not set. " +
+      "[Zambic Email] RESEND_API_KEY is not set. " +
         "Add it to .env.local as a server-only variable (no NEXT_PUBLIC_ prefix)."
     );
   }
@@ -47,7 +47,7 @@ function getResendClient(): Resend {
 }
 
 function getFromAddress(): string {
-  return process.env.RESEND_FROM_EMAIL || "Ropimo <invite@testing.brnnd.com>";
+  return process.env.RESEND_FROM_EMAIL || "Zambic <invite@testing.brnnd.com>";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,15 +82,15 @@ async function sendEmail(opts: {
     });
 
     if (error) {
-      console.error(`[Ropimo Email][${opts.tag || "send"}] Resend error:`, error);
+      console.error(`[Zambic Email][${opts.tag || "send"}] Resend error:`, error);
       return { success: false, error: error.message };
     }
 
-    console.log(`[Ropimo Email][${opts.tag || "send"}] Sent → ${opts.to} | id=${data?.id}`);
+    console.log(`[Zambic Email][${opts.tag || "send"}] Sent → ${opts.to} | id=${data?.id}`);
     return { success: true, emailId: data?.id };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[Ropimo Email][${opts.tag || "send"}] Unexpected error:`, msg);
+    console.error(`[Zambic Email][${opts.tag || "send"}] Unexpected error:`, msg);
     return { success: false, error: msg };
   }
 }
@@ -116,7 +116,7 @@ export interface SendInvitationEmailParams {
 export async function sendInvitationEmail(params: SendInvitationEmailParams): Promise<EmailResult> {
   return sendEmail({
     to: params.recipientEmail,
-    subject: `You've been invited to join ${params.workspaceName} on Ropimo`,
+    subject: `You've been invited to join ${params.workspaceName} on Zambic`,
     html: buildInvitationEmail(params),
     tag: "invitation",
   });
@@ -181,7 +181,7 @@ export interface SendProjectInvitationEmailParams {
 export async function sendProjectInvitationEmail(params: SendProjectInvitationEmailParams): Promise<EmailResult> {
   return sendEmail({
     to: params.recipientEmail,
-    subject: `You've been added to ${params.projectName} on Ropimo`,
+    subject: `You've been added to ${params.projectName} on Zambic`,
     html: buildProjectInvitationEmail(params),
     tag: "project_invitation",
   });
@@ -269,7 +269,7 @@ export interface SendPasswordResetEmailParams {
 export async function sendPasswordResetEmail(params: SendPasswordResetEmailParams): Promise<EmailResult> {
   return sendEmail({
     to: params.recipientEmail,
-    subject: "Reset your Ropimo password",
+    subject: "Reset your Zambic password",
     html: buildPasswordResetEmail(params),
     tag: "password_reset",
   });
@@ -291,7 +291,7 @@ export async function sendTestEmail(recipientEmail: string): Promise<EmailResult
 
   return sendEmail({
     to: recipientEmail,
-    subject: "Ropimo Email System — Test",
+    subject: "Zambic Email System — Test",
     html: `
       <!DOCTYPE html>
       <html>
@@ -305,9 +305,9 @@ export async function sendTestEmail(recipientEmail: string): Promise<EmailResult
         </style></head>
         <body>
           <div class="card">
-            <div class="logo">ROPIMO</div>
+            <div class="logo">ZAMBIC</div>
             <h1>Email System Test ✓</h1>
-            <p>This is a test email from the Ropimo email infrastructure.</p>
+            <p>This is a test email from the Zambic email infrastructure.</p>
             <p>If you're seeing this, Resend is connected and working correctly.</p>
             <div class="badge">Resend Connection: PASS</div>
             <p style="margin-top: 24px; font-size: 12px; color: #8C9489;">

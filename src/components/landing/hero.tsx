@@ -39,7 +39,7 @@ export function Hero() {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#65706A] sm:text-lg"
         >
-          Ropimo brings projects, tasks, files, documents, planning, and teamwork
+          Zambic brings projects, tasks, files, documents, planning, and teamwork
           into one simple workspace. Reliable, calm, and backed by real people.
         </motion.p>
 

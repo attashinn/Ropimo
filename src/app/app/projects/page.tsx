@@ -7,7 +7,7 @@ import { getWorkspaceTasks } from "@/lib/task/queries";
 import { ProjectsDirectory } from "@/components/app/projects-directory";
 
 export const metadata = {
-  title: "Projects — Ropimo",
+  title: "Projects — Zambic",
   description: "Track and manage all company projects in one place.",
 };
 

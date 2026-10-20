@@ -7,7 +7,7 @@ import { getWorkspacePeople } from "@/lib/people/queries";
 import { CandidateDetailView } from "@/components/app/recruitment/candidate-detail-view";
 
 export const metadata = {
-  title: "Candidate Profile — Ropimo",
+  title: "Candidate Profile — Zambic",
 };
 
 export default async function CandidateDetailPage(props: {

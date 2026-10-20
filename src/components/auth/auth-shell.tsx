@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ImageSlot } from "@/components/ui/image-slot";
 import { Check } from "lucide-react";
-import { LogoIcon } from "@/components/landing/icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 
 interface AuthShellProps {
   children: React.ReactNode;
@@ -37,10 +37,7 @@ export function AuthShell({
             href="/"
             className="inline-flex items-center gap-2.5 transition-transform duration-150 hover:scale-[1.02] focus:outline-none"
           >
-            <LogoIcon size={30} />
-            <span className="text-xl font-extrabold tracking-tight text-[#111]">
-              Ropimo
-            </span>
+            <ZambicLogo size={26} />
           </Link>
         </div>
 
@@ -61,7 +58,7 @@ export function AuthShell({
         {/* Bottom footer text */}
         <div className="w-full pb-1 text-center lg:text-left">
           <p className="text-[11px] text-[#8A948E]">
-            &copy; {new Date().getFullYear()} Ropimo Inc. All rights reserved.
+            &copy; {new Date().getFullYear()} Zambic Inc. All rights reserved.
           </p>
         </div>
       </div>

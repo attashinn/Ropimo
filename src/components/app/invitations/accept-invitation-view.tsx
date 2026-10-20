@@ -176,7 +176,7 @@ export function AcceptInvitationView({
               href="/"
               className="inline-flex h-9 px-4 rounded-[8px] bg-[#111111] text-white text-[12px] font-semibold items-center justify-center hover:bg-[#222222] transition-colors"
             >
-              Back to Ropimo
+              Back to Zambic
             </Link>
           </div>
         </div>
@@ -254,7 +254,7 @@ export function AcceptInvitationView({
               href="/"
               className="inline-flex h-9 px-4 rounded-[8px] bg-[#111111] text-white text-[12px] font-semibold items-center justify-center hover:bg-[#222222] transition-colors"
             >
-              Back to Ropimo
+              Back to Zambic
             </Link>
           </div>
         </div>
@@ -387,7 +387,7 @@ export function AcceptInvitationView({
         <div className="w-full max-w-md bg-[#FFFFFF] border border-[#E9E6DA] rounded-[12px] p-8 shadow-sm space-y-6">
           {/* Header */}
           <div className="text-center space-y-1">
-            <span className="text-[12px] font-bold tracking-wider text-[#111111]">ROPIMO</span>
+            <span className="text-[12px] font-bold tracking-wider text-[#111111]">ZAMBIC</span>
             <h1 className="text-[18px] font-semibold text-[#111111]">Join {workspaceName}</h1>
             <p className="text-[13px] text-[#6B6B6B]">
               <strong className="text-[#111111]">{inviterName}</strong> invited you to join as a{" "}
@@ -468,7 +468,7 @@ export function AcceptInvitationView({
       <div className="w-full max-w-md bg-[#FFFFFF] border border-[#E9E6DA] rounded-[12px] p-8 shadow-sm space-y-6">
         {/* Header */}
         <div className="text-center space-y-1">
-          <span className="text-[12px] font-bold tracking-wider text-[#111111]">ROPIMO</span>
+          <span className="text-[12px] font-bold tracking-wider text-[#111111]">ZAMBIC</span>
           <h1 className="text-[18px] font-semibold text-[#111111]">Join {workspaceName}</h1>
           <p className="text-[13px] text-[#6B6B6B]">
             <strong className="text-[#111111]">{inviterName}</strong> invited you to join the team.

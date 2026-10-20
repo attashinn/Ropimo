@@ -6,7 +6,7 @@ import { getOverviewData } from "@/lib/overview/queries";
 import { OverviewDashboard } from "@/components/app/overview-dashboard";
 
 export const metadata = {
-  title: "Overview — Ropimo",
+  title: "Overview — Zambic",
   description: "Company command center for active projects and team deliverables",
 };
 

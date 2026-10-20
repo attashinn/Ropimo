@@ -6,7 +6,7 @@ import { getWorkspacePeople } from "@/lib/people/queries";
 import { JobOpeningEditor } from "@/components/app/recruitment/job-opening-editor";
 
 export const metadata = {
-  title: "New Job Opening — Ropimo",
+  title: "New Job Opening — Zambic",
 };
 
 export default async function NewJobOpeningPage() {

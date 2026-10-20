@@ -607,7 +607,7 @@ export function DepartmentShowcase() {
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-bold text-[#111111]">Ropimo AI</span>
+                        <span className="text-[11px] font-bold text-[#111111]">Zambic AI</span>
                         <span className="text-[9.5px] text-neutral-400 font-medium">• Just now</span>
                       </div>
                       <span className="text-[10.5px] text-[#6B6B6B] truncate">

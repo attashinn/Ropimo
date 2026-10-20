@@ -4,7 +4,7 @@ import { getDefaultWorkspace } from "@/lib/workspace/queries";
 import { WorkspaceSettingsForm } from "@/components/app/settings/workspace-settings-form";
 
 export const metadata = {
-  title: "Workspace Settings — Ropimo",
+  title: "Workspace Settings — Zambic",
   description: "Configure workspace name, details, and membership preferences.",
 };
 

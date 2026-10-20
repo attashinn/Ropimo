@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       const res = await fetch(targetUrl, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; RopimoCompanyIntelligence/1.0; +https://ropimo.com)",
+          "User-Agent": "Mozilla/5.0 (compatible; ZambicCompanyIntelligence/1.0; +https://zambic.com)",
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
       });

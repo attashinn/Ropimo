@@ -5,7 +5,7 @@ import { getDefaultWorkspace } from "@/lib/workspace/queries";
 import { AgentChatView } from "@/components/app/ai/agent-chat-view";
 
 export const metadata = {
-  title: "AI Agent Copilot — Ropimo",
+  title: "AI Agent Copilot — Zambic",
   description: "Autonomous workspace intelligence and deliverable operations",
 };
 

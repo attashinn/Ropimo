@@ -85,7 +85,7 @@ export function Features() {
             Built for how modern teams actually work.
           </p>
           <p className="mt-4 text-base text-[#65706A] sm:text-lg">
-            Every feature in Ropimo is crafted to eliminate context switching and keep your team aligned from concept to release.
+            Every feature in Zambic is crafted to eliminate context switching and keep your team aligned from concept to release.
           </p>
         </div>
 

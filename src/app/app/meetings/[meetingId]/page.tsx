@@ -11,7 +11,7 @@ export async function generateMetadata({
   const { meetingId } = await params;
   const meeting = await getMeetingById(meetingId);
   return {
-    title: meeting ? `${meeting.title} — Ropimo Meetings` : "Meeting — Ropimo",
+    title: meeting ? `${meeting.title} — Zambic Meetings` : "Meeting — Zambic",
     description: meeting?.description ?? "Meeting details",
   };
 }

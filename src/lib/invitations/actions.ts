@@ -114,7 +114,7 @@ export async function inviteMembersBatchAction(
   } catch {}
 
   // Fetch workspace details
-  let workspaceName = "Ropimo Workspace";
+  let workspaceName = "Zambic Workspace";
   try {
     const { data: ws } = await adminClient
       .from("workspaces")
@@ -314,7 +314,7 @@ export async function inviteMembersBatchAction(
     try {
       emailHtml = await render(InvitationEmail(emailProps));
     } catch {
-      emailHtml = `<div style="font-family:sans-serif;padding:24px;"><h2>ROPIMO</h2><p><strong>${inviterName}</strong> invited you to join <strong>${workspaceName}</strong> as a <strong>${role}</strong>.</p><p><a href="${inviteUrl}">Accept invitation</a></p><p>This invitation expires in 7 days.</p></div>`;
+      emailHtml = `<div style="font-family:sans-serif;padding:24px;"><h2>ZAMBIC</h2><p><strong>${inviterName}</strong> invited you to join <strong>${workspaceName}</strong> as a <strong>${role}</strong>.</p><p><a href="${inviteUrl}">Accept invitation</a></p><p>This invitation expires in 7 days.</p></div>`;
     }
 
     const emailText = generateInvitationPlainText(emailProps);
@@ -322,7 +322,7 @@ export async function inviteMembersBatchAction(
     // Dispatch email via central engine
     const sendResult = await sendEmail({
       to: email,
-      subject: `${inviterName} invited you to join ${workspaceName} on Ropimo`,
+      subject: `${inviterName} invited you to join ${workspaceName} on Zambic`,
       html: emailHtml,
       text: emailText,
       template: "workspace-invitation",
@@ -495,7 +495,7 @@ export async function resendEmployeeInvitationAction(params: {
   } catch {}
 
   // Workspace details
-  let workspaceName = "Ropimo Workspace";
+  let workspaceName = "Zambic Workspace";
   try {
     const { data: ws } = await adminClient
       .from("workspaces")
@@ -538,7 +538,7 @@ export async function resendEmployeeInvitationAction(params: {
 
   const sendResult = await sendEmail({
     to: inviteRecord.email,
-    subject: `${inviterName} invited you to join ${workspaceName} on Ropimo`,
+    subject: `${inviterName} invited you to join ${workspaceName} on Zambic`,
     html: emailHtml,
     text: emailText,
     template: "workspace-invitation-resend",
@@ -856,14 +856,14 @@ export async function acceptWorkspaceInvitationAction(params: {
     try {
       const { data: inviterAuth } = await adminClient.auth.admin.getUserById(dbInvite.invited_by);
       if (inviterAuth?.user?.email) {
-        let workspaceName = "Ropimo";
+        let workspaceName = "Zambic";
         const { data: ws } = await adminClient.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
         if (ws?.name) workspaceName = ws.name;
 
         await sendEmail({
           to: inviterAuth.user.email,
           subject: `${finalFullName} accepted your invitation to join ${workspaceName}`,
-          html: `<div style="font-family:sans-serif;padding:24px;"><h2>ROPIMO</h2><p><strong>${finalFullName}</strong> (${userEmail}) has accepted your invitation and joined <strong>${workspaceName}</strong> as a <strong>${role}</strong> (Employee ID: ${nextEmpId}).</p></div>`,
+          html: `<div style="font-family:sans-serif;padding:24px;"><h2>ZAMBIC</h2><p><strong>${finalFullName}</strong> (${userEmail}) has accepted your invitation and joined <strong>${workspaceName}</strong> as a <strong>${role}</strong> (Employee ID: ${nextEmpId}).</p></div>`,
           text: `${finalFullName} (${userEmail}) accepted your invitation to join ${workspaceName} as a ${role} (${nextEmpId}).`,
           template: "invitation-accepted-notice",
           workspaceId,
@@ -914,13 +914,13 @@ export async function requestNewInviteAction(token: string): Promise<{ success: 
     }
 
     const ws = inv.workspaces as { name?: string } | null;
-    const wsName = ws?.name || "Ropimo Workspace";
+    const wsName = ws?.name || "Zambic Workspace";
 
     await sendEmail({
       to: inviterAuth.user.email,
       subject: `${inv.email} requested a new invitation to join ${wsName}`,
-      html: `<div style="font-family:sans-serif;padding:24px;"><h2>ROPIMO</h2><p><strong>${inv.email}</strong> clicked "Ask for a new invite" because their previous invitation to <strong>${wsName}</strong> expired.</p><p>You can resend them a fresh invite from the <strong>Invites & Onboarding</strong> tab in Ropimo.</p></div>`,
-      text: `${inv.email} requested a new invitation to join ${wsName} on Ropimo because their previous invite expired. Please send them a new invite from Invites & Onboarding tab.`,
+      html: `<div style="font-family:sans-serif;padding:24px;"><h2>ZAMBIC</h2><p><strong>${inv.email}</strong> clicked "Ask for a new invite" because their previous invitation to <strong>${wsName}</strong> expired.</p><p>You can resend them a fresh invite from the <strong>Invites & Onboarding</strong> tab in Zambic.</p></div>`,
+      text: `${inv.email} requested a new invitation to join ${wsName} on Zambic because their previous invite expired. Please send them a new invite from Invites & Onboarding tab.`,
       template: "invitation-expired-request",
       workspaceId: inv.workspace_id,
     });

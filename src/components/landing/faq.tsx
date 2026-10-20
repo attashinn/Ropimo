@@ -11,14 +11,14 @@ interface FAQItem {
 
 const FAQS: FAQItem[] = [
   {
-    question: "What makes Ropimo different from other project management tools?",
+    question: "What makes Zambic different from other project management tools?",
     answer:
-      "Ropimo replaces fragmented tool stacks by unifying tasks, collaborative documents, asset storage, and calendar planning in one high-performance interface. Instead of jumping between three different apps, your team executes everything in a single context.",
+      "Zambic replaces fragmented tool stacks by unifying tasks, collaborative documents, asset storage, and calendar planning in one high-performance interface. Instead of jumping between three different apps, your team executes everything in a single context.",
   },
   {
     question: "Can I import data from Trello, Asana, Jira, or Notion?",
     answer:
-      "Yes. Ropimo provides one-click workspace importers for Trello boards, Asana projects, Jira issues, and Notion pages. All your tasks, descriptions, attachments, and assignments are mapped automatically.",
+      "Yes. Zambic provides one-click workspace importers for Trello boards, Asana projects, Jira issues, and Notion pages. All your tasks, descriptions, attachments, and assignments are mapped automatically.",
   },
   {
     question: "Is there a free trial or free tier?",

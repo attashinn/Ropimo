@@ -85,16 +85,16 @@ export function Navbar() {
               : "h-[62px] bg-white/80 backdrop-blur-md border border-neutral-200/60 shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
           }`}
         >
-          {/* ── LEFT: Official Ropimo Logo + Wordmark (Clean, no extra badges) ── */}
+          {/* ── LEFT: Official Zambic Logo + Wordmark (Clean, no extra badges) ── */}
           <Link
             href="/"
             className="flex items-center gap-2.5 sm:gap-3 group shrink-0"
-            aria-label="Ropimo Home"
+            aria-label="Zambic Home"
           >
             <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center">
               <Image
                 src="/logo/favicon.png"
-                alt="Ropimo"
+                alt="Zambic"
                 width={36}
                 height={36}
                 className="w-full h-full object-contain rounded-xl"
@@ -103,7 +103,7 @@ export function Navbar() {
             </div>
 
             <span className="font-[800] tracking-[-0.04em] text-[#111111] text-[19px] sm:text-[20px] leading-none">
-              Ropimo
+              Zambic
             </span>
           </Link>
 
@@ -287,13 +287,13 @@ export function Navbar() {
                 >
                   <Image
                     src="/logo/favicon.png"
-                    alt="Ropimo"
+                    alt="Zambic"
                     width={32}
                     height={32}
                     className="w-8 h-8 rounded-xl object-contain"
                   />
                   <span className="text-[19px] font-extrabold tracking-[-0.04em] text-[#111111]">
-                    Ropimo
+                    Zambic
                   </span>
                 </Link>
                 <button

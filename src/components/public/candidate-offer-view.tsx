@@ -372,7 +372,7 @@ export function CandidateOfferView({ offer }: CandidateOfferViewProps) {
 
       {/* Footer */}
       <footer className="border-t border-[#D8DDD4] bg-white py-4 text-center text-xs text-[#65706A]">
-        © {new Date().getFullYear()} {offer.workspace_name}. Powered by Ropimo Recruitment.
+        © {new Date().getFullYear()} {offer.workspace_name}. Powered by Zambic Recruitment.
       </footer>
     </div>
   );

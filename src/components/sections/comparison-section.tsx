@@ -7,12 +7,11 @@ import Link from "next/link";
 
 // ─── Authentic Brand Logos ────────────────────────────────────────────────────
 
-function RopimoLogo() {
+function ZambicLogoMark() {
   return (
-    <div className="w-6 h-6 rounded-md bg-[#111111] flex items-center justify-center shrink-0">
-      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-        <rect x="3" y="3" width="14" height="14" rx="3.5" stroke="white" strokeWidth="1.8" />
-        <path d="M6.5 7.5H13.5M6.5 10H13.5M6.5 12.5H10.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+    <div className="w-6 h-6 rounded-md bg-[#111111] flex items-center justify-center shrink-0 text-white p-1">
+      <svg width="14" height="14" viewBox="0 0 218 218" fill="currentColor">
+        <path d="M54.5013 108.998L54.1367 109L54.5014 109.002C24.4011 109.002 2.39311e-05 133.403 2.39311e-05 163.503H54.5002L54.5002 218C84.5814 218 108.97 193.629 109 163.555C109.03 193.629 133.419 218 163.5 218V163.503L218 163.503C218 133.403 193.599 109.002 163.499 109.002L163.863 109L163.499 108.998C193.599 108.998 218 84.5972 218 54.4969L163.5 54.4969L163.5 0C133.417 -3.94501e-06 109.027 24.3739 109 54.4508C108.974 24.3739 84.5833 1.315e-06 54.5002 0L54.5002 54.4969L0 54.4969C-2.63145e-06 84.5972 24.4011 108.998 54.5013 108.998Z" />
       </svg>
     </div>
   );
@@ -309,7 +308,7 @@ export function ComparisonSection() {
           </motion.h2>
 
           <p className="mt-4 text-[15px] sm:text-[17px] text-[#6B6B6B] leading-relaxed font-medium">
-            Most teams pay for a project management tool, then still end up buying separate software for meetings, hiring, and company files. Ropimo puts your whole office in one calm sheet.
+            Most teams pay for a project management tool, then still end up buying separate software for meetings, hiring, and company files. Zambic puts your whole office in one calm sheet.
           </p>
         </div>
 
@@ -357,12 +356,12 @@ export function ComparisonSection() {
                     Capability
                   </th>
 
-                  {/* Ropimo Column (Featured, subtle warm cream tint, 1px hairlines) */}
+                  {/* Zambic Column (Featured, subtle warm cream tint, 1px hairlines) */}
                   <th className="py-4 px-4 sm:px-6 bg-[#FAF9F6] border-x border-[#E9E6DA] w-[26%] sm:w-[24%]">
                     <div className="flex flex-col items-start gap-1">
                       <img
-                        src="/logo/ropimo-logo.png"
-                        alt="Ropimo"
+                        src="/logo/black-logo.svg"
+                        alt="Zambic"
                         className="h-6 sm:h-7 w-auto object-contain"
                       />
                       <div className="flex items-center gap-1.5 mt-0.5">

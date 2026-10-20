@@ -144,7 +144,7 @@ export const getWorkspacePeople = cache(
 
     const dbPeople: WorkspacePerson[] = (members || []).map((m) => {
       const profile = userProfilesMap.get(m.user_id);
-      const email = profile?.email || m.email || "team@ropimo.com";
+      const email = profile?.email || m.email || "team@zambic.com";
       const full_name = m.full_name || profile?.fullName || email.split("@")[0] || "Team Member";
       const departments = userDeptsMap.get(m.user_id) || [];
       const linkedCandidate = candidateByUserMap.get(m.user_id);

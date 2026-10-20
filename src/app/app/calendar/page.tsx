@@ -8,7 +8,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { CalendarView } from "@/components/app/calendar-view";
 
 export const metadata = {
-  title: "Calendar — Ropimo",
+  title: "Calendar — Zambic",
   description: "Plan tasks, meetings, deadlines, and important company events.",
 };
 

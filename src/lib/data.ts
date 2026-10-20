@@ -4,7 +4,7 @@
  */
 
 export const brandConfig = {
-  name: "Ropimo",
+  name: "Zambic",
   tagline: "The all-in-one workspace for growing teams and agencies.",
   description:
     "Replaces the pile of disconnected task boards, calendars, hiring spreadsheets, and shared drives with one calm, unified system.",

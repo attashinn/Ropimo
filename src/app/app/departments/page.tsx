@@ -4,7 +4,7 @@ import { getWorkspaceDepartmentsWithStats } from "@/lib/department/queries";
 import { DepartmentsDirectory } from "@/components/app/departments-directory";
 
 export const metadata = {
-  title: "Departments — Ropimo",
+  title: "Departments — Zambic",
   description: "Company departments and operational teams in your workspace",
 };
 

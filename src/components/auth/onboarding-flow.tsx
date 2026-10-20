@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
-import { LogoIcon } from "@/components/landing/icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 import Link from "next/link";
 import { saveOnboardingAction } from "@/lib/auth/onboarding-action";
 
@@ -112,15 +112,13 @@ export function OnboardingFlow() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#FAF9F6] p-4 sm:p-8 antialiased selection:bg-[#111] selection:text-white font-[family-name:var(--font-plus-jakarta)]">
       {/* Top Logo */}
+      {/* Top Brand Logo */}
       <div className="mb-8">
         <Link
           href="/"
           className="inline-flex items-center gap-2.5 transition-transform duration-150 hover:scale-[1.02] focus:outline-none"
         >
-          <LogoIcon size={32} />
-          <span className="text-xl font-extrabold tracking-tight text-[#111]">
-            Ropimo
-          </span>
+          <ZambicLogo size={26} />
         </Link>
       </div>
 

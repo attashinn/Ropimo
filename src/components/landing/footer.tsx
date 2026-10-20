@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { LogoIcon } from "./icons";
+import { ZambicLogo } from "@/components/ui/zambic-logo";
 
 const FOOTER_COLUMNS = [
   {
@@ -53,10 +53,7 @@ export function Footer() {
           {/* Brand Info */}
           <div className="col-span-2 md:col-span-4">
             <Link href="/" className="flex items-center gap-2.5">
-              <LogoIcon size={28} />
-              <span className="text-xl font-bold tracking-tight text-[#18221E]">
-                Ropimo
-              </span>
+              <ZambicLogo size={24} />
             </Link>
             <p className="mt-4 max-w-xs text-xs leading-relaxed text-[#65706A]">
               The unified workspace for modern teams. Projects, tasks, documents, and collaboration in one calm, high-performance interface.
@@ -93,7 +90,7 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="mt-12 flex flex-col items-center justify-between border-t border-[#D8DDD4] pt-8 sm:flex-row text-xs text-[#65706A] gap-4">
-          <p>© {new Date().getFullYear()} Ropimo Inc. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Zambic Inc. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-[#18221E] transition-colors">
               Privacy

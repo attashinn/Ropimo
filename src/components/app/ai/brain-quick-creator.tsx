@@ -108,7 +108,7 @@ export function BrainQuickCreator({
           </div>
           <div>
             <h4 className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
-              <span>Ropimo Brain AI</span>
+              <span>Zambic Brain AI</span>
               <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
                 Cloudflare
               </span>

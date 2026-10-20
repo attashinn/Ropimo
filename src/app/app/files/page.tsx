@@ -8,7 +8,7 @@ import { getWorkspaceDepartments } from "@/lib/department/queries";
 import { FilesView } from "@/components/app/files-view";
 
 export const metadata = {
-  title: "Files — Ropimo",
+  title: "Files — Zambic",
   description: "Store, organize and share files across your workspace.",
 };
 

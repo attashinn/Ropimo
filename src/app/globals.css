@@ -1,19 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --ropimo-ink: #10251F;
-  --ropimo-ink-hover: #18342C;
-  --ropimo-lime: #C7F34A;
-  --ropimo-lime-hover: #B7E63D;
+  --zambic-ink: #10251F;
+  --zambic-ink-hover: #18342C;
+  --zambic-lime: #C7F34A;
+  --zambic-lime-hover: #B7E63D;
 
-  --ropimo-background: #FFFFFF;
-  --ropimo-surface: #FFFFFF;
-  --ropimo-soft-green: #E7EADF;
+  --zambic-background: #FFFFFF;
+  --zambic-surface: #FFFFFF;
+  --zambic-soft-green: #E7EADF;
 
-  --ropimo-border: #D8DDD4;
+  --zambic-border: #D8DDD4;
 
-  --ropimo-text: #18221E;
-  --ropimo-muted-text: #65706A;
+  --zambic-text: #18221E;
+  --zambic-muted-text: #65706A;
+
+  --ropimo-ink: var(--zambic-ink);
+  --ropimo-ink-hover: var(--zambic-ink-hover);
+  --ropimo-lime: var(--zambic-lime);
+  --ropimo-lime-hover: var(--zambic-lime-hover);
+
+  --ropimo-background: var(--zambic-background);
+  --ropimo-surface: var(--zambic-surface);
+  --ropimo-soft-green: var(--zambic-soft-green);
+
+  --ropimo-border: var(--zambic-border);
+
+  --ropimo-text: var(--zambic-text);
+  --ropimo-muted-text: var(--zambic-muted-text);
 
   /* Standard aliases */
   --background: var(--ropimo-background);
@@ -67,6 +81,17 @@
 }
 
 @theme inline {
+  --color-zambic-ink: var(--zambic-ink);
+  --color-zambic-ink-hover: var(--zambic-ink-hover);
+  --color-zambic-lime: var(--zambic-lime);
+  --color-zambic-lime-hover: var(--zambic-lime-hover);
+  --color-zambic-background: var(--zambic-background);
+  --color-zambic-surface: var(--zambic-surface);
+  --color-zambic-soft-green: var(--zambic-soft-green);
+  --color-zambic-border: var(--zambic-border);
+  --color-zambic-text: var(--zambic-text);
+  --color-zambic-muted-text: var(--zambic-muted-text);
+
   --color-ropimo-ink: var(--ropimo-ink);
   --color-ropimo-ink-hover: var(--ropimo-ink-hover);
   --color-ropimo-lime: var(--ropimo-lime);
