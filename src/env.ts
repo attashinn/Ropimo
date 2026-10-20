@@ -5,10 +5,6 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional(),
   NEON_DATABASE_URL: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000"),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().default(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "neon-anon-key"),
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   
   // Storage (Cloudflare R2)
   CLOUDFLARE_R2_ACCOUNT_ID: z.string().optional(),

@@ -47,7 +47,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' data: https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://challenges.cloudflare.com https://*.neon.tech https://*.neonauth.c-7.us-east-2.aws.neon.tech https://openrouter.ai",
+              "connect-src 'self' https://*.r2.cloudflarestorage.com https://challenges.cloudflare.com https://*.neon.tech https://*.neonauth.c-7.us-east-2.aws.neon.tech https://openrouter.ai",
               "frame-src 'self' https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",
