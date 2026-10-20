@@ -55,7 +55,9 @@ next-env.d.ts
 
 # scratch directory
 scratch/
-dashboard-reference/
+# separated repositories
+zambic-home/
+zambic-dash/
+zambic-app/
 
-# supabase cli temp
 supabase/.temp/
