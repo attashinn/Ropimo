@@ -38,6 +38,10 @@ import {
   ListTodo,
   Users,
   Sparkles,
+  UploadCloud,
+  FileText,
+  Trash2,
+  History,
 } from "lucide-react";
 import { BrainQuickCreator } from "./ai/brain-quick-creator";
 import { RichDescriptionEditor } from "@/components/app/rich-description-editor";
@@ -139,6 +143,21 @@ export function CreateTaskModal({
   const [criteria, setCriteria] = React.useState<{ id: string; text: string; done: boolean }[]>([]);
   const [newCriteriaInput, setNewCriteriaInput] = React.useState("");
   const [showAddCriteria, setShowAddCriteria] = React.useState(false);
+
+  // Subtasks State
+  const [subtasks, setSubtasks] = React.useState<
+    { id: string; title: string; done: boolean }[]
+  >([
+    { id: "st-1", title: "Review requirements and architectural plan", done: false },
+    { id: "st-2", title: "Implement core business logic & edge validations", done: false },
+  ]);
+  const [newSubtaskInput, setNewSubtaskInput] = React.useState("");
+
+  // Attachments State
+  const [attachments, setAttachments] = React.useState<
+    { id: string; name: string; size: string; type: string }[]
+  >([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Time Tracking
   const [loggedMinutes, setLoggedMinutes] = React.useState(0);
@@ -300,6 +319,69 @@ export function CreateTaskModal({
     setShowAddCriteria(false);
   };
 
+  const handleAddSubtask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubtaskInput.trim()) return;
+    setSubtasks((prev) => [
+      ...prev,
+      { id: `st-${Date.now()}`, title: newSubtaskInput.trim(), done: false },
+    ]);
+    setNewSubtaskInput("");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newItems = Array.from(files).map((f) => {
+      const sizeKB = (f.size / 1024).toFixed(1);
+      const sizeStr = f.size > 1024 * 1024 ? `${(f.size / (1024 * 1024)).toFixed(1)} MB` : `${sizeKB} KB`;
+      return {
+        id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: f.name,
+        size: sizeStr,
+        type: f.type || "file",
+      };
+    });
+    setAttachments((prev) => [...prev, ...newItems]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const activityItems = React.useMemo(() => {
+    const items = [
+      {
+        id: "act-init",
+        user: currentUserName,
+        action: "created task draft",
+        time: "Just now",
+      },
+    ];
+    if (assigneeId && selectedAssignee) {
+      items.push({
+        id: "act-assign",
+        user: currentUserName,
+        action: `assigned to ${selectedAssignee.full_name}`,
+        time: "Just now",
+      });
+    }
+    if (status !== "todo") {
+      items.push({
+        id: "act-status",
+        user: currentUserName,
+        action: `set status to ${currentStatusObj.label}`,
+        time: "Just now",
+      });
+    }
+    comments.forEach((c) => {
+      items.push({
+        id: c.id,
+        user: c.user,
+        action: `commented: "${c.text.slice(0, 40)}${c.text.length > 40 ? "..." : ""}"`,
+        time: c.time,
+      });
+    });
+    return items;
+  }, [currentUserName, assigneeId, selectedAssignee, status, currentStatusObj, comments]);
+
   const handleAddCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
@@ -399,13 +481,15 @@ export function CreateTaskModal({
     return `${h.toString().padStart(2, "0")}h ${m.toString().padStart(2, "0")}m`;
   };
 
-  const progressPercent = Math.min(100, Math.round((loggedMinutes / estimatedMinutes) * 100));
+  const progressPercent = estimatedMinutes > 0
+    ? Math.min(100, Math.round((loggedMinutes / estimatedMinutes) * 100))
+    : 0;
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden bg-black/45 backdrop-blur-[3px]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-5 md:p-8 overflow-hidden bg-black/45 backdrop-blur-[3px]">
         {/* Large Modal Container */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -413,57 +497,34 @@ export function CreateTaskModal({
           exit={{ opacity: 0, scale: 0.98, y: 12 }}
           transition={{ duration: 0.16, ease: "easeOut" }}
           ref={dropdownRef}
-          className={`relative z-10 flex flex-col bg-white border border-[#E2E8F0] shadow-2xl rounded-[18px] overflow-hidden text-[#111827] font-sans antialiased transition-all ${
+          className={`relative z-10 flex flex-col bg-white border-0 sm:border border-[#D8DDD4] shadow-2xl rounded-none sm:rounded-2xl overflow-hidden text-[#18221E] font-sans antialiased transition-all ${
             isFullscreen
-              ? "fixed inset-2 sm:inset-3 max-w-none h-[calc(100vh-1.5rem)]"
-              : "w-[94vw] max-w-[1220px] h-[90vh] max-h-[880px]"
+              ? "fixed inset-0 sm:inset-3 max-w-none h-full sm:h-[calc(100vh-1.5rem)]"
+              : "w-full sm:w-[94vw] max-w-none sm:max-w-[1220px] h-full sm:h-[90vh] max-h-none sm:max-h-[880px]"
           }`}
         >
           {/* ── TOP BREADCRUMB & HEADER BAR ──────────────────────────────── */}
-          <div className="flex items-center justify-between px-7 py-3.5 border-b border-[#F1F5F9] bg-white shrink-0 text-[13px] select-none">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 border-b border-[#D8DDD4] bg-white shrink-0 text-xs select-none">
             {/* Breadcrumb Path */}
-            <div className="flex items-center gap-2 text-[#64748B]">
-              <span className="hover:text-[#0F172A] cursor-pointer font-normal">
-                {activeDepartment ? activeDepartment.name : "Client Projects"}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <span className="font-semibold text-[#18221E] px-2 py-0.5 rounded-md bg-[#FAF9F5] border border-[#D8DDD4] truncate max-w-[100px] sm:max-w-none">
+                {activeDepartment ? activeDepartment.name : "Workspace"}
               </span>
-              <span className="text-[#CBD5E1]">/</span>
-              <span className="hover:text-[#0F172A] cursor-pointer font-normal">
-                Tasks
-              </span>
-              <span className="text-[#CBD5E1]">/</span>
-              <span className="font-semibold text-[#0F172A] truncate max-w-[280px]">
+              <span className="text-[#65706A]">/</span>
+              <span className="text-[#65706A] hidden xs:inline">Tasks</span>
+              <span className="text-[#65706A] hidden xs:inline">/</span>
+              <span className="font-semibold text-[#18221E] truncate max-w-[130px] sm:max-w-[280px]">
                 {trimmedTitle || "New Task"}
               </span>
             </div>
 
-            {/* Right Controls */}
-            <div className="flex items-center gap-3 text-[#64748B]">
-              <div className="relative hidden sm:block">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                <input
-                  type="text"
-                  placeholder="Search anything... ⌘K"
-                  className="w-56 pl-8 pr-3 py-1.5 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:bg-white transition-all"
-                />
-              </div>
-
-              <button
-                type="button"
-                className="relative p-1.5 rounded-lg hover:bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A] transition-colors"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              </button>
-
-              <div className="w-7 h-7 rounded-full bg-[#0F172A] text-white flex items-center justify-center text-[10px] font-bold">
-                TK
-              </div>
-
+            {/* Right Controls: Fullscreen & Close */}
+            <div className="flex items-center gap-1.5 text-[#65706A] shrink-0">
               <button
                 type="button"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 hover:bg-[#F8FAFC] rounded-lg text-[#94A3B8] hover:text-[#0F172A] transition-colors ml-1"
-                title={isFullscreen ? "Restore" : "Fullscreen"}
+                className="hidden sm:inline-flex p-1.5 hover:bg-[#FAF9F5] rounded-lg text-[#65706A] hover:text-[#18221E] transition-colors"
+                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
@@ -471,8 +532,8 @@ export function CreateTaskModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 hover:bg-[#F8FAFC] rounded-lg text-[#94A3B8] hover:text-[#0F172A] transition-colors"
-                title="Close"
+                className="p-1.5 hover:bg-[#FAF9F5] rounded-lg text-[#65706A] hover:text-[#18221E] transition-colors cursor-pointer"
+                title="Close (Esc)"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -481,7 +542,7 @@ export function CreateTaskModal({
 
           {/* Error Alert */}
           {errorMsg && (
-            <div className="px-7 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between">
               <span>{errorMsg}</span>
               <button type="button" onClick={() => setErrorMsg(null)}>
                 <X className="w-3.5 h-3.5" />
@@ -489,44 +550,45 @@ export function CreateTaskModal({
             </div>
           )}
 
-          {/* Creation Mode Switcher: Manual vs ClickUp Brain */}
-          <div className="flex items-center justify-between px-7 py-2.5 bg-[#FAF9F5] border-b border-[#E7EADF] shrink-0 select-none">
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#F0EFEA] border border-[#E2E1DC]">
+          {/* Creation Mode Switcher: Manual vs AI */}
+          <div className="flex items-center justify-between px-4 sm:px-6 py-2 sm:py-2.5 bg-[#FAF9F5] border-b border-[#D8DDD4] shrink-0 select-none">
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[#EAECE6] border border-[#D8DDD4]">
               <button
                 type="button"
                 onClick={() => setCreationMode("manual")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
                   creationMode === "manual"
-                    ? "bg-white text-[#18221E] shadow-xs"
+                    ? "bg-white text-[#18221E] shadow-2xs font-semibold"
                     : "text-[#65706A] hover:text-[#18221E]"
                 )}
               >
-                <span>📝</span>
-                <span>Create Manually</span>
+                <span>Manual Editor</span>
               </button>
               <button
                 type="button"
                 onClick={() => setCreationMode("ai")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
                   creationMode === "ai"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-xs font-bold"
-                    : "text-[#65706A] hover:text-emerald-700"
+                    ? "bg-[#18221E] text-white shadow-2xs font-semibold"
+                    : "text-[#65706A] hover:text-[#18221E]"
                 )}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Create with AI (Brain)</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>AI Generator</span>
               </button>
             </div>
-            <span className="text-[11px] text-[#8A958F] hidden sm:inline">
-              {creationMode === "ai" ? "ClickUp Brain AI • Type natural language, mention @teammates, attach files" : "ClickUp-style manual properties, assignees & checklists"}
+            <span className="text-[11px] text-[#65706A] hidden sm:inline">
+              {creationMode === "ai"
+                ? "Describe task in natural language • AI drafts description, criteria & properties"
+                : "Configure task properties, deliverables, acceptance criteria & assignees"}
             </span>
           </div>
 
           {/* ── CONDITIONAL BODY ────────────────────────────────────────── */}
           {creationMode === "ai" ? (
-            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
               <BrainQuickCreator
                 type="task"
                 workspaceId={workspaceId}
@@ -542,33 +604,33 @@ export function CreateTaskModal({
               />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto px-8 pt-7 pb-8">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-8 pt-4 sm:pt-6 pb-8">
             {/* ── TITLE & PRIMARY ACTIONS ROW ────────────────────────────── */}
-            <div className="flex items-start justify-between gap-6 mb-6">
-              <div className="space-y-3 flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-6 mb-4 sm:mb-6">
+              <div className="space-y-3 flex-1 min-w-0">
                 <input
                   type="text"
                   autoFocus
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Design hero section, API integration..."
-                  className="w-full text-[26px] font-bold text-[#0F172A] placeholder:text-[#94A3B8] bg-transparent border-0 focus:outline-none tracking-tight"
+                  placeholder="Task title..."
+                  className="w-full text-xl sm:text-2xl font-semibold text-[#18221E] placeholder:text-[#65706A]/40 bg-transparent border-0 focus:outline-none tracking-tight"
                 />
 
                 {/* Quick Badges Row */}
-                <div className="flex items-center gap-2.5 flex-wrap text-[12.5px]">
-                  {/* ClickUp Exact Status Trigger */}
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  {/* Status Trigger */}
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(openDropdown === "status" ? null : "status")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold text-zinc-800 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs font-medium text-[#18221E] shadow-2xs transition-colors"
                     >
                       <div className="flex items-center gap-1.5">
                         {currentStatusObj.icon}
                         <span>{currentStatusObj.label}</span>
                       </div>
-                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                      <ChevronDown className="w-3 h-3 text-[#65706A]" />
                     </button>
 
                     {openDropdown === "status" && (
@@ -584,18 +646,18 @@ export function CreateTaskModal({
                     )}
                   </div>
 
-                  {/* ClickUp Exact Priority Trigger */}
+                  {/* Priority Trigger */}
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(openDropdown === "priority" ? null : "priority")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold text-zinc-800 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs font-medium text-[#18221E] shadow-2xs transition-colors"
                     >
                       <div className="flex items-center gap-1.5">
                         {currentPriorityObj.icon}
                         <span className={currentPriorityObj.color}>{currentPriorityObj.label}</span>
                       </div>
-                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                      <ChevronDown className="w-3 h-3 text-[#65706A]" />
                     </button>
 
                     {openDropdown === "priority" && (
@@ -612,18 +674,18 @@ export function CreateTaskModal({
                     )}
                   </div>
 
-                  {/* ClickUp Exact Assignee Trigger */}
+                  {/* Assignee Trigger */}
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(openDropdown === "assignee" ? null : "assignee")}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold text-zinc-800 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs font-medium text-[#18221E] shadow-2xs transition-colors"
                     >
-                      <div className="w-4 h-4 rounded-full bg-[#6366F1] text-white flex items-center justify-center text-[8px] font-bold">
+                      <div className="w-4 h-4 rounded-full bg-[#18221E] text-white flex items-center justify-center text-[8px] font-bold">
                         {selectedAssignee?.full_name ? selectedAssignee.full_name[0] : "TK"}
                       </div>
-                      <span>{selectedAssignee?.full_name || "Tashin khan"}</span>
-                      <ChevronDown className="w-3 h-3 text-zinc-400" />
+                      <span className="truncate max-w-[120px]">{selectedAssignee?.full_name || "Assignee"}</span>
+                      <ChevronDown className="w-3 h-3 text-[#65706A]" />
                     </button>
 
                     {openDropdown === "assignee" && (
@@ -646,17 +708,17 @@ export function CreateTaskModal({
                       value={dueDate}
                       onChange={setDueDate}
                       placeholder="Due date"
-                      buttonClassName="h-7 px-2.5 rounded-full bg-[#F1F5F9] border-transparent text-[#475569] hover:bg-[#E2E8F0] shadow-none text-xs"
+                      buttonClassName="h-7 px-2.5 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-[#18221E] shadow-2xs text-xs font-medium"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                 <button
                   type="button"
-                  className="p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A] transition-colors"
+                  className="p-2 rounded-lg border border-[#D8DDD4] bg-white hover:bg-[#FAF9F5] text-[#65706A] hover:text-[#18221E] transition-colors"
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
@@ -664,8 +726,8 @@ export function CreateTaskModal({
                 <button
                   type="button"
                   onClick={() => setIsBookmarked(!isBookmarked)}
-                  className={`p-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors ${
-                    isBookmarked ? "text-amber-500 bg-amber-50/50" : "text-[#64748B]"
+                  className={`p-2 rounded-lg border border-[#D8DDD4] bg-white hover:bg-[#FAF9F5] transition-colors ${
+                    isBookmarked ? "text-amber-500 bg-amber-50/50" : "text-[#65706A]"
                   }`}
                   title="Bookmark"
                 >
@@ -676,7 +738,7 @@ export function CreateTaskModal({
                   type="button"
                   onClick={handleSubmit}
                   disabled={!isValid || loading}
-                  className="inline-flex items-center gap-1.5 px-4.5 py-2 rounded-lg bg-[#10251F] hover:bg-[#18342C] text-[#F4F3EE] text-xs font-semibold shadow-xs transition-all disabled:opacity-40 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#18221E] hover:bg-[#25322C] text-white text-xs font-semibold shadow-2xs transition-all disabled:opacity-40 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{loading ? "Creating..." : "Create Task"}</span>
@@ -685,21 +747,21 @@ export function CreateTaskModal({
             </div>
 
             {/* ── HORIZONTAL TABS ────────────────────────────────────────── */}
-            <div className="flex items-center gap-8 border-b border-[#F1F5F9] mb-7 text-[13.5px]">
+            <div className="flex items-center gap-4 sm:gap-6 border-b border-[#D8DDD4] mb-4 sm:mb-6 text-xs overflow-x-auto scrollbar-hide">
               <button
                 type="button"
                 onClick={() => setActiveTab("details")}
-                className={`pb-3 font-semibold transition-all relative ${
+                className={`pb-2.5 font-medium transition-all relative cursor-pointer ${
                   activeTab === "details"
-                    ? "text-[#0F172A]"
-                    : "text-[#64748B] hover:text-[#0F172A]"
+                    ? "text-[#18221E] font-semibold"
+                    : "text-[#65706A] hover:text-[#18221E]"
                 }`}
               >
                 <span>Details</span>
                 {activeTab === "details" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#18221E]"
                   />
                 )}
               </button>
@@ -707,17 +769,22 @@ export function CreateTaskModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("subtasks")}
-                className={`pb-3 flex items-center gap-1.5 font-medium transition-all relative ${
+                className={`pb-2.5 flex items-center gap-1.5 font-medium transition-all relative cursor-pointer ${
                   activeTab === "subtasks"
-                    ? "text-[#0F172A] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
+                    ? "text-[#18221E] font-semibold"
+                    : "text-[#65706A] hover:text-[#18221E]"
                 }`}
               >
                 <span>Subtasks</span>
+                {subtasks.length > 0 && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[#FAF9F5] text-[#65706A] border border-[#D8DDD4]">
+                    {subtasks.length}
+                  </span>
+                )}
                 {activeTab === "subtasks" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#18221E]"
                   />
                 )}
               </button>
@@ -725,17 +792,22 @@ export function CreateTaskModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("attachments")}
-                className={`pb-3 flex items-center gap-1.5 font-medium transition-all relative ${
+                className={`pb-2.5 flex items-center gap-1.5 font-medium transition-all relative cursor-pointer ${
                   activeTab === "attachments"
-                    ? "text-[#0F172A] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
+                    ? "text-[#18221E] font-semibold"
+                    : "text-[#65706A] hover:text-[#18221E]"
                 }`}
               >
                 <span>Attachments</span>
+                {attachments.length > 0 && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[#FAF9F5] text-[#65706A] border border-[#D8DDD4]">
+                    {attachments.length}
+                  </span>
+                )}
                 {activeTab === "attachments" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#18221E]"
                   />
                 )}
               </button>
@@ -743,234 +815,429 @@ export function CreateTaskModal({
               <button
                 type="button"
                 onClick={() => setActiveTab("activity")}
-                className={`pb-3 font-medium transition-all relative ${
+                className={`pb-2.5 font-medium transition-all relative cursor-pointer ${
                   activeTab === "activity"
-                    ? "text-[#0F172A] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
+                    ? "text-[#18221E] font-semibold"
+                    : "text-[#65706A] hover:text-[#18221E]"
                 }`}
               >
                 <span>Activity</span>
                 {activeTab === "activity" && (
                   <motion.div
                     layoutId="taskModalActiveTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0F172A]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#18221E]"
                   />
                 )}
               </button>
             </div>
 
             {/* ── 2-COLUMN GRID BODY ─────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* ── LEFT COLUMN (Description, Criteria, Comments) ───────── */}
-              <div className="lg:col-span-8 space-y-8">
-                {/* Description */}
-                <div className="space-y-3">
-                  <h2 className="text-[14px] font-bold text-[#0F172A]">Description</h2>
-                  <RichDescriptionEditor
-                    value={description}
-                    onChange={(val) => setDescription(val)}
-                    placeholder="Define the single source of truth for the engagement..."
-                  />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* ── LEFT COLUMN (Tab Views: Details, Subtasks, Attachments, Activity) ── */}
+              <div className="lg:col-span-8 space-y-6">
+                {/* 1. DETAILS TAB */}
+                {activeTab === "details" && (
+                  <motion.div
+                    key="details-view"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-6"
+                  >
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                        Description
+                      </h2>
+                      <RichDescriptionEditor
+                        value={description}
+                        onChange={(val) => setDescription(val)}
+                        placeholder="Add detailed description, context, or guidelines..."
+                      />
+                    </div>
 
-                {/* Acceptance Criteria */}
-                <div className="space-y-3.5 pt-2">
-                  <h2 className="text-[14px] font-bold text-[#0F172A]">Acceptance criteria</h2>
+                    {/* Acceptance Criteria */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                          Acceptance criteria
+                        </h2>
+                        {criteria.length > 0 && (
+                          <span className="text-[11px] text-[#65706A]">
+                            {criteria.filter((c) => c.done).length} of {criteria.length} done
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="space-y-2.5">
-                    {criteria.map((c) => (
-                      <div
-                        key={c.id}
-                        onClick={() =>
-                          setCriteria(
-                            criteria.map((item) =>
-                              item.id === c.id ? { ...item, done: !item.done } : item
-                            )
-                          )
-                        }
-                        className="flex items-center gap-3 text-[13.5px] cursor-pointer group select-none"
-                      >
-                        <div
-                          className={`w-4.5 h-4.5 rounded flex items-center justify-center transition-all ${
-                            c.done
-                              ? "bg-[#10B981] text-white"
-                              : "border border-[#CBD5E1] bg-white group-hover:border-[#94A3B8]"
-                          }`}
+                      <div className="space-y-2">
+                        {criteria.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-center justify-between p-2 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs transition-colors group"
+                          >
+                            <div
+                              onClick={() =>
+                                setCriteria(
+                                  criteria.map((item) =>
+                                    item.id === c.id ? { ...item, done: !item.done } : item
+                                  )
+                                )
+                              }
+                              className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 select-none"
+                            >
+                              <div
+                                className={cn(
+                                  "w-4 h-4 rounded flex items-center justify-center transition-all",
+                                  c.done
+                                    ? "bg-emerald-600 text-white"
+                                    : "border border-[#D8DDD4] bg-white group-hover:border-[#18221E]/40"
+                                )}
+                              >
+                                {c.done && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                              <span
+                                className={cn(
+                                  "truncate",
+                                  c.done ? "line-through text-[#65706A]" : "text-[#18221E] font-medium"
+                                )}
+                              >
+                                {c.text}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCriteria(criteria.filter((item) => item.id !== c.id))}
+                              className="opacity-0 group-hover:opacity-100 text-[#65706A] hover:text-rose-600 p-1 rounded transition-all cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {showAddCriteria ? (
+                        <form onSubmit={handleAddCriteriaSubmit} className="flex items-center gap-2 pt-1">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={newCriteriaInput}
+                            onChange={(e) => setNewCriteriaInput(e.target.value)}
+                            placeholder="Add acceptance criteria..."
+                            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] focus:bg-white focus:outline-none focus:border-[#18221E] transition-colors"
+                          />
+                          <button
+                            type="submit"
+                            className="px-3 py-1.5 rounded-lg bg-[#18221E] text-white text-xs font-semibold hover:bg-[#25322C] transition-colors cursor-pointer"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddCriteria(false)}
+                            className="px-2.5 py-1.5 text-xs text-[#65706A] hover:text-[#18221E] cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCriteria(true)}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
                         >
-                          {c.done && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                        <span
-                          className={
-                            c.done
-                              ? "line-through text-[#94A3B8]"
-                              : "text-[#334155] group-hover:text-[#0F172A]"
-                          }
-                        >
-                          {c.text}
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add criteria</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Comments Thread */}
+                    <div className="space-y-3 pt-3 border-t border-[#D8DDD4]">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                          Comments & Notes
+                        </h2>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#FAF9F5] text-[#65706A] border border-[#D8DDD4]">
+                          {comments.length}
                         </span>
                       </div>
-                    ))}
-                  </div>
 
-                  {showAddCriteria ? (
-                    <form onSubmit={handleAddCriteriaSubmit} className="flex items-center gap-2 pt-2">
+                      {/* Comment Input */}
+                      <form
+                        onSubmit={handleAddCommentSubmit}
+                        className="flex items-center gap-2.5 p-2 rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] focus-within:bg-white focus-within:border-[#18221E] shadow-2xs transition-all"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-[#18221E] text-white flex items-center justify-center text-[9px] font-bold shrink-0 ml-1">
+                          TK
+                        </div>
+                        <input
+                          type="text"
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder="Write a comment or note..."
+                          className="flex-1 text-xs bg-transparent text-[#18221E] placeholder:text-[#65706A] focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1 text-[#65706A] mr-1">
+                          <button type="button" className="p-1 hover:text-[#18221E]">
+                            <Smile className="w-3.5 h-3.5" />
+                          </button>
+                          <button type="button" className="p-1 hover:text-[#18221E]">
+                            <Paperclip className="w-3.5 h-3.5" />
+                          </button>
+                          <button type="button" className="p-1 hover:text-[#18221E]">
+                            <AtSign className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!newComment.trim()}
+                            className="p-1.5 rounded-lg bg-[#18221E] text-white disabled:opacity-20 hover:bg-[#25322C] transition-colors ml-1 cursor-pointer"
+                          >
+                            <Send className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 2. SUBTASKS TAB */}
+                {activeTab === "subtasks" && (
+                  <motion.div
+                    key="subtasks-view"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                          Subtasks Breakdown
+                        </h2>
+                        <p className="text-[11px] text-[#65706A] mt-0.5">
+                          Break down this task into bite-sized actionable items.
+                        </p>
+                      </div>
+                      {subtasks.length > 0 && (
+                        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          {subtasks.filter((s) => s.done).length} / {subtasks.length} completed
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Subtasks Progress Bar */}
+                    {subtasks.length > 0 && (
+                      <div className="h-1.5 w-full rounded-full bg-[#E7EADF] overflow-hidden">
+                        <div
+                          style={{
+                            width: `${Math.round(
+                              (subtasks.filter((s) => s.done).length / subtasks.length) * 100
+                            )}%`,
+                          }}
+                          className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                        />
+                      </div>
+                    )}
+
+                    {/* Subtasks List */}
+                    <div className="space-y-2">
+                      {subtasks.map((st) => (
+                        <div
+                          key={st.id}
+                          className="flex items-center justify-between p-2.5 rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs transition-colors group"
+                        >
+                          <div
+                            onClick={() =>
+                              setSubtasks((prev) =>
+                                prev.map((item) =>
+                                  item.id === st.id ? { ...item, done: !item.done } : item
+                                )
+                              )
+                            }
+                            className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 select-none"
+                          >
+                            <div
+                              className={cn(
+                                "w-4 h-4 rounded flex items-center justify-center transition-all",
+                                st.done
+                                  ? "bg-emerald-600 text-white"
+                                  : "border border-[#D8DDD4] bg-white group-hover:border-[#18221E]/40"
+                              )}
+                            >
+                              {st.done && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span
+                              className={cn(
+                                "truncate",
+                                st.done ? "line-through text-[#65706A]" : "text-[#18221E] font-medium"
+                              )}
+                            >
+                              {st.title}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSubtasks((prev) => prev.filter((item) => item.id !== st.id))}
+                            className="opacity-0 group-hover:opacity-100 text-[#65706A] hover:text-rose-600 p-1 rounded transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add Subtask Form */}
+                    <form onSubmit={handleAddSubtask} className="flex items-center gap-2 pt-1">
                       <input
                         type="text"
-                        autoFocus
-                        value={newCriteriaInput}
-                        onChange={(e) => setNewCriteriaInput(e.target.value)}
-                        placeholder="Type acceptance criteria..."
-                        className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#CBD5E1] focus:outline-none focus:border-[#0F172A]"
+                        value={newSubtaskInput}
+                        onChange={(e) => setNewSubtaskInput(e.target.value)}
+                        placeholder="Add a new subtask (press Enter)..."
+                        className="flex-1 text-xs px-3 py-2 rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] focus:bg-white focus:outline-none focus:border-[#18221E] transition-colors"
                       />
                       <button
                         type="submit"
-                        className="px-3 py-2 rounded-lg bg-[#0F172A] text-white text-xs font-semibold"
+                        disabled={!newSubtaskInput.trim()}
+                        className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-[#18221E] text-white text-xs font-semibold hover:bg-[#25322C] disabled:opacity-30 transition-colors cursor-pointer"
                       >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCriteria(false)}
-                        className="px-2 py-2 text-xs text-[#64748B] hover:text-[#0F172A]"
-                      >
-                        Cancel
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add subtask</span>
                       </button>
                     </form>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCriteria(true)}
-                      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#10B981] hover:text-[#059669] pt-1 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add criteria</span>
-                    </button>
-                  )}
-                </div>
+                  </motion.div>
+                )}
 
-                {/* Comments Thread */}
-                <div className="space-y-4 pt-4 border-t border-[#F1F5F9]">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-bold text-[#0F172A]">Comments</h2>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-[#F1F5F9] text-[#475569]">
-                      {comments.length}
-                    </span>
-                  </div>
-
-                  {/* Comment Input */}
-                  <form
-                    onSubmit={handleAddCommentSubmit}
-                    className="flex items-center gap-3 p-2 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs"
+                {/* 3. ATTACHMENTS TAB */}
+                {activeTab === "attachments" && (
+                  <motion.div
+                    key="attachments-view"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-5"
                   >
-                    <div className="w-7 h-7 rounded-full bg-[#0F172A] text-white flex items-center justify-center text-[10px] font-bold shrink-0 ml-1">
-                      TK
+                    <div>
+                      <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                        Attachments & Files
+                      </h2>
+                      <p className="text-[11px] text-[#65706A] mt-0.5">
+                        Upload assets, specifications, design files, or spreadsheets.
+                      </p>
                     </div>
+
+                    {/* Hidden File Input */}
                     <input
-                      type="text"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Write a comment..."
-                      className="flex-1 text-xs bg-transparent text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      multiple
+                      className="hidden"
                     />
-                    <div className="flex items-center gap-1 text-[#94A3B8] mr-1">
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <Smile className="w-4 h-4" />
-                      </button>
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <Paperclip className="w-4 h-4" />
-                      </button>
-                      <button type="button" className="p-1 hover:text-[#0F172A]">
-                        <AtSign className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={!newComment.trim()}
-                        className="p-1.5 rounded-lg bg-[#0F172A] text-white disabled:opacity-20 hover:bg-[#1E293B] transition-colors ml-1"
-                      >
-                        <Send className="w-3 h-3" />
-                      </button>
+
+                    {/* Drag and Drop Zone */}
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-6 border-2 border-dashed border-[#D8DDD4] hover:border-[#18221E]/40 bg-[#FAF9F5] hover:bg-white rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors group text-center"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-white border border-[#D8DDD4] group-hover:scale-105 flex items-center justify-center text-[#65706A] group-hover:text-[#18221E] transition-all shadow-2xs">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[#18221E]">
+                          Click to upload or drag & drop files
+                        </p>
+                        <p className="text-[11px] text-[#65706A] mt-0.5">
+                          PNG, JPG, PDF, SVG, DOCX or ZIP up to 50MB
+                        </p>
+                      </div>
                     </div>
-                  </form>
 
-                  {/* Thread Comments */}
-                  <div className="space-y-5 pt-2">
-                    {comments.map((cm) => (
-                      <div key={cm.id} className="flex items-start gap-3 text-xs">
-                        <div className="w-8 h-8 rounded-full bg-[#1E1B4B] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-                          {cm.user.split(" ").map((n) => n[0]).join("")}
-                        </div>
-
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#0F172A] text-[13px]">{cm.user}</span>
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#F1F5F9] text-[#64748B]">
-                              {cm.role}
-                            </span>
-                          </div>
-
-                          <p className="text-[13px] text-[#334155] leading-normal">{cm.text}</p>
-
-                          {/* Figma Attachment Card */}
-                          {cm.attachment && (
-                            <div className="flex items-center justify-between p-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] max-w-sm mt-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-white border border-[#E2E8F0] flex items-center justify-center shadow-2xs">
-                                  <svg className="w-4 h-4" viewBox="0 0 38 57" fill="none">
-                                    <path d="M19 28.5C19 23.2533 23.2533 19 28.5 19C33.7467 19 38 23.2533 38 28.5C38 33.7467 33.7467 38 28.5 38C23.2533 38 19 33.7467 19 28.5Z" fill="#1ABCFE"/>
-                                    <path d="M0 47.5C0 42.2533 4.25329 38 9.5 38H19V47.5C19 52.7467 14.7467 57 9.5 57C4.25329 57 0 52.7467 0 47.5Z" fill="#0ACF83"/>
-                                    <path d="M19 0V19H28.5C33.7467 19 38 14.7467 38 9.5C38 4.25329 33.7467 0 28.5 0H19Z" fill="#FF7262"/>
-                                    <path d="M0 9.5C0 14.7467 4.25329 19 9.5 19H19V0H9.5C4.25329 0 0 4.25329 0 9.5Z" fill="#F24E1E"/>
-                                    <path d="M0 28.5C0 33.7467 4.25329 38 9.5 38H19V19H9.5C4.25329 19 0 23.2533 0 28.5Z" fill="#A259FF"/>
-                                  </svg>
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-[#0F172A] text-xs">{cm.attachment.name}</p>
-                                  <p className="text-[10px] text-[#64748B]">
-                                    {cm.attachment.type} • {cm.attachment.size}
-                                  </p>
-                                </div>
+                    {/* Attachments List */}
+                    {attachments.length > 0 ? (
+                      <div className="space-y-2">
+                        {attachments.map((att) => (
+                          <div
+                            key={att.id}
+                            className="flex items-center justify-between p-2.5 rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs transition-colors group"
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <div className="w-7 h-7 rounded-lg bg-white border border-[#D8DDD4] flex items-center justify-center text-[#18221E] shrink-0">
+                                <FileText className="w-3.5 h-3.5 text-[#65706A]" />
                               </div>
-                              <button
-                                type="button"
-                                className="p-1.5 rounded-lg hover:bg-white text-[#64748B] hover:text-[#0F172A] transition-colors"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="truncate">
+                                <p className="font-medium text-[#18221E] truncate">{att.name}</p>
+                                <p className="text-[10px] text-[#65706A]">{att.size}</p>
+                              </div>
                             </div>
-                          )}
-
-                          <div className="flex items-center gap-3 pt-1 text-[11px] text-[#94A3B8]">
-                            <span>{cm.time}</span>
-                            <button type="button" className="hover:text-[#0F172A] font-medium">
-                              Reply
+                            <button
+                              type="button"
+                              onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== att.id))}
+                              className="text-[#65706A] hover:text-rose-600 p-1.5 rounded-md transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-[#D8DDD4] bg-[#FAF9F5] text-center text-xs text-[#65706A]">
+                        No attachments uploaded for this task yet.
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* 4. ACTIVITY TAB */}
+                {activeTab === "activity" && (
+                  <motion.div
+                    key="activity-view"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-5"
+                  >
+                    <div>
+                      <h2 className="text-xs font-semibold uppercase tracking-wider text-[#65706A]">
+                        Activity Timeline
+                      </h2>
+                      <p className="text-[11px] text-[#65706A] mt-0.5">
+                        Audit trail and changes recorded for this task draft.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#D8DDD4]">
+                      {activityItems.map((act) => (
+                        <div key={act.id} className="flex items-start gap-3 relative pl-1">
+                          <div className="w-5 h-5 rounded-full bg-[#18221E] text-white flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5 z-10 shadow-2xs">
+                            {act.user.slice(0, 1)}
+                          </div>
+                          <div className="flex-1 bg-[#FAF9F5] border border-[#D8DDD4] rounded-xl p-2.5 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-[#18221E]">{act.user}</span>
+                              <span className="text-[10px] text-[#65706A]">{act.time}</span>
+                            </div>
+                            <p className="text-[#65706A] mt-0.5 text-xs">{act.action}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               {/* ── RIGHT COLUMN (Task Details, Time Tracking, Tags) ─────── */}
-              <div className="lg:col-span-4 space-y-6">
+              <div className="lg:col-span-4 space-y-4">
                 {/* Card 1: Task Details */}
-                <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white shadow-2xs space-y-4 text-[13px]">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-[#0F172A]">Task details</h3>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-[#64748B] hover:text-[#0F172A] px-2.5 py-1 rounded-md border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
-                    >
-                      Edit
-                    </button>
+                <div className="p-4 rounded-xl border border-[#D8DDD4] bg-white shadow-2xs space-y-3 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#D8DDD4]">
+                    <h3 className="font-semibold text-[#18221E] text-xs">Task details</h3>
                   </div>
 
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     {/* Assignee */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
-                        <User className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2 shrink-0">
+                        <User className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Assignee</span>
                       </span>
                       <CustomSelect
@@ -985,8 +1252,8 @@ export function CreateTaskModal({
 
                     {/* Project */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
-                        <Folder className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2 shrink-0">
+                        <Folder className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Project</span>
                       </span>
                       <CustomSelect
@@ -1007,8 +1274,8 @@ export function CreateTaskModal({
 
                     {/* Workstream Phase */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
-                        <ListTodo className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2 shrink-0">
+                        <ListTodo className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Phase</span>
                       </span>
                       <CustomSelect
@@ -1023,8 +1290,8 @@ export function CreateTaskModal({
 
                     {/* Primary Department */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
-                        <Building2 className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2 shrink-0">
+                        <Building2 className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Department</span>
                       </span>
                       <CustomSelect
@@ -1039,13 +1306,13 @@ export function CreateTaskModal({
 
                     {/* Collaborative Multi-Department Badges */}
                     {departments.length > 0 && (
-                      <div className="pt-2 border-t border-[#F1F5F9] space-y-1.5">
+                      <div className="pt-2 border-t border-[#D8DDD4] space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-[#64748B] flex items-center gap-1.5 font-medium">
-                            <Users className="w-3.5 h-3.5 text-[#94A3B8]" />
+                          <span className="text-[#65706A] flex items-center gap-1.5 font-medium">
+                            <Users className="w-3.5 h-3.5 text-[#65706A]" />
                             <span>Collaborative Teams</span>
                           </span>
-                          <span className="text-[10px] text-[#94A3B8] font-semibold">
+                          <span className="text-[10px] text-[#65706A] font-medium">
                             {collaborativeDeptIds.length} assigned
                           </span>
                         </div>
@@ -1070,13 +1337,13 @@ export function CreateTaskModal({
                                 className={cn(
                                   "text-[10.5px] px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1",
                                   isSelected
-                                    ? "bg-[#10251F] text-[#F4F3EE] border-[#10251F] font-medium"
-                                    : "bg-[#FAF9F5] text-[#55635D] border-[#D8DDD4] hover:border-[#10251F]/40"
+                                    ? "bg-[#18221E] text-white border-[#18221E] font-medium"
+                                    : "bg-[#FAF9F5] text-[#65706A] border-[#D8DDD4] hover:border-[#18221E]/30"
                                 )}
                               >
                                 <span
                                   className="w-1.5 h-1.5 rounded-full shrink-0"
-                                  style={{ backgroundColor: dept.color || "#10251F" }}
+                                  style={{ backgroundColor: dept.color || "#18221E" }}
                                 />
                                 <span>{dept.name}</span>
                                 {isSelected && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
@@ -1087,77 +1354,110 @@ export function CreateTaskModal({
                       </div>
                     )}
 
-                    {/* Priority */}
+                    {/* Priority (Clickable and workable) */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <Flag className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2">
+                        <Flag className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Priority</span>
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        {currentPriorityObj.icon}
-                        <span className={`font-medium text-[12px] ${currentPriorityObj.color}`}>
-                          {currentPriorityObj.label}
-                        </span>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenDropdown(openDropdown === "priority-sidebar" ? null : "priority-sidebar")}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs font-medium text-[#18221E] transition-colors"
+                        >
+                          {currentPriorityObj.icon}
+                          <span className={currentPriorityObj.color}>{currentPriorityObj.label}</span>
+                          <ChevronDown className="w-3 h-3 text-[#65706A]" />
+                        </button>
+                        {openDropdown === "priority-sidebar" && (
+                          <div className="absolute right-0 top-full mt-1 z-50">
+                            <PriorityMenu
+                              currentPriority={priority}
+                              onSelect={(newPr) => {
+                                setPriority(newPr);
+                                setOpenDropdown(null);
+                              }}
+                              people={people}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Status */}
+                    {/* Status (Clickable and workable) */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <CircleDot className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2">
+                        <CircleDot className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Status</span>
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        {currentStatusObj.icon}
-                        <span className="font-semibold text-[12px] text-zinc-800">
-                          {currentStatusObj.label}
-                        </span>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setOpenDropdown(openDropdown === "status-sidebar" ? null : "status-sidebar")}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-xs font-medium text-[#18221E] transition-colors"
+                        >
+                          {currentStatusObj.icon}
+                          <span>{currentStatusObj.label}</span>
+                          <ChevronDown className="w-3 h-3 text-[#65706A]" />
+                        </button>
+                        {openDropdown === "status-sidebar" && (
+                          <div className="absolute right-0 top-full mt-1 z-50">
+                            <StatusMenu
+                              currentStatus={status}
+                              onSelect={(newSt) => {
+                                setStatus(newSt);
+                                setOpenDropdown(null);
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Due date */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#64748B] flex items-center gap-2 shrink-0">
-                        <Calendar className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2 shrink-0">
+                        <Calendar className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Due date</span>
                       </span>
                       <DatePicker
                         value={dueDate}
                         onChange={setDueDate}
                         placeholder="No due date"
-                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#E2E8F0] shadow-none"
+                        buttonClassName="h-7 px-2 py-0.5 max-w-[170px] border-[#D8DDD4] shadow-none rounded-lg"
                         align="right"
                       />
                     </div>
 
                     {/* Created by */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <User className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Created by</span>
                       </span>
-                      <span className="font-medium text-[#0F172A]">{currentUserName}</span>
+                      <span className="font-medium text-[#18221E]">{currentUserName}</span>
                     </div>
 
                     {/* Created on */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Created on</span>
                       </span>
-                      <span className="text-[#475569] text-xs">{createdOnText}</span>
+                      <span className="text-[#65706A] text-xs">{createdOnText}</span>
                     </div>
 
                     {/* Reviewer */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[#64748B] flex items-center gap-2">
-                        <User className="w-4 h-4 text-[#94A3B8]" />
+                      <span className="text-[#65706A] flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Reviewer</span>
                       </span>
                       <select
                         value={reviewerId}
                         onChange={(e) => setReviewerId(e.target.value)}
-                        className="text-xs font-medium text-[#0F172A] bg-transparent border border-[#E2E8F0] hover:border-[#CBD5E1] focus:border-[#0F172A] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
+                        className="text-xs font-medium text-[#18221E] bg-[#FAF9F5] border border-[#D8DDD4] hover:border-[#18221E]/30 focus:border-[#18221E] rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[150px] truncate"
                       >
                         <option value="">Unassigned</option>
                         {people.map((p) => (
@@ -1171,30 +1471,56 @@ export function CreateTaskModal({
                 </div>
 
                 {/* Card 2: Time Tracking */}
-                <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white shadow-2xs space-y-4">
-                  <h3 className="font-bold text-[#0F172A] text-[13px]">Time tracking</h3>
+                <div className="p-4 rounded-xl border border-[#D8DDD4] bg-white shadow-2xs space-y-3 text-xs">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#D8DDD4]">
+                    <h3 className="font-semibold text-[#18221E] text-xs">Time tracking</h3>
+                    <span className="text-[11px] font-medium text-emerald-700 tabular-nums">
+                      {progressPercent}%
+                    </span>
+                  </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <div>
-                        <span className="text-[#94A3B8] block text-[11px]">Logged time</span>
-                        <span className="font-bold text-[#0F172A] text-sm">{formatHoursMins(loggedMinutes)}</span>
+                        <span className="text-[#65706A] block text-[11px]">Logged</span>
+                        <span className="font-semibold text-[#18221E] text-xs tabular-nums">
+                          {formatHoursMins(loggedMinutes)}
+                        </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[#94A3B8] block text-[11px]">Estimated</span>
-                        <span className="font-semibold text-[#475569] text-sm">{formatHoursMins(estimatedMinutes)}</span>
+                        <span className="text-[#65706A] block text-[11px]">Estimate</span>
+                        <span className="font-semibold text-[#18221E] text-xs tabular-nums">
+                          {formatHoursMins(estimatedMinutes)}
+                        </span>
                       </div>
                     </div>
 
                     {/* Progress bar */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 rounded-full bg-[#F1F5F9] overflow-hidden">
-                        <div
-                          style={{ width: `${progressPercent}%` }}
-                          className="h-full bg-[#10B981] rounded-full transition-all duration-300"
-                        />
-                      </div>
-                      <span className="text-[11px] font-bold text-[#64748B]">{progressPercent}%</span>
+                    <div className="h-1.5 w-full rounded-full bg-[#E7EADF] overflow-hidden">
+                      <div
+                        style={{ width: `${progressPercent}%` }}
+                        className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                      />
+                    </div>
+
+                    {/* Quick estimate buttons */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <span className="text-[11px] text-[#65706A]">Estimate:</span>
+                      {[1, 2, 4, 8].map((hrs) => (
+                        <button
+                          key={hrs}
+                          type="button"
+                          onClick={() => setEstimatedMinutes(hrs * 60)}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer",
+                            estimatedMinutes === hrs * 60
+                              ? "bg-[#18221E] text-white border-[#18221E]"
+                              : "bg-[#FAF9F5] text-[#65706A] border-[#D8DDD4] hover:text-[#18221E] hover:bg-white"
+                          )}
+                        >
+                          {hrs}h
+                        </button>
+                      ))}
                     </div>
 
                     {isLoggingTime ? (
@@ -1206,18 +1532,18 @@ export function CreateTaskModal({
                           value={logTimeInput}
                           onChange={(e) => setLogTimeInput(e.target.value)}
                           placeholder="Hours (e.g. 1.5)"
-                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] focus:outline-none focus:border-[#0F172A]"
+                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] focus:bg-white focus:outline-none focus:border-[#18221E]"
                         />
                         <button
                           type="submit"
-                          className="px-2.5 py-1.5 rounded-lg bg-[#0F172A] text-white text-xs font-semibold"
+                          className="px-2.5 py-1.5 rounded-lg bg-[#18221E] text-white text-xs font-semibold hover:bg-[#25322C] transition-colors"
                         >
                           Save
                         </button>
                         <button
                           type="button"
                           onClick={() => setIsLoggingTime(false)}
-                          className="text-xs text-[#64748B] hover:text-[#0F172A]"
+                          className="text-xs text-[#65706A] hover:text-[#18221E]"
                         >
                           Cancel
                         </button>
@@ -1226,9 +1552,9 @@ export function CreateTaskModal({
                       <button
                         type="button"
                         onClick={() => setIsLoggingTime(true)}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#E2E8F0] hover:bg-[#F8FAFC] text-xs font-semibold text-[#334155] transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#D8DDD4] hover:bg-[#FAF9F5] text-xs font-medium text-[#18221E] transition-colors cursor-pointer"
                       >
-                        <Clock className="w-3.5 h-3.5 text-[#64748B]" />
+                        <Clock className="w-3.5 h-3.5 text-[#65706A]" />
                         <span>Log time</span>
                       </button>
                     )}
@@ -1236,30 +1562,33 @@ export function CreateTaskModal({
                 </div>
 
                 {/* Card 3: Tags */}
-                <div className="p-5 rounded-2xl border border-[#E2E8F0] bg-white shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-[#0F172A] text-[13px]">Tags</h3>
+                <div className="p-4 rounded-xl border border-[#D8DDD4] bg-white shadow-2xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#D8DDD4]">
+                    <h3 className="font-semibold text-[#18221E] text-xs">Tags</h3>
                     <button
                       type="button"
                       onClick={() => setIsEditingTags(!isEditingTags)}
-                      className="text-xs font-semibold text-[#64748B] hover:text-[#0F172A] px-2.5 py-1 rounded-md border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors"
+                      className="text-[11px] font-medium text-[#65706A] hover:text-[#18221E] transition-colors"
                     >
-                      Edit
+                      {isEditingTags ? "Done" : "+ Add"}
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {tags.length === 0 && !isEditingTags && (
+                      <span className="text-[11px] text-[#65706A] italic">No tags added</span>
+                    )}
                     {tags.map((t) => (
                       <span
                         key={t}
-                        className="px-2.5 py-1 rounded-md bg-[#ECFDF5] text-[#065F46] font-medium text-xs flex items-center gap-1"
+                        className="px-2 py-0.5 rounded-md bg-[#FAF9F5] border border-[#D8DDD4] text-[#18221E] font-medium text-[11px] flex items-center gap-1"
                       >
                         <span>{t}</span>
                         {isEditingTags && (
                           <button
                             type="button"
                             onClick={() => setTags(tags.filter((x) => x !== t))}
-                            className="text-emerald-800 hover:text-red-600"
+                            className="text-[#65706A] hover:text-rose-600"
                           >
                             <X className="w-2.5 h-2.5" />
                           </button>
@@ -1273,7 +1602,7 @@ export function CreateTaskModal({
                         onChange={(e) => setNewTagInput(e.target.value)}
                         onKeyDown={handleAddTag}
                         placeholder="+ Tag..."
-                        className="w-16 px-1.5 py-0.5 text-xs border-b border-[#0F172A] focus:outline-none"
+                        className="w-16 px-1.5 py-0.5 text-xs border-b border-[#18221E] bg-transparent focus:outline-none"
                       />
                     )}
                   </div>

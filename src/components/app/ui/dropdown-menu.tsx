@@ -3,6 +3,8 @@
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 
+import { cn } from "@/lib/utils";
+
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
@@ -13,12 +15,16 @@ export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 export const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className = "", sideOffset = 4, ...props }, ref) => (
+>(({ className = "", sideOffset = 4, style, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
-      className={`app-root z-50 min-w-[180px] overflow-hidden rounded-[12px] border border-hairline bg-surface bg-white p-1 text-ink shadow-[0_8px_24px_rgba(0,0,0,0.08)] duration-120 ease-out select-none focus:outline-none animate-in fade-in-0 zoom-in-95 ${className}`}
+      style={{ backgroundColor: "#FFFFFF", ...style }}
+      className={cn(
+        "z-50 min-w-[200px] overflow-hidden rounded-xl border border-hairline bg-white p-1 text-ink shadow-[0_12px_36px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.04)] duration-150 ease-out select-none focus:outline-none animate-in fade-in-0 zoom-in-95",
+        className
+      )}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
@@ -34,12 +40,16 @@ export const DropdownMenuItem = React.forwardRef<
 >(({ className = "", inset, shortcut, children, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
-    className={`relative flex h-[30px] cursor-pointer items-center justify-between rounded-lg px-2.5 text-[13px] text-ink outline-none transition-colors duration-120 ease-out data-[disabled]:pointer-events-none data-[disabled]:opacity-40 focus:bg-hover focus:text-ink ${
-      inset ? "pl-8" : ""
-    } ${className}`}
+    className={cn(
+      "relative flex cursor-pointer select-none items-center rounded-lg px-2.5 py-1.5 text-[13px] text-ink outline-none transition-colors duration-120 ease-out",
+      "data-[disabled]:pointer-events-none data-[disabled]:opacity-40",
+      "focus:bg-hover focus:text-ink hover:bg-hover hover:text-ink",
+      inset && "pl-8",
+      className
+    )}
     {...props}
   >
-    <span className="truncate">{children}</span>
+    {children}
     {shortcut && (
       <span className="ml-auto pl-4 font-mono text-[10px] text-ink-3">
         {shortcut}
@@ -55,7 +65,7 @@ export const DropdownMenuSeparator = React.forwardRef<
 >(({ className = "", ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={`-mx-1 my-1 h-px bg-hairline ${className}`}
+    className={cn("-mx-1 my-1 h-px bg-hairline", className)}
     {...props}
   />
 ));
@@ -69,9 +79,11 @@ export const DropdownMenuLabel = React.forwardRef<
 >(({ className = "", inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={`px-2.5 py-1 text-[11px] font-medium text-ink-3 ${
-      inset ? "pl-8" : ""
-    } ${className}`}
+    className={cn(
+      "px-2.5 py-1 text-[11px] font-medium text-ink-3",
+      inset && "pl-8",
+      className
+    )}
     {...props}
   />
 ));

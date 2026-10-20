@@ -1,14 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { Sidebar } from "./sidebar";
-import { Header } from "./header";
 import { Workspace } from "@/types/workspace";
 import { UserContext } from "@/types/permissions";
 import type { NavVisibility } from "@/lib/auth/permissions";
 import { Project } from "@/types/project";
 import { IconButton } from "@/components/app/ui";
+import { AppChromeTabs } from "./app-chrome-tabs";
 
 export interface AppShellProps {
   children: React.ReactNode;
@@ -112,62 +113,68 @@ export function AppShell({
       </div>
 
       {/* Mobile Slide-over Drawer */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/25 transition-opacity duration-120"
-            onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
-          />
-
-          {/* Drawer container */}
-          <div
-            className="relative flex w-[248px] max-w-[82vw] flex-1 flex-col bg-canvas border-r border-hairline shadow-[0_8px_24px_rgba(0,0,0,0.12)] z-50 duration-120"
-            role="dialog"
-            aria-modal="true"
-          >
-            {/* Close button */}
-            <div className="absolute top-2.5 right-2.5 z-50">
-              <IconButton
-                aria-label="Close menu"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <X className="h-4 w-4 stroke-[1.5]" />
-              </IconButton>
-            </div>
-
-            <Sidebar
-              user={user}
-              workspace={workspace}
-              allWorkspaces={allWorkspaces}
-              userContext={userContext}
-              navVisibility={navVisibility}
-              projects={projects}
-              isCollapsed={false}
-              onCloseMobile={() => setMobileMenuOpen(false)}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-[2px]"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-hidden="true"
             />
+
+            {/* Drawer container */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="relative flex w-[260px] max-w-[84vw] flex-1 flex-col bg-canvas border-r border-hairline shadow-2xl z-50"
+              role="dialog"
+              aria-modal="true"
+            >
+              {/* Close button */}
+              <div className="absolute top-2.5 right-2.5 z-50">
+                <IconButton
+                  aria-label="Close menu"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <X className="h-4 w-4 stroke-[1.5]" />
+                </IconButton>
+              </div>
+
+              <Sidebar
+                user={user}
+                workspace={workspace}
+                allWorkspaces={allWorkspaces}
+                userContext={userContext}
+                navVisibility={navVisibility}
+                projects={projects}
+                isCollapsed={false}
+                onCloseMobile={() => setMobileMenuOpen(false)}
+              />
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* Main Content Area: Inset 8px from top, right, and bottom */}
-      <div className="flex-1 flex flex-col h-screen min-w-0 p-2 lg:pl-0 overflow-hidden">
-        {/* The ONE white sheet (surface) with 12px radius and hairline border */}
-        <div className="flex-1 flex flex-col rounded-[12px] border border-hairline bg-surface overflow-hidden shadow-none h-[calc(100vh-16px)]">
-          {/* Topbar inside sheet: 48px with hairline bottom border */}
-          <Header
-            user={user}
-            workspace={workspace}
-            onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          />
-
-          {/* Content scrolls inside the sheet */}
-          <main className="flex-1 overflow-y-auto px-6 py-6 min-w-0">
-            {children}
-          </main>
-        </div>
-      </div>
+      {/* Main Content Area with Chrome-Like Tabs */}
+      <AppChromeTabs
+        isCollapsed={isCollapsed}
+        onToggleCollapse={toggleCollapsed}
+        onOpenMobileMenu={() => setMobileMenuOpen(true)}
+        workspace={workspace}
+        user={user}
+      >
+        {/* Content scrolls inside the sheet directly under the tabs */}
+        <main className="flex-1 overflow-y-auto px-3.5 sm:px-6 py-3.5 sm:py-6 min-w-0 pb-20 lg:pb-6">
+          {children}
+        </main>
+      </AppChromeTabs>
     </div>
   );
 }

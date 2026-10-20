@@ -1,136 +1,124 @@
-"use client";
-import React, { useState } from "react";
-import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
-import { LayoutDashboard, UserCog, Settings, LogOut } from "lucide-react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import Image from "next/image";
-import { cn } from "@/lib/utils";
+'use client';
 
-export function SidebarDemo() {
-  const links = [
-    {
-      label: "Dashboard",
-      href: "#",
-      icon: (
-        <LayoutDashboard className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-      ),
-    },
-    {
-      label: "Profile",
-      href: "#",
-      icon: (
-        <UserCog className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-      ),
-    },
-    {
-      label: "Settings",
-      href: "#",
-      icon: (
-        <Settings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-      ),
-    },
-    {
-      label: "Logout",
-      href: "#",
-      icon: (
-        <LogOut className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-      ),
-    },
-  ];
-  const [open, setOpen] = useState(false);
+import * as React from 'react';
+import { Home, FileText, Settings, Users, LayoutGrid } from 'lucide-react';
+import { SidebarWithTabs, NavItem } from '@/components/ui/sidebar-with-chrome-like-tabs';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+const navItems: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: Home },
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'team', label: 'Team', icon: Users },
+  { id: 'projects', label: 'Projects', icon: LayoutGrid },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
+
+function DashboardContent() {
   return (
-    <div
-      className={cn(
-        "rounded-md flex flex-col md:flex-row bg-gray-100 dark:bg-neutral-800 w-full flex-1 max-w-7xl mx-auto border border-neutral-200 dark:border-neutral-700 overflow-hidden",
-        "h-[60vh]" // for your use case, use `h-screen` instead of `h-[60vh]`
-      )}
-    >
-      <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-            {open ? <Logo /> : <LogoIcon />}
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <SidebarLink key={idx} link={link} />
-              ))}
-            </div>
-          </div>
-          <div>
-            <SidebarLink
-              link={{
-                label: "Manu Arora",
-                href: "#",
-                icon: (
-                  <Image
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                    className="h-7 w-7 flex-shrink-0 rounded-full object-cover"
-                    width={50}
-                    height={50}
-                    alt="Avatar"
-                  />
-                ),
-              }}
-            />
-          </div>
-        </SidebarBody>
-      </Sidebar>
-      <Dashboard />
+    <div className='p-6'>
+      <h1 className='text-xl font-semibold text-stone-800 dark:text-stone-100'>
+        Dashboard
+      </h1>
+      <p className='text-stone-500 dark:text-stone-400 mt-1'>
+        Welcome to your dashboard
+      </p>
     </div>
   );
 }
 
-export const Logo = () => {
+function DocumentsContent() {
   return (
-    <Link
-      href="#"
-      className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
-    >
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="font-medium text-black dark:text-white whitespace-pre"
-      >
-        Acet Labs
-      </motion.span>
-    </Link>
-  );
-};
-
-export const LogoIcon = () => {
-  return (
-    <Link
-      href="#"
-      className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
-    >
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
-    </Link>
-  );
-};
-
-// Dummy dashboard component with content
-const Dashboard = () => {
-  return (
-    <div className="flex flex-1">
-      <div className="p-2 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full">
-        <div className="flex gap-2">
-          {[...new Array(4)].map((_, i) => (
-            <div
-              key={"first-array" + i}
-              className="h-20 w-full rounded-lg bg-gray-100 dark:bg-neutral-800 animate-pulse"
-            ></div>
-          ))}
-        </div>
-        <div className="flex gap-2 flex-1">
-          {[...new Array(2)].map((_, i) => (
-            <div
-              key={"second-array" + i}
-              className="h-full w-full rounded-lg bg-gray-100 dark:bg-neutral-800 animate-pulse"
-            ></div>
-          ))}
-        </div>
-      </div>
+    <div className='p-6'>
+      <h1 className='text-xl font-semibold text-stone-800 dark:text-stone-100'>
+        Documents
+      </h1>
+      <p className='text-stone-500 dark:text-stone-400 mt-1'>
+        Manage your documents
+      </p>
     </div>
   );
+}
+
+function TeamContent() {
+  return (
+    <div className='p-6'>
+      <h1 className='text-xl font-semibold text-stone-800 dark:text-stone-100'>
+        Team
+      </h1>
+      <p className='text-stone-500 dark:text-stone-400 mt-1'>
+        Manage your team members
+      </p>
+    </div>
+  );
+}
+
+function ProjectsContent() {
+  return (
+    <div className='p-6'>
+      <h1 className='text-xl font-semibold text-stone-800 dark:text-stone-100'>
+        Projects
+      </h1>
+      <p className='text-stone-500 dark:text-stone-400 mt-1'>
+        Manage your projects
+      </p>
+    </div>
+  );
+}
+
+function SettingsContent() {
+  return (
+    <div className='p-6'>
+      <h1 className='text-xl font-semibold text-stone-800 dark:text-stone-100'>
+        Settings
+      </h1>
+      <p className='text-stone-500 dark:text-stone-400 mt-1'>
+        Manage your settings
+      </p>
+    </div>
+  );
+}
+
+const contentMap: Record<string, React.ReactNode> = {
+  dashboard: <DashboardContent />,
+  documents: <DocumentsContent />,
+  team: <TeamContent />,
+  projects: <ProjectsContent />,
+  settings: <SettingsContent />,
 };
+
+export default function HomePage() {
+  const renderContent = (navId: string) => {
+    return contentMap[navId] || <DashboardContent />;
+  };
+
+  return (
+    <SidebarWithTabs
+      companyName='Acme Inc'
+      navItems={navItems}
+      renderContent={renderContent}
+      defaultNavId='dashboard'
+      footer={
+        <div className='flex items-center gap-3 px-3 py-2 rounded-lg bg-sidebar-accent w-full'>
+          <Avatar>
+            <AvatarImage
+              src='https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
+              alt='User Avatar'
+              className='object-cover'
+            />
+            <AvatarFallback>UA</AvatarFallback>
+          </Avatar>
+          <div className='min-w-0 flex-1 overflow-hidden'>
+            <p className='text-xs font-medium text-sidebar-foreground truncate whitespace-nowrap'>
+              User Account
+            </p>
+            <p className='text-[10px] text-muted-foreground truncate whitespace-nowrap'>
+              Pro Plan
+            </p>
+          </div>
+        </div>
+      }
+    />
+  );
+}
+export { HomePage as ChromeTabsSidebarDemo };

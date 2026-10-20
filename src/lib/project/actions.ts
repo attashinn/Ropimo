@@ -18,9 +18,12 @@ export interface UpdateProjectInput {
   workspaceId: string;
   name?: string;
   description?: string;
-  status?: ProjectStatus;
+  status?: string;
   color?: string;
   icon?: string;
+  departmentId?: string | null;
+  leadId?: string | null;
+  dueDate?: string | null;
 }
 
 const CreateProjectSchema = z.object({
@@ -28,7 +31,7 @@ const CreateProjectSchema = z.object({
   departmentId: z.string().optional().nullable(),
   name: z.string().min(1, "Project name is required."),
   description: z.string().optional().nullable(),
-  status: z.enum(["planned", "in_progress", "completed", "on_hold", "cancelled"]).optional(),
+  status: z.string().optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
@@ -43,9 +46,12 @@ const UpdateProjectSchema = z.object({
   workspaceId: z.string().min(1, "Workspace ID is required."),
   name: z.string().optional(),
   description: z.string().optional().nullable(),
-  status: z.enum(["planned", "in_progress", "completed", "on_hold", "cancelled"]).optional(),
+  status: z.string().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
+  departmentId: z.string().optional().nullable(),
+  leadId: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
 });
 
 const AddProjectMemberSchema = z.object({
@@ -374,7 +380,7 @@ export async function updateProjectAction(
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid input data." };
   }
   const input = parsed.data;
-  const { projectId, workspaceId, name, description, status, color, icon } = input;
+  const { projectId, workspaceId, name, description, status, color, icon, departmentId, leadId, dueDate } = input;
 
   const authClient = await createClient();
   const {
@@ -396,6 +402,15 @@ export async function updateProjectAction(
   if (status !== undefined) updates.status = status;
   if (color !== undefined) updates.color = color;
   if (icon !== undefined) updates.icon = icon;
+  if (departmentId !== undefined) updates.department_id = departmentId;
+  if (leadId !== undefined) {
+    updates.lead_id = leadId;
+    updates.manager_id = leadId;
+  }
+  if (dueDate !== undefined) {
+    updates.due_date = dueDate;
+    updates.deadline = dueDate;
+  }
 
   const { data: updated, error } = await adminClient
     .from("projects")

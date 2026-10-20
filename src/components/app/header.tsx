@@ -77,7 +77,7 @@ export function Header({ user, workspace, onOpenMobileMenu }: HeaderProps) {
 
   return (
     <>
-      <header className="h-12 border-b border-hairline px-4 flex items-center justify-between shrink-0 bg-surface select-none">
+      <header className="h-12 px-6 flex items-center justify-between shrink-0 bg-surface select-none">
         {/* Left: Mobile hamburger + Breadcrumb */}
         <div className="flex items-center gap-2 min-w-0">
           {onOpenMobileMenu && (

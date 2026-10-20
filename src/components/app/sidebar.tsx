@@ -40,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/app/ui";
+import { cn } from "@/lib/utils";
 
 export interface SidebarProps {
   user: {
@@ -193,8 +194,7 @@ export function Sidebar({
               <Avatar
                 name={workspaceName}
                 size={24}
-                accent="green"
-                className="shrink-0"
+                className="shrink-0 rounded-md ring-1 ring-black/5"
               />
               {!isCollapsed && (
                 <>
@@ -208,56 +208,106 @@ export function Sidebar({
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            align={isCollapsed ? "center" : "start"}
+            align={isCollapsed ? "start" : "start"}
             side="bottom"
-            sideOffset={6}
-            className="w-56 bg-white"
+            sideOffset={8}
+            className="w-[264px] bg-white p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.04)] border border-hairline rounded-xl"
           >
-            <DropdownMenuLabel className="text-[11px] text-ink-3">
-              {planName}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            {/* Header: Section label & Plan badge */}
+            <div className="flex items-center justify-between px-2.5 py-1.5 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                Workspaces
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-accent-green/25 text-[#10251F] border border-[#10251F]/10">
+                <span className="h-1.5 w-1.5 rounded-full bg-status-done animate-pulse" />
+                {planName}
+              </span>
+            </div>
 
-            {allWorkspaces.length > 0 ? (
-              allWorkspaces.map((ws) => {
-                const isCurrent = ws.id === workspace?.id;
-                return (
-                  <DropdownMenuItem
-                    key={ws.id}
-                    onClick={() => handleSwitchWorkspace(ws.id)}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Avatar name={ws.name} size={20} accent="green" />
-                      <span className="truncate">{ws.name}</span>
-                    </div>
-                    {isCurrent && (
-                      <Check className="h-3.5 w-3.5 stroke-[1.5] text-ink shrink-0 ml-2" />
-                    )}
-                  </DropdownMenuItem>
-                );
-              })
-            ) : (
-              <DropdownMenuItem disabled>
-                <span className="truncate">{workspaceName}</span>
+            {/* Workspace list */}
+            <div className="space-y-0.5">
+              {allWorkspaces.length > 0 ? (
+                allWorkspaces.map((ws) => {
+                  const isCurrent = ws.id === workspace?.id;
+                  const isSwitching = switchingId === ws.id;
+
+                  return (
+                    <DropdownMenuItem
+                      key={ws.id}
+                      onClick={() => handleSwitchWorkspace(ws.id)}
+                      disabled={isSwitching}
+                      className={cn(
+                        "group flex items-center justify-between w-full px-2.5 py-2 rounded-lg cursor-pointer transition-colors duration-120",
+                        isCurrent
+                          ? "bg-hover/80 text-ink font-medium"
+                          : "text-ink hover:bg-hover"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="relative shrink-0">
+                          <Avatar
+                            name={ws.name}
+                            size={24}
+                            className="rounded-md ring-1 ring-black/5"
+                          />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1 text-left">
+                          <span className="truncate text-[13px] font-medium text-ink leading-snug">
+                            {ws.name}
+                          </span>
+                          {isCurrent && (
+                            <span className="text-[10px] text-ink-3 font-normal leading-none mt-0.5">
+                              Active workspace
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {isCurrent ? (
+                        <div className="flex items-center justify-center h-4 w-4 rounded-full bg-ink text-white shrink-0 ml-2 shadow-xs">
+                          <Check className="h-2.5 w-2.5 stroke-[3]" />
+                        </div>
+                      ) : isSwitching ? (
+                        <div className="h-3.5 w-3.5 rounded-full border-2 border-ink-3 border-t-ink animate-spin shrink-0 ml-2" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  );
+                })
+              ) : (
+                <DropdownMenuItem disabled className="px-2.5 py-2 text-ink-3 text-[13px]">
+                  <span className="truncate">{workspaceName}</span>
+                </DropdownMenuItem>
+              )}
+            </div>
+
+            <DropdownMenuSeparator className="my-1.5 bg-hairline/80" />
+
+            {/* Quick Actions */}
+            <div className="space-y-0.5">
+              <DropdownMenuItem
+                onClick={() => router.push("/onboarding")}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-ink hover:bg-hover transition-colors"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-ink/25 text-ink-2 group-hover:border-ink/50 group-hover:text-ink transition-colors shrink-0">
+                  <Plus className="h-3.5 w-3.5 stroke-[2]" />
+                </div>
+                <span className="text-[13px] font-medium text-ink flex-1 text-left">
+                  Create workspace
+                </span>
               </DropdownMenuItem>
-            )}
 
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => router.push("/onboarding")}
-              className="gap-2"
-            >
-              <Plus className="h-3.5 w-3.5 stroke-[1.5] text-ink-2" />
-              <span>Create workspace</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push("/app/settings")}
-              className="gap-2"
-            >
-              <Settings className="h-3.5 w-3.5 stroke-[1.5] text-ink-2" />
-              <span>Workspace settings</span>
-            </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push("/app/settings")}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-ink hover:bg-hover transition-colors"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-black/[0.04] text-ink-2 group-hover:bg-black/[0.08] group-hover:text-ink transition-colors shrink-0">
+                  <Settings className="h-3.5 w-3.5 stroke-[1.75]" />
+                </div>
+                <span className="text-[13px] font-medium text-ink flex-1 text-left">
+                  Workspace settings
+                </span>
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -314,33 +364,60 @@ export function Sidebar({
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            align={isCollapsed ? "center" : "start"}
+            align={isCollapsed ? "start" : "start"}
             side="top"
-            sideOffset={6}
-            className="w-52 bg-white"
+            sideOffset={8}
+            className="w-[240px] bg-white p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.04)] border border-hairline rounded-xl"
           >
-            <DropdownMenuItem
-              onClick={() => router.push("/app/profile")}
-              className="gap-2"
-            >
-              <UserIcon className="h-3.5 w-3.5 stroke-[1.5] text-ink-2" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push("/app/settings")}
-              className="gap-2"
-            >
-              <Settings className="h-3.5 w-3.5 stroke-[1.5] text-ink-2" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="gap-2 text-status-overdue focus:text-status-overdue"
-            >
-              <LogOut className="h-3.5 w-3.5 stroke-[1.5]" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
+            {/* User Header */}
+            <div className="px-2.5 py-2 border-b border-hairline/60 mb-1">
+              <div className="text-[13px] font-medium text-ink truncate leading-tight">
+                {displayName}
+              </div>
+              <div className="text-[11px] text-ink-3 truncate mt-0.5">
+                {user?.email || "Signed in"}
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <DropdownMenuItem
+                onClick={() => router.push("/app/profile")}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-ink hover:bg-hover transition-colors"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-black/[0.04] text-ink-2 group-hover:bg-black/[0.08] group-hover:text-ink transition-colors shrink-0">
+                  <UserIcon className="h-3.5 w-3.5 stroke-[1.75]" />
+                </div>
+                <span className="text-[13px] font-medium text-ink flex-1 text-left">
+                  Profile
+                </span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => router.push("/app/settings")}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-ink hover:bg-hover transition-colors"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-black/[0.04] text-ink-2 group-hover:bg-black/[0.08] group-hover:text-ink transition-colors shrink-0">
+                  <Settings className="h-3.5 w-3.5 stroke-[1.75]" />
+                </div>
+                <span className="text-[13px] font-medium text-ink flex-1 text-left">
+                  Settings
+                </span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="my-1 bg-hairline/80" />
+
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-status-overdue hover:bg-status-overdue/10 transition-colors"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-overdue/10 text-status-overdue shrink-0">
+                  <LogOut className="h-3.5 w-3.5 stroke-[1.75]" />
+                </div>
+                <span className="text-[13px] font-medium text-status-overdue flex-1 text-left">
+                  Sign out
+                </span>
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

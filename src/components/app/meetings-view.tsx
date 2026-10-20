@@ -878,11 +878,11 @@ export function MeetingsView({
   }
 
   const STAT_CARDS = [
-    { label: "TOTAL MEETINGS", value: meetingStats.totalMeetings, sub: "All time", iconBg: "bg-[#EAF4E2]", iconColor: "text-[#2D6A3F]", Icon: IconCalendar },
-    { label: "UPCOMING", value: meetingStats.upcomingThisWeek, sub: "This week", iconBg: "bg-[#FFF7ED]", iconColor: "text-[#D97706]", Icon: IconClock },
-    { label: "ATTENDED", value: meetingStats.totalAttended, sub: "Meetings attended", iconBg: "bg-[#EEF2FF]", iconColor: "text-[#3730A3]", Icon: IconUsers },
-    { label: "MEETING HOURS", value: meetingStats.totalHours, sub: "Total hours", iconBg: "bg-[#F0F9FF]", iconColor: "text-[#0369A1]", Icon: IconVideo },
-    { label: "CANCELLED", value: meetingStats.cancelledThisMonth, sub: "This month", iconBg: "bg-[#FFF1F2]", iconColor: "text-[#9F1239]", Icon: IconX },
+    { label: "Total Meetings", value: meetingStats.totalMeetings, sub: "All time scheduled", iconColor: "text-ink-3", Icon: IconCalendar },
+    { label: "Upcoming", value: meetingStats.upcomingThisWeek, sub: "This week", iconColor: "text-blue-600", Icon: IconClock },
+    { label: "Attended", value: meetingStats.totalAttended, sub: "Meetings attended", iconColor: "text-emerald-600", Icon: IconUsers },
+    { label: "Meeting Hours", value: `${meetingStats.totalHours}h`, sub: "Total time spent", iconColor: "text-ink-2", Icon: IconVideo },
+    { label: "Cancelled", value: meetingStats.cancelledThisMonth, sub: "This month", iconColor: "text-ink-3", Icon: IconX },
   ];
 
   return (
@@ -898,15 +898,10 @@ export function MeetingsView({
       {toast && <Toast msg={toast.msg} type={toast.type} />}
 
       {/* ── Page Header ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5 border-b border-[#D8DDD4]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-hairline">
         <div>
-          <p className="text-xs text-[#65706A] mb-1">
-            <span className="hover:text-[#18221E] cursor-pointer transition-colors">{workspaceName}</span>
-            {" / "}
-            <span className="text-[#18221E] font-medium">Meetings</span>
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight text-[#18221E]">Meetings</h1>
-          <p className="text-sm text-[#65706A] mt-0.5">Schedule, manage and track all company meetings in one place.</p>
+          <h1 className="text-[24px] sm:text-[26px] font-semibold tracking-tight text-ink">Meetings</h1>
+          <p className="text-[13px] text-ink-2 mt-0.5">Schedule, manage and track all company meetings in one place.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <PrimaryButton size="sm" onClick={() => setScheduleOpen(true)}>
@@ -914,7 +909,7 @@ export function MeetingsView({
           </PrimaryButton>
           <button
             onClick={() => setJoinOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#D8DDD4] bg-white text-xs font-medium text-[#18221E] hover:bg-[#F4F3EE] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-hairline bg-surface text-[12px] font-medium text-ink hover:bg-hover transition-colors shadow-xs"
           >
             <IconLink size={13} />
             Join with ID
@@ -922,15 +917,15 @@ export function MeetingsView({
           <div className="relative" data-action-menu>
             <button
               onClick={() => setHeaderMenuOpen(o => !o)}
-              className="flex items-center justify-center w-8 h-8 rounded-md border border-[#D8DDD4] bg-white hover:bg-[#F4F3EE] transition-colors text-[#65706A]"
+              className="flex items-center justify-center w-8 h-8 rounded-lg border border-hairline bg-surface hover:bg-hover transition-colors text-ink-2 shadow-xs"
             >
               <IconMoreVertical size={15} />
             </button>
             {headerMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#D8DDD4] rounded-lg shadow-lg z-30 py-1">
+              <div className="absolute right-0 top-full mt-1 w-44 bg-surface border border-hairline rounded-xl shadow-card z-30 py-1 text-[12px]">
                 {["Export Meetings", "Import Schedule", "Meeting Settings", "Analytics"].map(item => (
                   <button key={item} onClick={() => setHeaderMenuOpen(false)}
-                    className="w-full text-left px-3 py-2 text-xs text-[#18221E] hover:bg-[#F4F3EE] transition-colors">
+                    className="w-full text-left px-3 py-1.5 text-ink hover:bg-hover transition-colors">
                     {item}
                   </button>
                 ))}
@@ -940,18 +935,21 @@ export function MeetingsView({
         </div>
       </div>
 
-      {/* ── Stat Cards ── */}
+      {/* ── Stat Cards (Linear / Craft style) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {STAT_CARDS.map(({ label, value, sub, iconBg, iconColor, Icon }) => (
-          <div key={label} className="flex items-start gap-3 bg-white border border-[#D8DDD4] rounded-lg p-3.5">
-            <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", iconBg)}>
-              <Icon size={15} className={iconColor} />
+        {STAT_CARDS.map(({ label, value, sub, iconColor, Icon }) => (
+          <div
+            key={label}
+            className="rounded-xl border border-hairline bg-surface p-3.5 hover:border-ink/20 hover:shadow-xs transition-all select-none"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[12px] font-medium text-ink-2">{label}</span>
+              <Icon size={14} className={iconColor} />
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#65706A] leading-none mb-1">{label}</p>
-              <p className="text-xl font-bold text-[#18221E] leading-none">{value}</p>
-              <p className="text-[10px] text-[#65706A] mt-0.5 leading-none">{sub}</p>
+            <div className="text-[22px] font-semibold text-ink tabular-nums leading-tight mb-1">
+              {value}
             </div>
+            <p className="text-[11px] text-ink-3">{sub}</p>
           </div>
         ))}
       </div>

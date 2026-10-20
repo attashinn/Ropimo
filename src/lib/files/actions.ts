@@ -315,6 +315,53 @@ export async function moveItemAction(
 }
 
 /**
+ * Assign or change a file or folder's department
+ */
+export async function updateFileDepartmentAction(
+  id: string,
+  departmentId: string | null,
+  isFolder: boolean,
+  workspaceId: string
+): Promise<{ success: boolean; error?: string }> {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  const adminClient = createAdminClient();
+  const table = isFolder ? "workspace_folders" : "workspace_files";
+
+  try {
+    const { error } = await adminClient
+      .from(table)
+      .update({ department_id: departmentId || null, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("workspace_id", workspaceId);
+
+    if (error) {
+      console.error("Error updating department in DB:", error);
+      return { success: false, error: error.message };
+    }
+
+    const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Team Member";
+    await logFileActivity({
+      fileId: isFolder ? null : id,
+      folderId: isFolder ? id : null,
+      userId: user?.id,
+      userName,
+      actionType: `Updated department assignment`,
+    });
+
+    revalidatePath("/app/files");
+    return { success: true };
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : undefined;
+    console.error("Error updating department:", err);
+    return { success: false, error: errMessage || "Failed to update department" };
+  }
+}
+
+/**
  * Delete a single file or folder
  */
 export async function deleteFileItemAction(

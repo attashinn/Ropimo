@@ -14,7 +14,6 @@ import {
 import { WorkspacePerson } from "@/types/people";
 import { Project } from "@/types/project";
 import { Department } from "@/types/department";
-import { PrimaryButton } from "@/components/ui/primary-button";
 import { cn } from "@/lib/utils";
 import {
   FolderIcon,
@@ -50,12 +49,35 @@ import {
   uploadFilesAction,
   renameFileItemAction,
   moveItemAction,
+  updateFileDepartmentAction,
   deleteFileItemAction,
   bulkDeleteFilesAction,
   toggleStarFileAction,
   shareFileItemAction,
 } from "@/lib/files/actions";
 import { uploadFileToR2 } from "@/lib/storage/upload-client";
+import { FileDetailsDrawer } from "./file-details-drawer";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/app/ui";
+import { toast } from "sonner";
+import {
+  Building2,
+  ChevronDown,
+  Check,
+  Trash2,
+  Edit,
+  Share2,
+  Download,
+  ExternalLink,
+  Star,
+  Folder,
+} from "lucide-react";
 
 export interface FilesViewProps {
   workspaceId: string;
@@ -295,6 +317,37 @@ export function FilesView({
     setBulkMoveModalOpen(false);
   };
 
+  // Inline department assignment
+  const handleInlineDepartmentChange = async (
+    item: FileItem,
+    deptId: string | null
+  ) => {
+    const selectedDept = departments.find((d) => d.id === deptId);
+    const updated: FileItem = {
+      ...item,
+      department_id: deptId,
+      department_name: selectedDept?.name || null,
+      department: selectedDept
+        ? { id: selectedDept.id, name: selectedDept.name, color: selectedDept.color || "#246244", icon: selectedDept.icon || "building" }
+        : null,
+    };
+    setAllItems((prev) => prev.map((f) => (f.id === item.id ? updated : f)));
+    if (selectedFileForDetails?.id === item.id) {
+      setSelectedFileForDetails(updated);
+    }
+
+    try {
+      const res = await updateFileDepartmentAction(item.id, deptId, item.is_folder, workspaceId);
+      if (res.success) {
+        toast.success(`Department updated to ${selectedDept?.name || "None"}`);
+      } else {
+        toast.error(res.error || "Failed to update department");
+      }
+    } catch {
+      toast.error("Failed to update department");
+    }
+  };
+
   // Download Trigger
   const handleDownload = (item: FileItem) => {
     if (!item.file_url) return;
@@ -330,140 +383,142 @@ export function FilesView({
       {/* ================================================== */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#D8DDD4] pb-5">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight text-[#18221E]">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-[#18221E]">
               Files
-            </span>
+            </h1>
             <span className="rounded-full bg-[#FAF9F5] px-2.5 py-0.5 text-xs font-semibold text-[#65706A] border border-[#D8DDD4]">
-              {storageStats.totalFilesCount} files
+              {storageStats.totalFilesCount} {storageStats.totalFilesCount === 1 ? "file" : "files"}
             </span>
           </div>
 
-          {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-1.5 text-xs text-[#65706A]">
-            {folderHistory.map((crumb, idx) => (
-              <React.Fragment key={crumb.id || "root"}>
-                {idx > 0 && <ChevronRightIcon size={12} className="text-[#65706A]/60" />}
-                <button
-                  type="button"
-                  onClick={() => handleNavigateBreadcrumb(idx)}
-                  className={cn(
-                    "hover:text-[#18221E] transition-colors",
-                    idx === folderHistory.length - 1
-                      ? "font-bold text-[#18221E]"
-                      : "font-medium hover:underline"
-                  )}
-                >
-                  {crumb.name}
-                </button>
-              </React.Fragment>
-            ))}
-          </nav>
+          {/* Breadcrumb Navigation - rendered when navigated into subfolders */}
+          {folderHistory.length > 1 && (
+            <nav className="flex items-center gap-1.5 text-xs text-[#65706A]">
+              {folderHistory.map((crumb, idx) => (
+                <React.Fragment key={crumb.id || "root"}>
+                  {idx > 0 && <ChevronRightIcon size={12} className="text-[#65706A]/60" />}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateBreadcrumb(idx)}
+                    className={cn(
+                      "hover:text-[#18221E] transition-colors",
+                      idx === folderHistory.length - 1
+                        ? "font-semibold text-[#18221E]"
+                        : "font-medium hover:underline"
+                    )}
+                  >
+                    {crumb.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </nav>
+          )}
         </div>
 
         {/* Action Buttons: New Folder, Upload */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setNewFolderModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#D8DDD4] bg-white px-3.5 py-2 text-xs font-semibold text-[#18221E] hover:bg-[#FAF9F5] transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#D8DDD4] bg-white px-3.5 py-2 text-xs font-medium text-[#18221E] hover:bg-[#FAF9F5] transition-colors shadow-2xs"
           >
-            <PlusIcon size={14} />
+            <PlusIcon size={13} />
             <span>New Folder</span>
           </button>
 
-          <PrimaryButton
+          <button
             type="button"
             onClick={() => setUploadModalOpen(true)}
-            className="h-9 px-4 text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#18221E] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#25322C] transition-colors shadow-2xs"
           >
-            <UploadIcon size={14} />
+            <UploadIcon size={13} />
             <span>Upload</span>
-          </PrimaryButton>
+          </button>
         </div>
       </div>
 
       {/* ================================================== */}
       {/* 5 TOP STAT CARDS (100% REAL METRICS) */}
       {/* ================================================== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {/* Card 1: Total Files */}
-        <div className="flex items-center gap-3 rounded-[12px] border border-[#D8DDD4] bg-white p-3.5 shadow-2xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#FAF9F5] border border-[#D8DDD4] text-[#10251F]">
-            <PdfIcon size={18} />
+        <div className="flex items-center gap-3 rounded-xl border border-[#D8DDD4] bg-white p-3.5 shadow-2xs hover:border-[#18221E]/20 transition-all">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FAF9F5] border border-[#D8DDD4] text-[#18221E]">
+            <PdfIcon size={17} />
           </div>
           <div className="min-w-0 truncate">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-              TOTAL FILES
+            <span className="block text-[11px] font-medium text-[#65706A]">
+              Total Files
             </span>
-            <span className="text-lg font-bold text-[#18221E] leading-none block mt-0.5">
+            <span className="text-lg font-bold text-[#18221E] leading-tight block tabular-nums">
               {storageStats.totalFilesCount}
             </span>
-            <span className="text-[10px] text-[#65706A] mt-0.5 block">Accessible files</span>
+            <span className="text-[10px] text-[#65706A] block">Accessible files</span>
           </div>
         </div>
 
         {/* Card 2: Folders */}
-        <div className="flex items-center gap-3 rounded-[12px] border border-[#D8DDD4] bg-white p-3.5 shadow-2xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#FAF9F5] border border-[#D8DDD4] text-[#D97706]">
-            <FolderIcon size={18} />
+        <div className="flex items-center gap-3 rounded-xl border border-[#D8DDD4] bg-white p-3.5 shadow-2xs hover:border-[#18221E]/20 transition-all">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 border border-amber-200/60 text-amber-600">
+            <FolderIcon size={17} />
           </div>
           <div className="min-w-0 truncate">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-              FOLDERS
+            <span className="block text-[11px] font-medium text-[#65706A]">
+              Folders
             </span>
-            <span className="text-lg font-bold text-[#18221E] leading-none block mt-0.5">
+            <span className="text-lg font-bold text-[#18221E] leading-tight block tabular-nums">
               {storageStats.totalFoldersCount}
             </span>
-            <span className="text-[10px] text-[#65706A] mt-0.5 block">All folders</span>
+            <span className="text-[10px] text-[#65706A] block">All folders</span>
           </div>
         </div>
 
         {/* Card 3: Total Size */}
-        <div className="flex items-center gap-3 rounded-[12px] border border-[#D8DDD4] bg-white p-3.5 shadow-2xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#EFF6FF] text-[#2563EB]">
-            <StorageIcon size={18} />
+        <div className="flex items-center gap-3 rounded-xl border border-[#D8DDD4] bg-white p-3.5 shadow-2xs hover:border-[#18221E]/20 transition-all">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 border border-blue-200/60 text-blue-600">
+            <StorageIcon size={17} />
           </div>
           <div className="min-w-0 truncate">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-              TOTAL SIZE
+            <span className="block text-[11px] font-medium text-[#65706A]">
+              Total Size
             </span>
-            <span className="text-lg font-bold text-[#18221E] leading-none block mt-0.5">
+            <span className="text-lg font-bold text-[#18221E] leading-tight block tabular-nums">
               {formatBytes(storageStats.totalBytesUsed)}
             </span>
-            <span className="text-[10px] text-[#65706A] mt-0.5 block">Used storage</span>
+            <span className="text-[10px] text-[#65706A] block">Used storage</span>
           </div>
         </div>
 
         {/* Card 4: Shared Files */}
-        <div className="flex items-center gap-3 rounded-[12px] border border-[#D8DDD4] bg-white p-3.5 shadow-2xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#FAF5FF] text-[#7C3AED]">
-            <UsersIcon size={18} />
+        <div className="flex items-center gap-3 rounded-xl border border-[#D8DDD4] bg-white p-3.5 shadow-2xs hover:border-[#18221E]/20 transition-all">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 border border-purple-200/60 text-purple-600">
+            <UsersIcon size={17} />
           </div>
           <div className="min-w-0 truncate">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-              SHARED FILES
+            <span className="block text-[11px] font-medium text-[#65706A]">
+              Shared Files
             </span>
-            <span className="text-lg font-bold text-[#18221E] leading-none block mt-0.5">
+            <span className="text-lg font-bold text-[#18221E] leading-tight block tabular-nums">
               {storageStats.sharedFilesCount}
             </span>
-            <span className="text-[10px] text-[#65706A] mt-0.5 block">Shared with others</span>
+            <span className="text-[10px] text-[#65706A] block">Shared with others</span>
           </div>
         </div>
 
         {/* Card 5: Recently Added */}
-        <div className="col-span-2 sm:col-span-1 flex items-center gap-3 rounded-[12px] border border-[#D8DDD4] bg-white p-3.5 shadow-2xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#FEF2F2] text-[#DC2626]">
-            <ClockIcon size={18} />
+        <div className="col-span-2 sm:col-span-1 flex items-center gap-3 rounded-xl border border-[#D8DDD4] bg-white p-3.5 shadow-2xs hover:border-[#18221E]/20 transition-all">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 border border-rose-200/60 text-rose-600">
+            <ClockIcon size={17} />
           </div>
           <div className="min-w-0 truncate">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-              RECENTLY ADDED
+            <span className="block text-[11px] font-medium text-[#65706A]">
+              Recently Added
             </span>
-            <span className="text-lg font-bold text-[#18221E] leading-none block mt-0.5">
+            <span className="text-lg font-bold text-[#18221E] leading-tight block tabular-nums">
               {storageStats.recentlyAddedCount}
             </span>
-            <span className="text-[10px] text-[#65706A] mt-0.5 block">In the last 7 days</span>
+            <span className="text-[10px] text-[#65706A] block">In last 7 days</span>
           </div>
         </div>
       </div>
@@ -475,11 +530,11 @@ export function FilesView({
         {/* LEFT COLUMN: FILE BROWSER (~75% on XL) */}
         <div className="xl:col-span-8 2xl:col-span-9 space-y-4">
           {/* FILE BROWSER TOOLBAR */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-[14px] border border-[#D8DDD4] bg-white p-3 shadow-2xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-[#D8DDD4] bg-white p-2.5 shadow-2xs">
             {/* Left: Search input */}
             <div className="relative flex-1 max-w-sm">
               <SearchIcon
-                size={14}
+                size={13}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[#65706A]"
               />
               <input
@@ -487,7 +542,7 @@ export function FilesView({
                 placeholder="Search files and folders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-full rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] pl-8.5 pr-8 text-xs text-[#18221E] placeholder:text-[#65706A] focus:border-[#10251F] focus:bg-white focus:outline-none transition-colors"
+                className="h-8.5 w-full rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] pl-8.5 pr-8 text-xs text-[#18221E] placeholder:text-[#65706A] focus:border-[#18221E] focus:bg-white focus:outline-none transition-colors"
               />
               {searchQuery && (
                 <button
@@ -506,7 +561,7 @@ export function FilesView({
               <select
                 value={selectedFileType}
                 onChange={(e) => setSelectedFileType(e.target.value as "all" | FileType)}
-                className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
+                className="h-8 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-medium text-[#18221E] hover:border-[#18221E]/30 focus:outline-none cursor-pointer transition-colors"
               >
                 <option value="all">Type: All</option>
                 <option value="folder">Folders</option>
@@ -522,7 +577,7 @@ export function FilesView({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as "last_modified" | "name" | "size")}
-                className="h-8 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-semibold text-[#18221E] focus:outline-none cursor-pointer"
+                className="h-8 rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] px-2.5 text-xs font-medium text-[#18221E] hover:border-[#18221E]/30 focus:outline-none cursor-pointer transition-colors"
               >
                 <option value="last_modified">Last Modified</option>
                 <option value="name">Name A–Z</option>
@@ -530,32 +585,32 @@ export function FilesView({
               </select>
 
               {/* View Toggle (Grid / List) */}
-              <div className="flex items-center rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] p-0.5 shadow-2xs">
+              <div className="flex items-center rounded-lg border border-[#D8DDD4] bg-[#FAF9F5] p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setViewMode("grid")}
                   className={cn(
-                    "rounded-[6px] p-1.5 transition-colors",
+                    "rounded-md p-1.5 transition-colors",
                     viewMode === "grid"
-                      ? "bg-[#10251F] text-[#F4F3EE] shadow-xs"
+                      ? "bg-white text-[#18221E] shadow-2xs border border-[#D8DDD4]/80"
                       : "text-[#65706A] hover:text-[#18221E]"
                   )}
                   title="Grid View"
                 >
-                  <GridIcon size={14} />
+                  <GridIcon size={13} />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode("list")}
                   className={cn(
-                    "rounded-[6px] p-1.5 transition-colors",
+                    "rounded-md p-1.5 transition-colors",
                     viewMode === "list"
-                      ? "bg-[#10251F] text-[#F4F3EE] shadow-xs"
+                      ? "bg-white text-[#18221E] shadow-2xs border border-[#D8DDD4]/80"
                       : "text-[#65706A] hover:text-[#18221E]"
                   )}
                   title="List View"
                 >
-                  <ListIcon size={14} />
+                  <ListIcon size={13} />
                 </button>
               </div>
 
@@ -565,13 +620,13 @@ export function FilesView({
                   type="button"
                   onClick={() => setFilterPopoverOpen(!filterPopoverOpen)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 h-8 rounded-[8px] border px-2.5 text-xs font-semibold transition-colors focus:outline-none",
+                    "inline-flex items-center gap-1.5 h-8 rounded-lg border px-2.5 text-xs font-medium transition-colors focus:outline-none",
                     selectedDeptId !== "all" || selectedProjId !== "all" || selectedUploaderId !== "all"
-                      ? "bg-[#10251F] text-white border-[#10251F]"
+                      ? "bg-[#18221E] text-white border-[#18221E]"
                       : "bg-white text-[#18221E] border-[#D8DDD4] hover:bg-[#FAF9F5]"
                   )}
                 >
-                  <FilterIcon size={13} />
+                  <FilterIcon size={12} />
                   <span>Filters</span>
                 </button>
 
@@ -586,10 +641,10 @@ export function FilesView({
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
-                        className="absolute right-0 top-full mt-2 w-64 rounded-[12px] border border-[#D8DDD4] bg-white p-4 shadow-xl z-40 text-xs space-y-3"
+                        className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-[#D8DDD4] bg-white p-4 shadow-xl z-40 text-xs space-y-3"
                       >
                         <div className="flex items-center justify-between pb-2 border-b border-[#D8DDD4]">
-                          <span className="font-bold text-[#18221E]">Filter Files</span>
+                          <span className="font-semibold text-[#18221E]">Filter Files</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -605,13 +660,13 @@ export function FilesView({
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#65706A] mb-1">
                             Department
                           </label>
                           <select
                             value={selectedDeptId}
                             onChange={(e) => setSelectedDeptId(e.target.value)}
-                            className="w-full rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
+                            className="w-full rounded-md border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
                           >
                             <option value="all">All Departments</option>
                             {departments.map((d) => (
@@ -623,13 +678,13 @@ export function FilesView({
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#65706A] mb-1">
                             Project
                           </label>
                           <select
                             value={selectedProjId}
                             onChange={(e) => setSelectedProjId(e.target.value)}
-                            className="w-full rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
+                            className="w-full rounded-md border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
                           >
                             <option value="all">All Projects</option>
                             {projects.map((p) => (
@@ -641,13 +696,13 @@ export function FilesView({
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#65706A] mb-1">
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#65706A] mb-1">
                             Updated By
                           </label>
                           <select
                             value={selectedUploaderId}
                             onChange={(e) => setSelectedUploaderId(e.target.value)}
-                            className="w-full rounded-[6px] border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
+                            className="w-full rounded-md border border-[#D8DDD4] bg-[#FAF9F5] p-1.5 text-xs"
                           >
                             <option value="all">All People</option>
                             {people.map((p) => (
@@ -666,7 +721,7 @@ export function FilesView({
           </div>
 
           {/* QUICK ACCESS FILTER TABS */}
-          <div className="flex items-center gap-2 border-b border-[#D8DDD4] pb-2 text-xs">
+          <div className="flex items-center gap-1.5 border-b border-[#D8DDD4] pb-2 text-xs">
             <button
               type="button"
               onClick={() => {
@@ -675,9 +730,9 @@ export function FilesView({
                 setFolderHistory([{ id: null, name: "Files" }]);
               }}
               className={cn(
-                "rounded-full px-3 py-1 font-semibold transition-colors",
+                "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 activeQuickFilter === "all"
-                  ? "bg-[#10251F] text-[#F4F3EE]"
+                  ? "bg-[#18221E] text-white shadow-2xs"
                   : "text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               )}
             >
@@ -688,13 +743,13 @@ export function FilesView({
               type="button"
               onClick={() => setActiveQuickFilter("starred")}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold transition-colors",
+                "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 activeQuickFilter === "starred"
-                  ? "bg-[#10251F] text-[#F4F3EE]"
+                  ? "bg-[#18221E] text-white shadow-2xs"
                   : "text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               )}
             >
-              <StarIcon size={13} filled={activeQuickFilter === "starred"} />
+              <StarIcon size={12} filled={activeQuickFilter === "starred"} />
               <span>Starred</span>
             </button>
 
@@ -702,13 +757,13 @@ export function FilesView({
               type="button"
               onClick={() => setActiveQuickFilter("shared")}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold transition-colors",
+                "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 activeQuickFilter === "shared"
-                  ? "bg-[#10251F] text-[#F4F3EE]"
+                  ? "bg-[#18221E] text-white shadow-2xs"
                   : "text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               )}
             >
-              <ShareIcon size={13} />
+              <ShareIcon size={12} />
               <span>Shared</span>
             </button>
 
@@ -716,13 +771,13 @@ export function FilesView({
               type="button"
               onClick={() => setActiveQuickFilter("trash")}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold transition-colors",
+                "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                 activeQuickFilter === "trash"
-                  ? "bg-[#10251F] text-[#F4F3EE]"
+                  ? "bg-[#18221E] text-white shadow-2xs"
                   : "text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
               )}
             >
-              <TrashIcon size={13} />
+              <TrashIcon size={12} />
               <span>Trash</span>
             </button>
           </div>
@@ -754,14 +809,14 @@ export function FilesView({
                     <PlusIcon size={13} />
                     <span>New Folder</span>
                   </button>
-                  <PrimaryButton
+                  <button
                     type="button"
                     onClick={() => setUploadModalOpen(true)}
-                    className="h-8 px-3 text-xs"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#18221E] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#25322C] transition-colors shadow-2xs"
                   >
                     <UploadIcon size={13} />
                     <span>Upload File</span>
-                  </PrimaryButton>
+                  </button>
                 </div>
               </div>
             ) : viewMode === "list" ? (
@@ -865,15 +920,56 @@ export function FilesView({
                               : formatBytes(item.file_size || 0)}
                           </td>
 
-                          {/* Department */}
-                          <td className="px-4 py-3">
-                            {item.department_name ? (
-                              <span className="rounded-full bg-[#FAF9F5] px-2 py-0.5 text-[10px] font-semibold text-[#18221E] border border-[#D8DDD4]">
-                                {item.department_name}
-                              </span>
-                            ) : (
-                              <span className="text-[#65706A]">—</span>
-                            )}
+                          {/* Department (Workable Inline Dropdown) */}
+                          <td
+                            className="px-4 py-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-[#FAF9F5] border border-transparent hover:border-[#D8DDD4]",
+                                    item.department_name
+                                      ? "text-[#18221E] bg-[#FAF9F5] border-[#D8DDD4]"
+                                      : "text-[#65706A] hover:text-[#18221E]"
+                                  )}
+                                >
+                                  <Building2 size={12} className="text-[#65706A]" />
+                                  <span className="truncate max-w-[110px]">
+                                    {item.department_name || "Assign"}
+                                  </span>
+                                  <ChevronDown size={11} className="text-[#65706A]" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-48 p-1">
+                                <DropdownMenuLabel className="text-[11px] font-semibold text-[#65706A]">
+                                  Assign Department
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => handleInlineDepartmentChange(item, null)}
+                                  className="flex items-center justify-between text-xs"
+                                >
+                                  <span className="text-[#65706A]">None</span>
+                                  {!item.department_id && <Check size={13} className="text-[#10251F]" />}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {departments.map((dept) => {
+                                  const isCurrent = item.department_id === dept.id;
+                                  return (
+                                    <DropdownMenuItem
+                                      key={dept.id}
+                                      onClick={() => handleInlineDepartmentChange(item, dept.id)}
+                                      className="flex items-center justify-between text-xs"
+                                    >
+                                      <span className="truncate">{dept.name}</span>
+                                      {isCurrent && <Check size={13} className="text-[#10251F]" />}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
 
                           {/* Updated By */}
@@ -893,115 +989,77 @@ export function FilesView({
                             {item.last_modified}
                           </td>
 
-                          {/* Actions menu */}
+                          {/* Actions menu (Radix Dropdown) */}
                           <td
-                            className="px-4 py-3 text-right relative"
+                            className="px-4 py-3 text-right"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenActionMenuId(
-                                  openActionMenuId === item.id ? null : item.id
-                                )
-                              }
-                              className="rounded p-1 text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E]"
-                            >
-                              <MoreHorizontalIcon size={15} />
-                            </button>
-
-                            {openActionMenuId === item.id && (
-                              <>
-                                <div
-                                  className="fixed inset-0 z-30"
-                                  onClick={() => setOpenActionMenuId(null)}
-                                />
-                                <div className="absolute right-4 top-10 w-44 rounded-[10px] border border-[#D8DDD4] bg-white p-1.5 shadow-xl z-40 text-xs text-left space-y-0.5">
-                                  {!item.is_folder && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setOpenActionMenuId(null);
-                                          setPreviewModalFile(item);
-                                        }}
-                                        className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                      >
-                                        <ExternalLinkIcon size={13} />
-                                        <span>Preview</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setOpenActionMenuId(null);
-                                          handleDownload(item);
-                                        }}
-                                        className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                      >
-                                        <DownloadIcon size={13} />
-                                        <span>Download</span>
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionMenuId(null);
-                                      setShareModalItem(item);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                  >
-                                    <ShareIcon size={13} />
-                                    <span>Share</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionMenuId(null);
-                                      setMoveModalItem(item);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                  >
-                                    <FolderIcon size={13} />
-                                    <span>Move</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionMenuId(null);
-                                      handleToggleStar(item);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                  >
-                                    <StarIcon size={13} filled={item.is_starred} />
-                                    <span>{item.is_starred ? "Unstar" : "Star"}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionMenuId(null);
-                                      setRenameModalItem(item);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-[#FAF9F5] text-[#18221E]"
-                                  >
-                                    <EditIcon size={13} />
-                                    <span>Rename</span>
-                                  </button>
-                                  <div className="my-1 border-t border-[#D8DDD4]" />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionMenuId(null);
-                                      setDeleteConfirmItem(item);
-                                    }}
-                                    className="w-full flex items-center gap-2 rounded-[6px] px-2 py-1.5 hover:bg-red-50 text-red-600 font-medium"
-                                  >
-                                    <TrashIcon size={13} />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              </>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="rounded p-1 text-[#65706A] hover:bg-[#FAF9F5] hover:text-[#18221E] transition-colors focus:outline-none"
+                                >
+                                  <MoreHorizontalIcon size={15} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44 p-1">
+                                {!item.is_folder && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => setPreviewModalFile(item)}
+                                      className="flex items-center gap-2 text-xs"
+                                    >
+                                      <ExternalLink size={13} />
+                                      <span>Preview</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDownload(item)}
+                                      className="flex items-center gap-2 text-xs"
+                                    >
+                                      <Download size={13} />
+                                      <span>Download</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => setShareModalItem(item)}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <Share2 size={13} />
+                                  <span>Share</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setMoveModalItem(item)}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <Folder size={13} />
+                                  <span>Move</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleStar(item)}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <Star size={13} className={item.is_starred ? "fill-amber-500 text-amber-500" : ""} />
+                                  <span>{item.is_starred ? "Unstar" : "Star"}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setRenameModalItem(item)}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <Edit size={13} />
+                                  <span>Rename</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteConfirmItem(item)}
+                                  className="flex items-center gap-2 text-xs text-rose-600 focus:text-rose-600 focus:bg-rose-50"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Delete</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       );
@@ -1094,15 +1152,15 @@ export function FilesView({
         </div>
 
         {/* RIGHT COLUMN: STORAGE OVERVIEW & QUICK ACCESS (~25% on XL) */}
-        <div className="xl:col-span-4 2xl:col-span-3 space-y-5">
+        <div className="xl:col-span-4 2xl:col-span-3 space-y-4">
           {/* SECTION 1: STORAGE OVERVIEW (100% REAL DYNAMIC NUMBERS) */}
-          <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-4 shadow-2xs">
+          <div className="rounded-xl border border-[#D8DDD4] bg-white p-4 shadow-2xs">
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#D8DDD4]">
-              <span className="text-xs font-bold text-[#18221E]">Storage Overview</span>
+              <span className="text-xs font-semibold text-[#18221E]">Storage Overview</span>
               <button
                 type="button"
                 onClick={() => setUploadModalOpen(true)}
-                className="text-[11px] font-semibold text-[#65706A] hover:text-[#18221E]"
+                className="text-[11px] font-medium text-[#65706A] hover:text-[#18221E] transition-colors"
               >
                 Manage
               </button>
@@ -1111,14 +1169,14 @@ export function FilesView({
             <div className="space-y-3">
               <div className="flex items-baseline justify-between text-xs">
                 <div>
-                  <span className="font-bold text-[#18221E] text-sm">
+                  <span className="font-semibold text-[#18221E] text-sm tabular-nums">
                     {formatBytes(storageStats.totalBytesUsed)}
                   </span>
                   <span className="text-[#65706A]">
                     {" "}of {formatBytes(storageStats.totalBytesCapacity)} used
                   </span>
                 </div>
-                <span className="font-bold text-[#246244]">
+                <span className="font-semibold text-emerald-700 tabular-nums">
                   {(
                     (storageStats.totalBytesUsed / (storageStats.totalBytesCapacity || 1)) *
                     100
@@ -1128,9 +1186,9 @@ export function FilesView({
               </div>
 
               {/* Progress Bar */}
-              <div className="h-2 w-full rounded-full bg-[#E7EADF] overflow-hidden">
+              <div className="h-1.5 w-full rounded-full bg-[#E7EADF] overflow-hidden">
                 <div
-                  className="h-full bg-[#246244] rounded-full transition-all duration-500"
+                  className="h-full bg-emerald-600 rounded-full transition-all duration-500"
                   style={{
                     width: `${Math.min(
                       100,
@@ -1150,7 +1208,7 @@ export function FilesView({
                     <span className="h-2 w-2 rounded-full bg-[#246244]" />
                     <span className="text-[#65706A]">Files</span>
                   </div>
-                  <span className="font-semibold text-[#18221E]">
+                  <span className="font-medium text-[#18221E] tabular-nums">
                     {formatBytes(storageStats.breakdown.filesBytes)}
                   </span>
                 </div>
@@ -1160,7 +1218,7 @@ export function FilesView({
                     <span className="h-2 w-2 rounded-full bg-[#2563EB]" />
                     <span className="text-[#65706A]">Documents</span>
                   </div>
-                  <span className="font-semibold text-[#18221E]">
+                  <span className="font-medium text-[#18221E] tabular-nums">
                     {formatBytes(storageStats.breakdown.documentsBytes)}
                   </span>
                 </div>
@@ -1170,7 +1228,7 @@ export function FilesView({
                     <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
                     <span className="text-[#65706A]">Images</span>
                   </div>
-                  <span className="font-semibold text-[#18221E]">
+                  <span className="font-medium text-[#18221E] tabular-nums">
                     {formatBytes(storageStats.breakdown.imagesBytes)}
                   </span>
                 </div>
@@ -1180,7 +1238,7 @@ export function FilesView({
                     <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
                     <span className="text-[#65706A]">Other</span>
                   </div>
-                  <span className="font-semibold text-[#18221E]">
+                  <span className="font-medium text-[#18221E] tabular-nums">
                     {formatBytes(storageStats.breakdown.otherBytes)}
                   </span>
                 </div>
@@ -1189,13 +1247,13 @@ export function FilesView({
           </div>
 
           {/* SECTION 2: RECENT ACTIVITY (REAL TIMELINE) */}
-          <div className="rounded-[14px] border border-[#D8DDD4] bg-white p-4 shadow-2xs">
+          <div className="rounded-xl border border-[#D8DDD4] bg-white p-4 shadow-2xs">
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#D8DDD4]">
-              <span className="text-xs font-bold text-[#18221E]">Recent Activity</span>
+              <span className="text-xs font-semibold text-[#18221E]">Recent Activity</span>
               <button
                 type="button"
                 onClick={() => setActivityModalOpen(true)}
-                className="text-[11px] font-semibold text-[#65706A] hover:text-[#18221E]"
+                className="text-[11px] font-medium text-[#65706A] hover:text-[#18221E] transition-colors"
               >
                 View all →
               </button>
@@ -1317,30 +1375,47 @@ export function FilesView({
         }}
       />
 
-      {/* File Details Drawer */}
-      {selectedFileForDetails && (
-        <FileDetailsDrawer
-          file={selectedFileForDetails}
-          onClose={() => setSelectedFileForDetails(null)}
-          onPreview={() => {
+      {/* File Details Drawer (Framer Motion Drawer) */}
+      <FileDetailsDrawer
+        file={selectedFileForDetails}
+        workspaceId={workspaceId}
+        departments={departments}
+        projects={projects}
+        onClose={() => setSelectedFileForDetails(null)}
+        onPreview={() => {
+          if (selectedFileForDetails) {
             setPreviewModalFile(selectedFileForDetails);
             setSelectedFileForDetails(null);
-          }}
-          onShare={() => {
+          }
+        }}
+        onShare={() => {
+          if (selectedFileForDetails) {
             setShareModalItem(selectedFileForDetails);
             setSelectedFileForDetails(null);
-          }}
-          onRename={() => {
+          }
+        }}
+        onRename={() => {
+          if (selectedFileForDetails) {
             setRenameModalItem(selectedFileForDetails);
             setSelectedFileForDetails(null);
-          }}
-          onDelete={() => {
+          }
+        }}
+        onDelete={() => {
+          if (selectedFileForDetails) {
             setDeleteConfirmItem(selectedFileForDetails);
             setSelectedFileForDetails(null);
-          }}
-          onToggleStar={() => handleToggleStar(selectedFileForDetails)}
-        />
-      )}
+          }
+        }}
+        onToggleStar={() => {
+          if (selectedFileForDetails) {
+            handleToggleStar(selectedFileForDetails);
+          }
+        }}
+        onFileUpdated={(updated) => {
+          setAllItems((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+          setSelectedFileForDetails(updated);
+        }}
+      />
 
       {/* File Preview Modal */}
       {previewModalFile && (
@@ -2035,184 +2110,7 @@ function NewFolderModal({
   );
 }
 
-// =========================================================================
-// FILE DETAILS DRAWER
-// =========================================================================
 
-function FileDetailsDrawer({
-  file,
-  onClose,
-  onPreview,
-  onShare,
-  onRename,
-  onDelete,
-  onToggleStar,
-}: {
-  file: FileItem;
-  onClose: () => void;
-  onPreview: () => void;
-  onShare: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  onToggleStar: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 bg-[#10251F]/40 backdrop-blur-xs"
-      />
-
-      <motion.div
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
-        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-        className="relative w-full max-w-md h-full bg-white border-l border-[#D8DDD4] p-6 shadow-2xl z-10 flex flex-col justify-between overflow-y-auto space-y-6"
-      >
-        <div className="space-y-5">
-          {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#D8DDD4]">
-            <span className="text-xs font-bold text-[#65706A] uppercase tracking-wider">
-              {file.is_folder ? "Folder Details" : "File Details"}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded p-1 text-[#65706A] hover:bg-[#FAF9F5]"
-            >
-              <XIcon size={16} />
-            </button>
-          </div>
-
-          {/* Preview Box */}
-          <div className="flex flex-col items-center justify-center rounded-[12px] border border-[#D8DDD4] bg-[#FAF9F5] p-6 text-center">
-            {file.file_type === "image" && file.file_url ? (
-              <img
-                src={file.file_url}
-                alt={file.name}
-                className="max-h-36 max-w-full rounded-[8px] object-contain mb-3 shadow-xs"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-[12px] bg-white border border-[#D8DDD4] shadow-xs mb-3">
-                {getFileIcon(file.file_type)}
-              </div>
-            )}
-            <h3 className="text-sm font-bold text-[#18221E] break-all max-w-xs">
-              {file.name}
-            </h3>
-            <span className="text-xs text-[#65706A] mt-1">
-              {formatTypeLabel(file.file_type)}
-              {!file.is_folder && ` · ${formatBytes(file.file_size || 0)}`}
-            </span>
-          </div>
-
-          {/* Actions Bar */}
-          <div className="grid grid-cols-4 gap-2">
-            {!file.is_folder && (
-              <button
-                type="button"
-                onClick={onPreview}
-                className="flex flex-col items-center justify-center p-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-[11px] font-semibold text-[#18221E]"
-              >
-                <ExternalLinkIcon size={14} className="mb-1 text-[#10251F]" />
-                <span>Preview</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onShare}
-              className="flex flex-col items-center justify-center p-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-[11px] font-semibold text-[#18221E]"
-            >
-              <ShareIcon size={14} className="mb-1 text-[#10251F]" />
-              <span>Share</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleStar}
-              className="flex flex-col items-center justify-center p-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-[11px] font-semibold text-[#18221E]"
-            >
-              <StarIcon size={14} filled={file.is_starred} className="mb-1 text-amber-500" />
-              <span>{file.is_starred ? "Starred" : "Star"}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onRename}
-              className="flex flex-col items-center justify-center p-2 rounded-[8px] border border-[#D8DDD4] bg-[#FAF9F5] hover:bg-white text-[11px] font-semibold text-[#18221E]"
-            >
-              <EditIcon size={14} className="mb-1 text-[#10251F]" />
-              <span>Rename</span>
-            </button>
-          </div>
-
-          {/* Metadata Table */}
-          <div className="space-y-2.5 pt-3 border-t border-[#D8DDD4] text-xs">
-            <div className="flex justify-between py-1 border-b border-[#FAF9F5]">
-              <span className="text-[#65706A]">Uploaded By</span>
-              <span className="font-semibold text-[#18221E]">
-                {file.uploader?.full_name || "Workspace Member"}
-              </span>
-            </div>
-
-            <div className="flex justify-between py-1 border-b border-[#FAF9F5]">
-              <span className="text-[#65706A]">Last Modified</span>
-              <span className="font-semibold text-[#18221E]">{file.last_modified}</span>
-            </div>
-
-            <div className="flex justify-between py-1 border-b border-[#FAF9F5]">
-              <span className="text-[#65706A]">Access Level</span>
-              <span className="font-semibold text-[#18221E] capitalize">{file.access_level || "Company"}</span>
-            </div>
-
-            {file.department_name && (
-              <div className="flex justify-between py-1 border-b border-[#FAF9F5]">
-                <span className="text-[#65706A]">Department</span>
-                <span className="font-semibold text-[#18221E]">{file.department_name}</span>
-              </div>
-            )}
-
-            {file.project_name && (
-              <div className="flex justify-between py-1 border-b border-[#FAF9F5]">
-                <span className="text-[#65706A]">Related Project</span>
-                <span className="font-semibold text-[#18221E]">{file.project_name}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Description */}
-          {file.description && (
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#65706A]">
-                Description
-              </span>
-              <p className="rounded-[8px] bg-[#FAF9F5] p-2.5 text-xs text-[#18221E] border border-[#D8DDD4]">
-                {file.description}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer Delete */}
-        <div className="pt-4 border-t border-[#D8DDD4]">
-          <button
-            type="button"
-            onClick={onDelete}
-            className="w-full flex items-center justify-center gap-2 rounded-[8px] border border-red-200 bg-red-50 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
-          >
-            <TrashIcon size={14} />
-            <span>Delete {file.is_folder ? "Folder" : "File"}</span>
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 // =========================================================================
 // FILE PREVIEW MODAL

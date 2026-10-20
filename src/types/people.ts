@@ -203,8 +203,8 @@ export interface UpdatePersonInput {
 }
 
 export interface AssignDepartmentInput {
-  departmentId: string;
+  departmentId?: string | null;
   workspaceId: string;
   userId: string;
-  jobTitle?: string;
+  jobTitle?: string | null;
 }

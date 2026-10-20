@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +13,13 @@ import {
   ChevronRight,
   Clock,
   Video,
+  FolderKanban,
+  CheckSquare,
+  Briefcase,
+  AlertCircle,
+  CalendarDays,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Project } from "@/types/project";
 import { Task } from "@/types/task";
 import { WorkspacePerson } from "@/types/people";
@@ -30,10 +37,7 @@ import {
   Button,
   IconButton,
   Avatar,
-  AvatarStack,
   Kbd,
-  Tabs,
-  StatusDot,
   Tooltip,
   EmptyLine,
 } from "@/components/app/ui";
@@ -131,7 +135,7 @@ export function OverviewDashboard({
   // Format first name
   const firstName = userName.trim().split(" ")[0] || "there";
 
-  // Today's formatted date string e.g. "Friday, Oct 9"
+  // Today's formatted date string e.g. "Tuesday, Oct 20"
   const formattedTodayDate = React.useMemo(() => {
     return new Date().toLocaleDateString("en-US", {
       weekday: "long",
@@ -262,6 +266,18 @@ export function OverviewDashboard({
     { id: "approvals", label: "Approvals", count: approvalTasks.length },
   ];
 
+  // Helper to format event time
+  const formatEventTime = (startTime?: string | null) => {
+    if (!startTime) return "Today";
+    if (startTime.includes("T") || startTime.includes("-")) {
+      const d = new Date(startTime);
+      return isNaN(d.getTime())
+        ? startTime
+        : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    }
+    return startTime;
+  };
+
   const renderTaskRow = (task: Task, isOverdue: boolean = false) => {
     const isCompleted = task.status === "completed";
     const projectColor = task.project?.color || "#7ED08A";
@@ -275,54 +291,61 @@ export function OverviewDashboard({
       : null;
 
     return (
-      <div
+      <motion.div
         key={task.id}
+        whileHover={{ x: 2 }}
+        whileTap={{ scale: 0.995 }}
+        transition={{ type: "spring", stiffness: 450, damping: 30 }}
         onClick={() => setSelectedTask(task)}
-        className="group relative flex h-11 items-center justify-between border-b border-hairline px-2 text-[13px] hover:bg-hover transition-colors duration-120 cursor-pointer select-none rounded-lg"
+        className="group relative flex h-11 items-center justify-between px-3 text-[13px] hover:bg-hover/60 transition-colors duration-120 cursor-pointer select-none"
       >
         {/* Left: Circle Checkbox + Title */}
         <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
           <button
             type="button"
             onClick={(e) => handleToggleTask(task, e)}
-            className={`h-4 w-4 rounded-full border transition-colors duration-120 flex items-center justify-center shrink-0 cursor-pointer ${
+            className={`h-4 w-4 rounded-full border transition-all duration-120 flex items-center justify-center shrink-0 cursor-pointer ${
               isCompleted
                 ? "bg-ink border-ink text-white"
-                : "border-hairline hover:border-ink bg-surface"
+                : "border-hairline hover:border-ink bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
             }`}
             aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
           >
-            {isCompleted && <Check className="h-2.5 w-2.5 stroke-[2]" />}
+            {isCompleted && <Check className="h-2.5 w-2.5 stroke-[2.5]" />}
           </button>
 
           <span
-            className={`truncate font-normal ${
-              isCompleted ? "text-ink-3 line-through" : "text-ink"
+            className={`truncate font-normal transition-colors ${
+              isCompleted ? "text-ink-3 line-through" : "text-ink font-medium"
             }`}
           >
             {task.title}
           </span>
         </div>
 
-        {/* Middle/Right: Project dot + Due date + Hover actions */}
-        <div className="flex items-center gap-4 shrink-0">
-          {/* Project Color Dot + Name */}
-          <div className="hidden sm:flex items-center gap-1.5 max-w-[120px] truncate">
+        {/* Middle/Right: Project tag + Due date badge + Hover actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Project Tag */}
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-hover/80 border border-hairline/60 max-w-[130px] truncate">
             <span
               className="h-1.5 w-1.5 rounded-full shrink-0"
               style={{ backgroundColor: projectColor }}
               aria-hidden="true"
             />
-            <span className="text-[12px] text-ink-2 truncate">{projectName}</span>
+            <span className="text-[11px] font-medium text-ink-2 truncate">{projectName}</span>
           </div>
 
-          {/* Due date */}
+          {/* Due date badge */}
           {formattedDue && (
             <span
-              className={`text-[12px] tabular-nums ${
-                isOverdue ? "text-status-overdue font-normal" : "text-ink-3"
-              }`}
+              className={cn(
+                "text-[11px] tabular-nums font-medium px-2 py-0.5 rounded-full inline-flex items-center gap-1",
+                isOverdue
+                  ? "bg-red-50 text-status-overdue border border-red-200/60"
+                  : "bg-hover/60 text-ink-3 border border-hairline/40"
+              )}
             >
+              {isOverdue && <Clock className="h-3 w-3 stroke-[2] text-status-overdue" />}
               {formattedDue}
             </span>
           )}
@@ -364,30 +387,48 @@ export function OverviewDashboard({
             </Tooltip>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-6 space-y-8 font-sans text-ink">
-      {/* 1. Header */}
-      <header className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 pb-2">
-        <div className="flex items-baseline flex-wrap">
-          <h1 className="text-[20px] font-semibold text-ink tracking-tight">
+    <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6 font-sans text-ink">
+      {/* 1. Header: Greeting & Quick Actions */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-1">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-[12px] font-medium bg-hover text-ink-2 border border-hairline select-none">
+              <Calendar className="h-3 w-3 stroke-[1.75]" />
+              {formattedTodayDate}
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-[24px] font-semibold text-ink tracking-tight">
             Good morning, {firstName}
           </h1>
-          <span className="text-[13px] font-normal text-ink-3 ml-3 tabular-nums select-none">
-            {formattedTodayDate}
-          </span>
+          <p className="text-xs sm:text-[13px] text-ink-2 mt-0.5">
+            {overdueTasks.length > 0 ? (
+              <>
+                You have <span className="text-status-overdue font-medium">{overdueTasks.length} overdue {overdueTasks.length === 1 ? "task" : "tasks"}</span> requiring your attention today.
+              </>
+            ) : tasks.filter((t) => t.status !== "completed").length > 0 ? (
+              <>
+                You have {tasks.filter((t) => t.status !== "completed").length} active tasks and {todayEvents.length} {todayEvents.length === 1 ? "meeting" : "meetings"} scheduled today.
+              </>
+            ) : (
+              <>You&apos;re all caught up on tasks for today.</>
+            )}
+          </p>
         </div>
 
-        {/* Right buttons: ONE black "New task" (with C hint) and ghost "New project" */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Action buttons */}
+        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-2.5 shrink-0 pt-1 sm:pt-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setCreateProjectModalOpen(true)}
+            className="w-full sm:w-auto justify-center gap-2 border border-hairline bg-surface hover:bg-hover text-ink text-xs h-9 sm:h-8"
           >
+            <FolderKanban className="h-3.5 w-3.5 stroke-[1.75] text-ink-2" />
             <span>New project</span>
           </Button>
 
@@ -395,218 +436,303 @@ export function OverviewDashboard({
             variant="primary"
             size="sm"
             onClick={() => setCreateTaskModalOpen(true)}
-            className="gap-2"
+            className="w-full sm:w-auto justify-center gap-2 bg-ink text-white hover:bg-ink/90 shadow-sm text-xs h-9 sm:h-8"
           >
-            <Plus className="h-3.5 w-3.5 stroke-[1.5]" />
+            <Plus className="h-3.5 w-3.5 stroke-[1.75]" />
             <span>New task</span>
-            <Kbd className="bg-white/20 text-white border-transparent">C</Kbd>
+            <Kbd className="hidden sm:inline-flex bg-white/20 text-white border-transparent text-[10px] px-1 py-0.2">C</Kbd>
           </Button>
         </div>
       </header>
 
-      {/* 2. Stat Strip: Single row, no card, no icons, 5 items separated by vertical hairlines */}
-      <section className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-hairline border-y border-hairline py-3">
-        {/* Item 1: Open tasks */}
+      {/* 2. Executive Metric Cards */}
+      <section className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
+        {/* Card 1: Open tasks */}
         <Link
           href="/app/my-tasks"
-          className="group block p-2 rounded-lg hover:bg-hover/60 transition-colors"
+          className="group block p-3.5 sm:p-4 rounded-xl border border-hairline bg-surface hover:border-ink/20 hover:shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition-all duration-150"
         >
-          <div className="flex items-baseline">
-            <span className="text-[24px] font-semibold text-ink tabular-nums leading-tight">
-              {openTasksCount || tasks.filter((t) => t.status !== "completed").length}
-            </span>
-            {overdueCount > 0 && (
-              <span className="text-[11px] text-status-overdue ml-2 tabular-nums">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-ink-2">Open tasks</span>
+            <div className="h-7 w-7 rounded-lg bg-hover/80 flex items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+              <CheckSquare className="h-3.5 w-3.5 stroke-[1.75]" />
+            </div>
+          </div>
+          <div className="text-[26px] font-semibold text-ink tabular-nums leading-tight mb-2">
+            {openTasksCount || tasks.filter((t) => t.status !== "completed").length}
+          </div>
+          <div className="flex items-center">
+            {overdueCount > 0 ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-status-overdue bg-red-50 px-2 py-0.5 rounded-full border border-red-200/50">
+                <span className="h-1.5 w-1.5 rounded-full bg-status-overdue animate-pulse" />
                 {overdueCount} overdue
               </span>
+            ) : (
+              <span className="text-[11px] text-ink-3">All on schedule</span>
             )}
           </div>
-          <p className="text-[12px] font-normal text-ink-2 mt-0.5">Open tasks</p>
         </Link>
 
-        {/* Item 2: Due this week */}
+        {/* Card 2: Due this week */}
         <Link
           href="/app/my-tasks"
-          className="group block p-2 rounded-lg hover:bg-hover/60 transition-colors"
+          className="group block p-3.5 sm:p-4 rounded-xl border border-hairline bg-surface hover:border-ink/20 hover:shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition-all duration-150"
         >
-          <div className="flex items-baseline">
-            <span className="text-[24px] font-semibold text-ink tabular-nums leading-tight">
-              {dueTodayCount || todayTasks.length}
-            </span>
-            {todayTasks.length > 0 && (
-              <span className="text-[11px] text-ink-3 ml-2 tabular-nums">
-                today
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-ink-2">Due this week</span>
+            <div className="h-7 w-7 rounded-lg bg-hover/80 flex items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+              <Clock className="h-3.5 w-3.5 stroke-[1.75]" />
+            </div>
+          </div>
+          <div className="text-[22px] sm:text-[26px] font-semibold text-ink tabular-nums leading-tight mb-2">
+            {dueTodayCount || todayTasks.length}
+          </div>
+          <div className="flex items-center">
+            {todayTasks.length > 0 ? (
+              <span className="text-[11px] font-medium text-ink-2 bg-hover px-2 py-0.5 rounded-full border border-hairline/60">
+                {todayTasks.length} due today
               </span>
+            ) : (
+              <span className="text-[11px] text-ink-3">Clear for today</span>
             )}
           </div>
-          <p className="text-[12px] font-normal text-ink-2 mt-0.5">Due this week</p>
         </Link>
 
-        {/* Item 3: Active projects */}
+        {/* Card 3: Active projects */}
         <Link
           href="/app/projects"
-          className="group block p-2 rounded-lg hover:bg-hover/60 transition-colors"
+          className="group block p-3.5 sm:p-4 rounded-xl border border-hairline bg-surface hover:border-ink/20 hover:shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition-all duration-150"
         >
-          <div className="flex items-baseline">
-            <span className="text-[24px] font-semibold text-ink tabular-nums leading-tight">
-              {projects.length}
-            </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-ink-2">Active projects</span>
+            <div className="h-7 w-7 rounded-lg bg-hover/80 flex items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+              <FolderKanban className="h-3.5 w-3.5 stroke-[1.75]" />
+            </div>
           </div>
-          <p className="text-[12px] font-normal text-ink-2 mt-0.5">Active projects</p>
+          <div className="text-[22px] sm:text-[26px] font-semibold text-ink tabular-nums leading-tight mb-2">
+            {projects.length}
+          </div>
+          <div className="flex items-center">
+            <span className="text-[11px] text-ink-3">Across company</span>
+          </div>
         </Link>
 
-        {/* Item 4: Open roles */}
+        {/* Card 4: Meetings today */}
         <Link
-          href="/app/people"
-          className="group block p-2 rounded-lg hover:bg-hover/60 transition-colors"
+          href="/app/calendar"
+          className="group block p-3.5 sm:p-4 rounded-xl border border-hairline bg-surface hover:border-ink/20 hover:shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition-all duration-150"
         >
-          <div className="flex items-baseline">
-            <span className="text-[24px] font-semibold text-ink tabular-nums leading-tight">
-              {openJobsCount || jobOpenings.length}
-            </span>
-            {candidates.length > 0 && (
-              <span className="text-[11px] text-ink-3 ml-2 tabular-nums">
-                +{candidates.length} candidates
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[12px] font-medium text-ink-2">Meetings today</span>
+            <div className="h-7 w-7 rounded-lg bg-hover/80 flex items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+              <Video className="h-3.5 w-3.5 stroke-[1.75]" />
+            </div>
+          </div>
+          <div className="text-[22px] sm:text-[26px] font-semibold text-ink tabular-nums leading-tight mb-2">
+            {todayEvents.length}
+          </div>
+          <div className="flex items-center">
+            {todayEvents.length > 0 ? (
+              <span className="text-[11px] font-medium text-ink-2 bg-hover px-2 py-0.5 rounded-full border border-hairline/60">
+                Next: {formatEventTime(todayEvents[0]?.start_time)}
               </span>
+            ) : (
+              <span className="text-[11px] text-ink-3">No meetings scheduled</span>
             )}
           </div>
-          <p className="text-[12px] font-normal text-ink-2 mt-0.5">Open roles</p>
         </Link>
 
-        {/* Item 5: Pending leave */}
+        {/* Card 5: Open roles & people (Span 2 cols on mobile, 1 col on desktop) */}
         <Link
-          href="/app/leave"
-          className="group block p-2 rounded-lg hover:bg-hover/60 transition-colors"
+          href="/app/people"
+          className="col-span-2 sm:col-span-1 group block p-3.5 sm:p-4 rounded-xl border border-hairline bg-surface hover:border-ink/20 hover:shadow-[0_2px_8px_rgba(0,0,0,0.03)] transition-all duration-150"
         >
-          <div className="flex items-baseline">
-            <span className="text-[24px] font-semibold text-ink tabular-nums leading-tight">
-              {pendingLeavesCount || pendingLeaves.length}
-            </span>
+          <div className="flex sm:block items-center justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <span className="text-[12px] font-medium text-ink-2">Open roles</span>
+                <div className="hidden sm:flex h-7 w-7 rounded-lg bg-hover/80 items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+                  <Briefcase className="h-3.5 w-3.5 stroke-[1.75]" />
+                </div>
+              </div>
+              <div className="text-[22px] sm:text-[26px] font-semibold text-ink tabular-nums leading-tight mb-0 sm:mb-2">
+                {openJobsCount || jobOpenings.length}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="sm:hidden h-7 w-7 rounded-lg bg-hover/80 flex items-center justify-center text-ink-2 group-hover:text-ink transition-colors">
+                <Briefcase className="h-3.5 w-3.5 stroke-[1.75]" />
+              </div>
+              {candidates.length > 0 ? (
+                <span className="text-[11px] text-ink-2 bg-hover px-2 py-0.5 rounded-full border border-hairline/60">
+                  +{candidates.length} candidates
+                </span>
+              ) : (
+                <span className="text-[11px] text-ink-3">Hiring overview</span>
+              )}
+            </div>
           </div>
-          <p className="text-[12px] font-normal text-ink-2 mt-0.5">Pending leave</p>
         </Link>
       </section>
 
-      {/* 3. Two columns below (65% / 35%), separated by vertical hairline */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-0 pt-2">
-        {/* Left Column (65%): "My tasks" with Tabs */}
-        <div className="lg:col-span-8 lg:pr-8 lg:border-r lg:border-hairline space-y-4">
-          <div className="flex items-center justify-between pb-1">
-            <h2 className="text-[14px] font-semibold text-ink">My tasks</h2>
-          </div>
+      {/* 3. Main Workspace Grid: Two Columns (65% / 35%) */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-1">
+        {/* Left Column (65%): Focus Area with Segmented Tabs */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Segmented Pill Tabs Header */}
+          <div className="flex items-center justify-between gap-2 pb-1 overflow-x-auto scrollbar-hide">
+            <div className="inline-flex items-center gap-1 p-1 bg-hover/80 rounded-xl border border-hairline shrink-0">
+              {tabsConfig.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 select-none",
+                      isActive
+                        ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)] border border-black/[0.04]"
+                        : "text-ink-2 hover:text-ink hover:bg-black/[0.03]"
+                    )}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={cn(
+                        "text-[11px] px-1.5 py-0.2 rounded-full tabular-nums",
+                        isActive
+                          ? "bg-hover text-ink font-semibold"
+                          : "bg-black/[0.04] text-ink-3"
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Underline Tabs: Tasks / Projects / Approvals */}
-          <Tabs
-            tabs={tabsConfig}
-            activeId={activeTab}
-            onChange={setActiveTab}
-          />
+            <button
+              type="button"
+              onClick={() => setCreateTaskModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-2 hover:text-ink hover:bg-hover px-2.5 py-1.5 rounded-lg transition-colors border border-hairline bg-surface shadow-xs"
+            >
+              <Plus className="h-3.5 w-3.5 stroke-[1.75]" />
+              <span>Add task</span>
+            </button>
+          </div>
 
           {/* Tab 1: Tasks list grouped by Overdue, Today, Upcoming */}
           {activeTab === "tasks" && (
-            <div className="space-y-6 pt-2">
+            <div className="space-y-4 pt-1">
               {/* Group 1: Overdue */}
               {overdueTasks.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between px-2 pb-1">
-                    <span className="text-[12px] font-medium text-status-overdue">
+                <div className="rounded-xl border border-red-200/80 bg-surface overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-red-50/50 border-b border-red-100">
+                    <span className="text-[12px] font-medium text-red-700 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 stroke-[2] text-red-600" />
                       Overdue ({overdueTasks.length})
                     </span>
+                    <span className="text-[11px] text-red-600/80">Requires immediate attention</span>
                   </div>
-                  <div>
+                  <div className="divide-y divide-hairline">
                     {overdueTasks.map((task) => renderTaskRow(task, true))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCreateTaskModalOpen(true)}
-                    className="h-8 flex items-center gap-2 px-2 text-[12px] text-ink-3 hover:text-ink hover:bg-hover/60 rounded-lg cursor-pointer transition-colors duration-120 w-full"
-                  >
-                    <Plus className="h-3 w-3 stroke-[1.5]" />
-                    <span>Add task</span>
-                  </button>
                 </div>
               )}
 
               {/* Group 2: Today */}
               {todayTasks.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between px-2 pb-1">
-                    <span className="text-[12px] font-medium text-ink-2">
-                      Today ({todayTasks.length})
+                <div className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-hover/40 border-b border-hairline">
+                    <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 stroke-[1.75] text-ink-2" />
+                      Due Today ({todayTasks.length})
                     </span>
                   </div>
-                  <div>
+                  <div className="divide-y divide-hairline">
                     {todayTasks.map((task) => renderTaskRow(task, false))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCreateTaskModalOpen(true)}
-                    className="h-8 flex items-center gap-2 px-2 text-[12px] text-ink-3 hover:text-ink hover:bg-hover/60 rounded-lg cursor-pointer transition-colors duration-120 w-full"
-                  >
-                    <Plus className="h-3 w-3 stroke-[1.5]" />
-                    <span>Add task</span>
-                  </button>
                 </div>
               )}
 
               {/* Group 3: Upcoming */}
               {upcomingTasks.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between px-2 pb-1">
-                    <span className="text-[12px] font-medium text-ink-2">
+                <div className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-hover/40 border-b border-hairline">
+                    <span className="text-[12px] font-medium text-ink flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 stroke-[1.75] text-ink-2" />
                       Upcoming ({upcomingTasks.length})
                     </span>
                   </div>
-                  <div>
+                  <div className="divide-y divide-hairline">
                     {upcomingTasks.map((task) => renderTaskRow(task, false))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCreateTaskModalOpen(true)}
-                    className="h-8 flex items-center gap-2 px-2 text-[12px] text-ink-3 hover:text-ink hover:bg-hover/60 rounded-lg cursor-pointer transition-colors duration-120 w-full"
-                  >
-                    <Plus className="h-3 w-3 stroke-[1.5]" />
-                    <span>Add task</span>
-                  </button>
                 </div>
               )}
+
+              {/* Quick Add Row Button */}
+              <button
+                type="button"
+                onClick={() => setCreateTaskModalOpen(true)}
+                className="w-full h-10 flex items-center justify-center gap-2 border border-dashed border-hairline hover:border-ink/30 rounded-xl text-[13px] text-ink-2 hover:text-ink hover:bg-hover/40 transition-colors"
+              >
+                <Plus className="h-4 w-4 stroke-[1.75]" />
+                <span>Add a task to your list...</span>
+              </button>
 
               {/* If no tasks in any group */}
               {overdueTasks.length === 0 &&
                 todayTasks.length === 0 &&
                 upcomingTasks.length === 0 && (
-                  <EmptyLine
-                    message="No open tasks right now."
-                    actionText="Create one"
-                    onAction={() => setCreateTaskModalOpen(true)}
-                  />
+                  <div className="rounded-xl border border-hairline bg-surface p-8 text-center space-y-3">
+                    <div className="h-10 w-10 rounded-full bg-hover flex items-center justify-center mx-auto text-ink-2">
+                      <Check className="h-5 w-5 stroke-[2]" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-ink">No open tasks right now</p>
+                      <p className="text-[12px] text-ink-3 mt-0.5">You&apos;re completely clear. Create a new task to get started.</p>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setCreateTaskModalOpen(true)}
+                      className="mx-auto"
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[1.75] mr-1.5" />
+                      Create task
+                    </Button>
+                  </div>
                 )}
             </div>
           )}
 
-          {/* Tab 2: Projects */}
+          {/* Tab 2: Projects Directory */}
           {activeTab === "projects" && (
-            <div className="space-y-1 pt-2">
+            <div className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)] divide-y divide-hairline">
               {projects.length > 0 ? (
                 projects.map((proj) => (
                   <div
                     key={proj.id}
                     onMouseEnter={() => router.prefetch(`/app/projects/${proj.id}`)}
                     onClick={() => router.push(`/app/projects/${proj.id}`)}
-                    className="flex h-11 items-center justify-between border-b border-hairline px-2 text-[13px] hover:bg-hover transition-colors duration-120 cursor-pointer rounded-lg"
+                    className="flex h-12 items-center justify-between px-3.5 text-[13px] hover:bg-hover/60 transition-colors duration-120 cursor-pointer"
                   >
-                    <div className="flex items-center gap-2.5 truncate">
+                    <div className="flex items-center gap-3 truncate">
                       <span
-                        className="h-2 w-2 rounded-full shrink-0"
+                        className="h-2.5 w-2.5 rounded-full shrink-0 shadow-xs"
                         style={{ backgroundColor: proj.color || "#3B63F0" }}
                       />
-                      <span className="text-ink font-normal truncate">
+                      <span className="text-ink font-medium truncate">
                         {proj.name}
                       </span>
                     </div>
-                    <span className="text-[12px] text-ink-3">
-                      {proj.status || "Active"}
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[11px] font-medium text-ink-2 px-2 py-0.5 rounded-full bg-hover border border-hairline/60">
+                        {proj.status || "Active"}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 stroke-[1.5] text-ink-3" />
+                    </div>
                   </div>
                 ))
               ) : (
@@ -621,110 +747,167 @@ export function OverviewDashboard({
 
           {/* Tab 3: Approvals */}
           {activeTab === "approvals" && (
-            <div className="space-y-1 pt-2">
+            <div className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)] divide-y divide-hairline">
               {approvalTasks.length > 0 ? (
                 approvalTasks.map((task) => renderTaskRow(task, false))
               ) : (
                 <EmptyLine
-                  message="No items awaiting approval."
+                  message="No items awaiting approval right now."
                 />
               )}
             </div>
           )}
         </div>
 
-        {/* Right Column (35%): "Up next" & optional "Needs attention" */}
-        <div className="lg:col-span-4 lg:pl-8 space-y-6 pt-6 lg:pt-0">
-          {/* Up next: Today's meetings as simple vertical timeline */}
-          <div className="space-y-3">
-            <h2 className="text-[14px] font-semibold text-ink">Up next</h2>
+        {/* Right Column (35%): Today's Schedule & Focus */}
+        <div className="lg:col-span-4 space-y-4">
+          {/* Up next: Today's Schedule */}
+          <div className="rounded-xl border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[13px] font-semibold text-ink flex items-center gap-1.5">
+                <Video className="h-3.5 w-3.5 stroke-[1.75] text-ink-2" />
+                Up next
+              </h2>
+              <Link
+                href="/app/calendar"
+                className="text-[11px] font-medium text-ink-2 hover:text-ink transition-colors inline-flex items-center gap-0.5"
+              >
+                <span>Calendar</span>
+                <ChevronRight className="h-3 w-3 stroke-[1.5]" />
+              </Link>
+            </div>
 
             {todayEvents.length > 0 ? (
-              <div className="space-y-2.5">
-                {todayEvents.map((evt) => {
-                  const time = evt.start_time
-                    ? evt.start_time.includes("T") || evt.start_time.includes("-")
-                      ? (() => {
-                          const d = new Date(evt.start_time);
-                          return isNaN(d.getTime())
-                            ? evt.start_time
-                            : d.toLocaleTimeString("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                              });
-                        })()
-                      : evt.start_time
-                    : "Today";
+              <div className="space-y-2 pt-1">
+                {todayEvents.map((evt, idx) => {
+                  const time = formatEventTime(evt.start_time);
+                  const isFirst = idx === 0;
 
                   return (
                     <div
                       key={evt.id}
                       onMouseEnter={() => router.prefetch("/app/calendar")}
                       onClick={() => router.push("/app/calendar")}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-hover transition-colors duration-120 cursor-pointer"
+                      className={cn(
+                        "p-2.5 rounded-lg transition-all duration-120 cursor-pointer",
+                        isFirst
+                          ? "bg-hover/80 border border-hairline shadow-xs"
+                          : "hover:bg-hover/60 border border-transparent"
+                      )}
                     >
-                      <span className="text-[12px] tabular-nums text-ink-3 w-14 shrink-0 font-normal">
-                        {time}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-normal text-ink truncate">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-semibold tabular-nums text-ink-2">
+                          {time}
+                        </span>
+                        {isFirst && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-full border border-emerald-200/60">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Next up
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[13px] font-medium text-ink truncate">
                           {evt.title}
                         </p>
+                        <Video className="h-3.5 w-3.5 stroke-[1.5] text-ink-3 shrink-0" />
                       </div>
-                      <Video className="h-3.5 w-3.5 stroke-[1.5] text-ink-3 shrink-0" />
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <EmptyLine
-                message="No upcoming events today."
-                actionText="Schedule one"
-                onAction={() => router.push("/app/calendar")}
-              />
+              <div className="py-4 text-center">
+                <p className="text-[12px] text-ink-3">No upcoming events scheduled today</p>
+                <Link
+                  href="/app/calendar"
+                  className="text-[11px] font-medium text-ink hover:underline inline-block mt-1"
+                >
+                  Schedule meeting →
+                </Link>
+              </div>
             )}
           </div>
 
-          {/* Needs attention: rendered ONLY if there are items */}
+          {/* Needs attention: rendered ONLY if there are attention items */}
           {attentionItems.length > 0 && (
-            <div className="space-y-3 pt-4 border-t border-hairline">
-              <h2 className="text-[14px] font-semibold text-ink">Needs attention</h2>
+            <div className="rounded-xl border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-3">
+              <h2 className="text-[13px] font-semibold text-ink flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 stroke-[2] text-amber-600" />
+                Needs attention
+              </h2>
 
               <div className="space-y-2">
                 {attentionItems.map((item) => (
                   <Link
                     key={item.id}
                     href={item.href}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-hairline bg-surface hover:bg-hover transition-colors duration-120 text-[13px]"
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-hairline bg-hover/40 hover:bg-hover transition-colors duration-120 text-[13px]"
                   >
                     <div className="space-y-0.5 min-w-0 pr-2">
-                      <p className="font-normal text-ink truncate">{item.title}</p>
-                      <span className="text-[11px] text-ink-3">{item.label}</span>
+                      <p className="font-medium text-ink truncate text-[12px]">{item.title}</p>
+                      <span className="text-[11px] text-status-overdue font-normal">{item.label}</span>
                     </div>
-                    <ChevronRight className="h-4 w-4 stroke-[1.5] text-ink-3 shrink-0" />
+                    <ChevronRight className="h-3.5 w-3.5 stroke-[1.5] text-ink-3 shrink-0" />
                   </Link>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Workspace Quick Links */}
+          <div className="rounded-xl border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-2.5">
+            <h2 className="text-[13px] font-semibold text-ink">Quick shortcuts</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/app/my-tasks"
+                className="flex items-center gap-2 p-2 rounded-lg bg-hover/50 hover:bg-hover transition-colors text-[12px] font-medium text-ink-2 hover:text-ink border border-hairline/60"
+              >
+                <CheckSquare className="h-3.5 w-3.5 stroke-[1.75]" />
+                <span className="truncate">My tasks</span>
+              </Link>
+              <Link
+                href="/app/projects"
+                className="flex items-center gap-2 p-2 rounded-lg bg-hover/50 hover:bg-hover transition-colors text-[12px] font-medium text-ink-2 hover:text-ink border border-hairline/60"
+              >
+                <FolderKanban className="h-3.5 w-3.5 stroke-[1.75]" />
+                <span className="truncate">Projects</span>
+              </Link>
+              <Link
+                href="/app/calendar"
+                className="flex items-center gap-2 p-2 rounded-lg bg-hover/50 hover:bg-hover transition-colors text-[12px] font-medium text-ink-2 hover:text-ink border border-hairline/60"
+              >
+                <Calendar className="h-3.5 w-3.5 stroke-[1.75]" />
+                <span className="truncate">Calendar</span>
+              </Link>
+              <Link
+                href="/app/people"
+                className="flex items-center gap-2 p-2 rounded-lg bg-hover/50 hover:bg-hover transition-colors text-[12px] font-medium text-ink-2 hover:text-ink border border-hairline/60"
+              >
+                <Briefcase className="h-3.5 w-3.5 stroke-[1.75]" />
+                <span className="truncate">Directory</span>
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* 4. Bottom: "Activity" as a compact feed (6 items with View all) */}
-      <section className="pt-6 border-t border-hairline space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-ink">Activity</h2>
+      {/* 4. Bottom: Activity Feed */}
+      <section className="rounded-xl border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-3">
+        <div className="flex items-center justify-between pb-1">
+          <h2 className="text-[13px] font-semibold text-ink">Recent team activity</h2>
           <Link
             href="/app/my-tasks"
-            className="text-[12px] font-medium text-ink-2 hover:text-ink transition-colors"
+            className="text-[11px] font-medium text-ink-2 hover:text-ink transition-colors inline-flex items-center gap-0.5"
           >
-            View all
+            <span>View all</span>
+            <ChevronRight className="h-3 w-3 stroke-[1.5]" />
           </Link>
         </div>
 
         {recentActivities && recentActivities.length > 0 ? (
           <div className="divide-y divide-hairline">
-            {recentActivities.slice(0, 6).map((act) => {
+            {recentActivities.slice(0, 5).map((act) => {
               const actorName = act.actorName || "Team member";
               const timeAgo = act.createdAt
                 ? new Date(act.createdAt).toLocaleDateString("en-US", {
@@ -738,11 +921,11 @@ export function OverviewDashboard({
                   key={act.id}
                   className="flex items-center gap-3 py-2.5 text-[13px]"
                 >
-                  <Avatar name={actorName} size={20} accent="blue" />
-                  <span className="text-ink truncate font-normal">
+                  <Avatar name={actorName} size={24} accent="blue" />
+                  <span className="text-ink truncate font-normal text-[13px]">
                     {formatActivityText(act)}
                   </span>
-                  <span className="text-[12px] tabular-nums text-ink-3 shrink-0 ml-auto pl-3">
+                  <span className="text-[11px] tabular-nums text-ink-3 shrink-0 ml-auto pl-3">
                     {timeAgo}
                   </span>
                 </div>
