@@ -60,16 +60,18 @@ Create `.env.local` using `.env.example` as a template:
 |---|---|---|
 | `NEXT_PUBLIC_SITE_URL` | Public marketing site URL (`https://zambic.com`) | Client & Server |
 | `NEXT_PUBLIC_APP_URL` | Application dashboard URL (`https://app.zambic.com`) | Client & Server |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL | Client & Server |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous public key | Client & Server |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (admin tasks) | Server-Only |
+| `DATABASE_URL` | Neon PostgreSQL pooled connection string | Server-Only |
+| `NEON_DATABASE_URL` | Neon PostgreSQL direct connection string | Server-Only |
+| `SESSION_SECRET` | 32-character minimum secret for HMAC session signing | Server-Only |
+| `NEON_AUTH_URL` | Hosted Neon Auth endpoint URL | Client & Server |
 | `CLOUDFLARE_R2_ACCOUNT_ID` | Cloudflare account ID | Server-Only |
-| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket name | Server-Only |
+| `CLOUDFLARE_R2_BUCKET_NAME` | R2 bucket name (`zambic`) | Server-Only |
+| `CLOUDFLARE_R2_ENDPOINT` | R2 S3 endpoint URL | Server-Only |
 | `CLOUDFLARE_R2_ACCESS_KEY_ID` | R2 S3 access key ID | Server-Only |
 | `CLOUDFLARE_R2_SECRET_ACCESS_KEY`| R2 S3 secret access key | Server-Only |
-| `CLOUDFLARE_AI_TOKEN` | Cloudflare Workers AI API token | Server-Only |
+| `OPENROUTER_API_KEY` | OpenRouter API Key for Llama 3.3 / Claude LLMs | Server-Only |
 | `RESEND_API_KEY` | Resend API key for transactional emails | Server-Only |
-| `RESEND_FROM_EMAIL` | Sender address (e.g. `Zambic <notifications@app.zambic.com>`) | Server-Only |
+| `RESEND_FROM_EMAIL` | Sender address (e.g. `Zambic <notifications@zambic.com>`) | Server-Only |
 
 ---
 
@@ -84,10 +86,7 @@ npm start
 ```
 
 ### Deploying to Vercel
-1. Create a new Vercel project pointing to the `zambic-dash` (or `zambic/app`) repository.
+1. Point your Vercel project to the `zambic/app` repository (`main` branch).
 2. Set Framework Preset: `Next.js`.
 3. Configure the environment variables listed in `.env.example`.
 4. Under Project Settings -> Domains, assign `app.zambic.com`.
-5. Ensure Supabase Auth redirect URLs in your Supabase dashboard include:
-   - `https://app.zambic.com/auth/callback`
-   - `https://app.zambic.com/reset-password`
